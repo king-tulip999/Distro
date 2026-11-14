@@ -49,7 +49,7 @@ Two separate apps: take one or both. Neither needs the other.
 
 ### iRacing Overlay
 
-19 widgets: relative, standings, fuel and strategy, delta, radar, track map, inputs, tires, weather and more. Drag them around in the car with `Ctrl+Alt+E`, save layouts per car or track, or add any widget to OBS as a browser source.
+19 widgets: relative, standings, fuel and strategy, delta, radar, track map, inputs, tires, weather and more. Drag them around in the car with `Ctrl+Alt+E`, save layouts per car or track, add any widget to OBS as a browser source, or show them in your VR headset.
 
 <details>
 <summary><b>See every widget</b></summary>
@@ -59,6 +59,7 @@ Two separate apps: take one or both. Neither needs the other.
 - **Pit exit:** where a stop right now would put you, learned per track and car.
 - **Strategy:** fuel saving to skip a stop, undercut and overcut targets.
 - **Practice goals, notes per corner, track limits and a race result card.**
+- **VR:** any widget can show in your headset through SteamVR or OpenXR, fixed in the cockpit or following your head. Set its position, distance and width per widget, or match where it sits on the monitor.
 
 **Widget editor:** click any part of a widget to change it, drag columns into your own order, and pick when it shows.
 
@@ -225,7 +226,9 @@ The exes aren't code-signed (certificates cost money every year). To check your 
 <summary><b>Is it safe with anti-cheat?</b></summary>
 <br>
 
-Nothing is injected into games: the overlays are separate click-through windows. They show over borderless and windowed games, not exclusive fullscreen.
+On a monitor nothing is injected into games: the overlays are separate click-through windows. They show over borderless and windowed games, not exclusive fullscreen.
+
+In VR, widgets are SteamVR overlays when SteamVR is running. With any other OpenXR runtime, Velocita registers a standard OpenXR API layer that iRacing loads to draw them. The layer is only registered while **VR widgets** is on, and only acts in iRacing.
 </details>
 
 <details>
