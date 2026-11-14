@@ -11,7 +11,6 @@ internal static class FuelEditor
         Groups = new HudGroup[]
         {
             new("look", "Title and edges", HudTab.Layout, true, O("title"), O("statusEdge")),
-            new("arrange", "Columns", HudTab.Layout, true, O("columns") with { Label = "Side by side" }),
             new("rates", "Rates", HudTab.Layout, true, O("avgLaps") with { ShowIf = o => Has("parts", "grid")(o) && Has("gridRows", "avgN")(o) }),
             new("parts", "Sections", HudTab.Content, true, new PickerSetting("parts", NoCategories)),
             new("shows", "In the sections", HudTab.Content, true,
@@ -26,8 +25,7 @@ internal static class FuelEditor
                     new("Stops", "add", "stops", "window", "pitexit"),
                 }) { ShowIf = Has("parts", "figures") },
                 new PickerSetting("cols", NoCategories) { ShowIf = Has("parts", "table") },
-                new PickerSetting("rows", NoCategories) { ShowIf = Has("parts", "table") },
-                O("exitLook") with { ShowIf = Has("parts", "undercut") }),
+                new PickerSetting("rows", NoCategories) { ShowIf = Has("parts", "table") }),
         },
         Regions = new Dictionary<string, string> { ["title"] = "title" },
     };

@@ -57,7 +57,7 @@ Two separate apps: take one or both. Neither needs the other.
 <img src="screenshots/all-overlays.png" alt="All iRacing Overlay widgets">
 
 - **Pit exit:** where a stop right now would put you, learned per track and car.
-- **Strategy:** fuel saving to skip a stop, undercut and overcut targets.
+- **Strategy:** fuel saving to skip a stop.
 - **Practice goals, notes per corner, track limits and a race result card.**
 - **VR:** any widget can show in your headset through SteamVR or OpenXR, fixed in the cockpit or following your head. Set its position, distance and width per widget, or match where it sits on the monitor.
 

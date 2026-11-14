@@ -101,18 +101,14 @@ internal static class HudSheet
 
             var fuel = HudCatalog.Find("fuel")!;
             Save(fuel, fuel.W, 150, Path.Combine(dir, "fuel-pitexit.png"), 1, ("parts", "header,figures"), ("head", "togo,pitexit,stops,add"), ("top", "pitexit,level,laps"));
-            Save(fuel, fuel.W, 150, Path.Combine(dir, "fuel-save.png"), 1, ("parts", "header,save,undercut"));
+            Save(fuel, fuel.W, 150, Path.Combine(dir, "fuel-save.png"), 1, ("parts", "header,save"));
             var everyFuel = new[]
             {
-                ("parts", "header,gauge,plan,save,figures,undercut,table,grid"), ("head", "togo,nextpit,stops,pitby,add,pitexit,level"),
+                ("parts", "header,gauge,plan,save,figures,table,grid"), ("head", "togo,nextpit,stops,pitby,add,pitexit,level"),
                 ("gridRows", "curr,avg,max,min,last"), ("top", "level,perlap,togo,laps,add,stops,window,pitexit,atflag,surplus,tofinish,max,last,time"),
             };
-            foreach (var (look, columns) in new[] { ("full", "1"), ("full", "2"), ("full", "3"), ("compact", "3") })
-            {
-                var options = everyFuel.Append(("columns", columns)).Append(("exitLook", look)).ToArray();
-                var size = Fitted(fuel, options);
-                Save(fuel, size.Width, size.Height, Path.Combine(dir, $"fuel-every-{look}-{columns}col.png"), 1, options);
-            }
+            var everySize = Fitted(fuel, everyFuel);
+            Save(fuel, everySize.Width, everySize.Height, Path.Combine(dir, "fuel-every.png"), 1, everyFuel);
 
             SizeF Fitted(HudWidgetDef def, (string Key, string Value)[] options)
             {

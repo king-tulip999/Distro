@@ -15,8 +15,8 @@ internal static class HudCatalog
         new("timing", "Lap timing and delta", "Live delta to your best, the session best or your optimal lap, predicted lap, lap times and sectors.", 380, 150, () => new TimingWidget())
             { MinW = 200, MinH = 70, DefaultHz = 20, Options = TimingWidget.Options, Editor = Editors.TimingEditor.Def,
               Limits = "Deltas are iRacing's own. Sector times are measured by Velocita at iRacing's sector lines. iRacing doesn't publish whether a lap counts, so “clean” means no incident points and no pit road." },
-        new("fuel", "Fuel and strategy", "Laps to go, the next pit lap and stops left; the tank with the laps it lasts; a grid of this lap / average / most / least with per lap, laps, refuel and what's left at the flag; your recent laps' use; the plan's state.", 320, 300, () => new FuelWidget())
-            { MinW = 220, MinH = 120, DefaultHz = 4, Options = FuelWidget.Options, Editor = Editors.FuelEditor.Def,
+        new("fuel", "Fuel and strategy", "Laps to go, the next pit lap and stops left; the tank with the laps it lasts; a grid of this lap / average / most / least with per lap, laps, refuel and what's left at the flag; your recent laps' use; the plan's state.", 450, 300, () => new FuelWidget())
+            { MinW = FuelWidget.WidgetMin, MinH = 120, DefaultHz = 4, Options = FuelWidget.Options, Editor = Editors.FuelEditor.Def,
               Limits = "Per-lap use is measured from your clean, green laps. Everything to the flag is an estimate." },
         new("session", "Session", "Session, time or laps left, lap, positions, phase, temperatures and progress.", 340, 120, () => new SessionWidget())
             { MinW = 140, MinH = 60, DefaultHz = 2, Options = SessionWidget.Options, Editor = Editors.SessionEditor.Def },

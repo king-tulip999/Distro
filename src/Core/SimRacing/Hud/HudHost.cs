@@ -64,6 +64,7 @@ internal sealed class HudHost : IDisposable
         public bool Empty;
         public float BandPx;
         public bool BandTop;
+        public bool DragBandTop;
         public SizeF Fit;
     }
 
@@ -777,7 +778,7 @@ internal sealed class HudHost : IDisposable
     private void OnDragging(HudWindow window, RectangleF proposed, bool resizing)
     {
         if (!_slots.TryGetValue((string)window.Tag!, out var s)) return;
-        if (_dragging != s) { RecordUndo(); _dragging = s; }
+        if (_dragging != s) { RecordUndo(); _dragging = s; s.DragBandTop = s.BandTop; }
         var monitor = HudGeometry.MonitorAt(new PointF(proposed.X + proposed.Width / 2, proposed.Y + proposed.Height / 2), Monitors);
         var fit = s.Fit.Width > 0 ? s.Fit : SizeOf(s.Config, Race);
         bool snap = Settings.Snap && !HudWindow.Free;
@@ -798,11 +799,13 @@ internal sealed class HudHost : IDisposable
             Draw(s, Race.Frame);
             return;
         }
+        var moved = new RectangleF(proposed.X, s.DragBandTop ? proposed.Y + s.BandPx : proposed.Y, proposed.Width, Math.Max(1, proposed.Height - s.BandPx));
         if (snap)
-            proposed = HudGeometry.Snap(proposed, Others(s, monitor), monitor.Bounds, Settings.GridSize * monitor.Scale, 10 * monitor.Scale, false);
-        proposed = HudGeometry.Clamp(proposed, monitor.Bounds);
-        window.Rect = proposed;
-        HudGeometry.Store(s.Config, Content(s, proposed), monitor, fit);
+            moved = HudGeometry.Snap(moved, Others(s, monitor), monitor.Bounds, Settings.GridSize * monitor.Scale, 10 * monitor.Scale, false);
+        moved = HudGeometry.Clamp(moved, monitor.Bounds);
+        s.BandTop = moved.Bottom + s.BandPx > monitor.Bounds.Bottom + 0.5f;
+        window.Rect = new RectangleF(moved.X, s.BandTop ? moved.Y - s.BandPx : moved.Y, moved.Width, moved.Height + s.BandPx);
+        HudGeometry.Store(s.Config, moved, monitor, fit);
         s.Dirty = true;
         Draw(s, Race.Frame);
     }
@@ -811,9 +814,9 @@ internal sealed class HudHost : IDisposable
     {
         if (!_slots.TryGetValue((string)window.Tag!, out var s)) return;
         var monitor = HudGeometry.MonitorAt(new PointF(window.Rect.X + window.Rect.Width / 2, window.Rect.Y + window.Rect.Height / 2), Monitors);
-        var rect = window.Rect;
+        var rect = Content(s, window.Rect);
         if (!HudWindow.Free) rect = HudGeometry.Resolve(rect, Others(s, monitor).ToList(), monitor.Bounds);
-        HudGeometry.Store(s.Config, Content(s, rect), monitor, s.Fit.Width > 0 ? s.Fit : SizeOf(s.Config, Race));
+        HudGeometry.Store(s.Config, rect, monitor, s.Fit.Width > 0 ? s.Fit : SizeOf(s.Config, Race));
         _dragging = null;
         s.Dirty = true;
         Save();
@@ -826,7 +829,7 @@ internal sealed class HudHost : IDisposable
 
     private IEnumerable<RectangleF> Others(Slot s, HudMonitor monitor) =>
         _slots.Values.Where(o => o != s && o.Window?.Visible == true && HudGeometry.MonitorFor(o.Config.Monitor, Monitors).Id == monitor.Id)
-            .Select(o => o.Window!.Rect);
+            .Select(o => Content(o, o.Window!.Rect));
 
     private void OnClicked(HudWindow window, PointF at)
     {

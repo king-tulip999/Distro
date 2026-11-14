@@ -22,7 +22,7 @@ internal static class HudPresets
             {
                 W("standings", HudAnchor.TopLeft, 0, 20, 560, 540),
                 W("timing", HudAnchor.BottomRight, -452, -8, 380, 140),
-                W("fuel", HudAnchor.BottomRight, 0, -8, 440, 280),
+                W("fuel", HudAnchor.BottomRight, 0, -8, 450, 280),
                 W("relative", HudAnchor.BottomLeft, 20, -28, 500, 300),
             },
         },

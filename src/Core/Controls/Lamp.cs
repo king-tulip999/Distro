@@ -41,7 +41,8 @@ public class Lamp : Border
         };
         _tick.SetResourceReference(Path.DataProperty, "I.Tick");
         _tick.SetResourceReference(Shape.StrokeProperty, "OnAccent");
-        _lit = new Border { Child = _tick };
+        CornerRadius = Core.Theme.ThemeManager.Round(5);
+        _lit = new Border { Child = _tick, CornerRadius = Core.Theme.ThemeManager.Round(3) };
         _lit.SetResourceReference(BackgroundProperty, LitKey);
         Child = _lit;
         _lit.Opacity = 0;

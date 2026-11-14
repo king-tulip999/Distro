@@ -185,6 +185,7 @@ internal sealed partial class RaceHudWidgets
         _panel = Hairline.Frame(new Border
         {
             Width = _panelWidth,
+            CornerRadius = ThemeManager.CardCorner,
             Child = dock,
         });
         _panel.SetResourceReference(Border.BackgroundProperty, "Panel");
@@ -476,10 +477,17 @@ internal sealed partial class RaceHudWidgets
                 toggle.ToolTip = "Everything is shown";
                 ToolTipService.SetShowOnDisabled(toggle, true);
             }
+            void ShowOpen(bool isOpen)
+            {
+                toggle.Content = isOpen ? Ui.IconLabel("I.Tick", "Done adding") : Ui.IconLabel("I.Plus", label);
+                Ui.SetToggled(toggle, isOpen);
+            }
+            if (open) ShowOpen(true);
             toggle.Click += (_, _) =>
             {
                 bool now = laneAdd.Visibility != Visibility.Visible;
                 laneAdd.Visibility = now ? Visibility.Visible : Visibility.Collapsed;
+                ShowOpen(now);
                 if (now) _addsOpen.Add(openKey); else _addsOpen.Remove(openKey);
                 _well?.Dispatcher.BeginInvoke(PlacePanel, System.Windows.Threading.DispatcherPriority.Loaded);
             };

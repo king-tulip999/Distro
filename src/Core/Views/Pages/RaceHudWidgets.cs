@@ -687,11 +687,12 @@ internal sealed partial class RaceHudWidgets
             string note = (race.Frame.Simulated ? "Sample data (no live session)" : "Live from iRacing") + $" · {size}";
             if (!TextCase.Plain(_previewNote!.Text).Equals(note, StringComparison.OrdinalIgnoreCase)) _previewNote.Text = note;
             DrawHighlight();
-            if (_laidSize != (laid.Width, laid.Height, scale))
+            float drawnWidth = (float)Math.Max(laid.Width, _preview.Width / scale), drawnHeight = (float)Math.Max(laid.Height, _preview.Height / scale);
+            if (_laidSize != (drawnWidth, drawnHeight, scale))
             {
-                _laidSize = (laid.Width, laid.Height, scale);
-                _laidWidth = laid.Width;
-                _laidHeight = laid.Height;
+                _laidSize = (drawnWidth, drawnHeight, scale);
+                _laidWidth = drawnWidth;
+                _laidHeight = drawnHeight;
                 if (_openPanel is null && _well is not null) _well.Height = WellHeight();
                 else PlacePanel();
             }
