@@ -68,7 +68,7 @@ internal sealed class ReorderGrid : Panel
             double used = _rects.Length == 0 ? 0 : _rects.Max(r => r.Right);
             return new Size(double.IsInfinity(available.Width) ? used : available.Width, _rects.Length == 0 ? 0 : _rects.Max(r => r.Bottom));
         }
-        double width = double.IsInfinity(available.Width) ? Math.Max(1, n) * (MinCellWidth + Gap) - Gap : available.Width;
+        double width = double.IsInfinity(available.Width) ? Math.Clamp(n, 1, Math.Max(1, MaxColumns)) * (MinCellWidth + Gap) - Gap : available.Width;
         _columns = Math.Clamp((int)((width + Gap) / (MinCellWidth + Gap)), 1, Math.Max(1, MaxColumns));
         _cellWidth = Math.Max(0, Math.Floor((width - Gap * (_columns - 1)) / _columns));
         _cellHeight = 0;
