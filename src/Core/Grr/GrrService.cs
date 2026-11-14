@@ -83,18 +83,6 @@ internal sealed class GrrService
         if (_consumers.Remove(consumer) && _consumers.Count == 0) _timer.Stop();
     }
 
-    public GrrRace? Next(string league, DateTime now) =>
-        Races.FirstOrDefault(r => r.League == league && r.Start + RaceLength > now);
-
-    public GrrRace? Last(string league, DateTime now) =>
-        Races.LastOrDefault(r => r.League == league && r.Start + RaceLength <= now);
-
-    public IEnumerable<DateTime> Starts(IEnumerable<string> leagues)
-    {
-        var set = leagues.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return Races.Where(r => set.Contains(r.League)).Select(r => r.Start);
-    }
-
     private static HttpClient CreateClient()
     {
         var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };

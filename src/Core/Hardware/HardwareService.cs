@@ -175,13 +175,6 @@ internal sealed class HardwareService : IDisposable
         Reconcile();
     }
 
-    public void ResetMinMax()
-    {
-        _resetMinMax = true;
-        _demo?.ResetMinMax();
-        Nudge();
-    }
-
     public void Configure(int intervalMs, BackgroundUsage background)
     {
         _monitorMs = Math.Clamp(intervalMs, PerformanceSettings.MinMs, PerformanceSettings.MaxMs);

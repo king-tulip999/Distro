@@ -21,8 +21,6 @@ internal static class RaceFormat
         return t.Done();
     }
 
-    public static string Plural(string word) => word + PluralEnding(word);
-
     private static string PluralEnding(string word) =>
         word.EndsWith("s", StringComparison.Ordinal) || word.EndsWith("x", StringComparison.Ordinal) || word.EndsWith("ch", StringComparison.Ordinal) || word.EndsWith("sh", StringComparison.Ordinal) ? "es" : "s";
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;

@@ -74,8 +74,6 @@ public sealed class CurveEditor : FrameworkElement
 
     public bool ReadOnly { get; init; }
 
-    public void Refresh() => Changed();
-
     public void SetPoints(List<CurvePoint> points)
     {
         _points = points;

@@ -24,13 +24,6 @@ internal sealed class ThemePicker : UniformGrid
         }
     }
 
-    public static int Balanced(int most = 3)
-    {
-        int count = Math.Max(1, Themes.All.Count);
-        int rows = (count + most - 1) / most;
-        return (count + rows - 1) / rows;
-    }
-
     private static Button Swatch(ThemeSpec theme, bool selected, Action<AppTheme> pick, double height, Action<FrameworkElement>? menu)
     {
         var c = ThemeManager.Resolve(theme);

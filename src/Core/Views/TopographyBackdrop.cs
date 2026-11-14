@@ -1,10 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
-using Core.Services;
 using Core.Theme;
 
 namespace Core.Views;
@@ -147,39 +144,5 @@ internal sealed class TopographyBackdrop : Grid
             App.LogError(ex);
             return false;
         }
-    }
-}
-
-internal sealed class GlassPane : Border
-{
-    public const double BlurRadius = 14;
-
-    private readonly Rectangle _frost = new() { IsHitTestVisible = false };
-    private readonly VisualBrush _brush;
-    private readonly FrameworkElement _source;
-    private Rect _seen;
-
-    public GlassPane(FrameworkElement source)
-    {
-        _source = source;
-        IsHitTestVisible = false;
-        ClipToBounds = true;
-        _brush = new VisualBrush(source) { ViewboxUnits = BrushMappingMode.Absolute, Stretch = Stretch.Fill };
-        _frost.Fill = _brush;
-        _frost.Margin = new Thickness(-BlurRadius);
-        if (PcClass.Effects) _frost.Effect = new BlurEffect { Radius = BlurRadius, KernelType = KernelType.Gaussian, RenderingBias = RenderingBias.Performance };
-        Child = _frost;
-        LayoutUpdated += (_, _) => Follow();
-    }
-
-    private void Follow()
-    {
-        if (!IsVisible || _frost.ActualWidth <= 0 || !_source.IsVisible || PresentationSource.FromVisual(_frost) is null) return;
-        Rect at;
-        try { at = _frost.TransformToVisual(_source).TransformBounds(new Rect(_frost.RenderSize)); }
-        catch (InvalidOperationException) { return; }
-        if (at == _seen) return;
-        _seen = at;
-        _brush.Viewbox = at;
     }
 }

@@ -131,12 +131,6 @@ internal sealed class DemoHardware
 
     private readonly Dictionary<string, (float Min, float Max)> _range = new();
 
-    public void ResetMinMax()
-    {
-        lock (_range)
-            _range.Clear();
-    }
-
     public SensorTree Tree(HardwareSnapshot hw, HardwareCatalog catalog)
     {
         double Wave(double period, double phase = 0) => Math.Sin(_t / period * Math.PI * 2 + phase);

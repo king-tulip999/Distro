@@ -86,12 +86,6 @@ internal sealed class NetworkMonitor : IDisposable
         pinger?.Dispose();
     }
 
-    public (IReadOnlyList<double?> Down, IReadOnlyList<double?> Up, IReadOnlyList<double?> Ping) History()
-    {
-        lock (_gate)
-            return (_down.ToList(), _up.ToList(), _ping.ToList());
-    }
-
     private void OnAddressChanged(object? sender, EventArgs e) => _dirty = true;
 
     private void OnAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e) => _dirty = true;
@@ -249,18 +243,6 @@ internal sealed class NetworkMonitor : IDisposable
         NetworkInterfaceType.Wwanpp or NetworkInterfaceType.Wwanpp2 => "Mobile broadband",
         _ => type.ToString(),
     };
-
-    public static string Bits(double bytesPerSecond)
-    {
-        double bits = bytesPerSecond * 8;
-        return bits switch
-        {
-            >= 1e9 => $"{bits / 1e9:0.0} Gbit/s",
-            >= 1e6 => $"{bits / 1e6:0.0} Mbit/s",
-            >= 1e3 => $"{bits / 1e3:0} kbit/s",
-            _ => $"{bits:0} bit/s",
-        };
-    }
 
     public void Dispose()
     {

@@ -141,15 +141,6 @@ internal sealed class PanelGrid : Panel
         Commit(_added.OrderBy(i => i.Def.Order).ToList());
     }
 
-    public void Resize(string id, double width)
-    {
-        if (_items.FirstOrDefault(i => i.Def.Id == id && CanResize(i.Def)) is not { } item) return;
-        var (min, max) = ColumnRange(item.Def);
-        item.Slot.Cols = Math.Clamp(ColumnsFor(width), min, max);
-        item.Slot.Rows = null;
-        InvalidateMeasure();
-    }
-
     public bool Editing
     {
         get => _editing;
@@ -172,8 +163,6 @@ internal sealed class PanelGrid : Panel
         int Key(Item i) { int k = _slots.IndexOf(i.Slot); return k < 0 ? int.MaxValue : k; }
         return _items.OrderBy(Key).ToList();
     }
-
-    public bool Contains(string id) => _items.Any(i => i.Def.Id == id);
 
     public void Clear()
     {
@@ -205,21 +194,6 @@ internal sealed class PanelGrid : Panel
         _added.Add(item);
         _dragOthers?.Add(item);
         Children.Add(host);
-    }
-
-    public void Remove(string id)
-    {
-        var item = _items.FirstOrDefault(i => i.Def.Id == id);
-        if (item is null) return;
-        if (item == _drag || item == _pressed || item == _resize) CancelAll();
-        else if (_dragOthers is { } others && others.Remove(item))
-        {
-            _dragIndex = Math.Min(_dragIndex, others.Count);
-            _dragCell = (-1, -1);
-        }
-        _items.Remove(item);
-        _added.Remove(item);
-        Children.Remove(item.Host);
     }
 
     private void SetContent(Item item)

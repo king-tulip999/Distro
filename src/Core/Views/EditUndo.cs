@@ -45,12 +45,6 @@ internal sealed class EditUndo
         return this;
     }
 
-    public EditUndo Custom(Func<bool> restore)
-    {
-        _restore.Add(restore);
-        return this;
-    }
-
     public bool Revert()
     {
         bool changed = false;

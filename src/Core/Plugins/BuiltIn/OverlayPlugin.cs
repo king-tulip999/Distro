@@ -63,10 +63,6 @@ internal sealed class OverlayPlugin : Plugin
         items.Add(item);
     }
 
-    public override string? Status(AppServices app) => app.Overlay.Showing ? "On screen"
-        : app.Config.Overlay.Visible && app.Demo ? "Switched on (not drawn in demo mode)"
-        : "Hidden";
-
     protected override void OnStart(AppServices app) => app.Overlay.Enabled = true;
 
     protected override void OnStop(AppServices app) => app.Overlay.Enabled = false;

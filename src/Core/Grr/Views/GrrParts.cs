@@ -64,12 +64,6 @@ internal static class GrrParts
     public static TextBlock Wrapped(string text, double top = 0) =>
         new() { Text = text, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, top, 0, 0), TextWrapping = TextWrapping.Wrap };
 
-    public static TextBlock Clock(double size, string brush = "Heading") => new()
-    {
-        FontFamily = Ui.Res<FontFamily>("MetricFont"), FontSize = size, FontWeight = size >= 20 ? FontWeights.Bold : FontWeights.SemiBold,
-        Foreground = Ui.Res<Brush>(brush), Typography = { NumeralAlignment = FontNumeralAlignment.Tabular },
-    };
-
     public static Border Tag(string text, bool live = false)
     {
         var tag = Ui.Chip(text, live ? "SageSoft" : "AccentSoft", live ? "SageDeep" : "AccentText");

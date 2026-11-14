@@ -4,14 +4,13 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using Core.Config;
 using Core.Services;
+using Core.SimRacing.Hud.Vr;
 using Core.SimRacing.Hud.Web;
 using Core.SimRacing.Race;
 using Core.SimRacing.Telemetry;
 using WinForms = System.Windows.Forms;
 
 namespace Core.SimRacing.Hud;
-
-internal sealed record HudWidgetStats(string Id, string Name, bool OnScreen, double DrawMs, double PerSecond);
 
 internal sealed class HudHost : IDisposable
 {
@@ -36,10 +35,13 @@ internal sealed class HudHost : IDisposable
     private HudWebServer? _web;
     private readonly HudWebRenderer _webRenderer = new();
     private bool _webDirty = true;
+    private readonly HudVr _vr;
 
     public string? WebProblem { get; private set; }
 
     public int? WebPort => _web is { Running: true } w ? w.Port : null;
+
+    public HudVr Vr => _vr;
 
     private int WebClients => _web?.Clients.Count ?? 0;
 
@@ -71,6 +73,8 @@ internal sealed class HudHost : IDisposable
     {
         _app = app;
         Race = new RaceState(() => Settings, app.PitLoss) { MapLoader = TrackMaps.TrackMapLibrary.ForRace };
+        _vr = new HudVr(app);
+        _vr.Changed += OnVrChanged;
         _timer.Tick += (_, _) => SafeTick();
         app.Telemetry.StatusChanged += OnStatusChanged;
         app.Telemetry.SimStarted += OnSimStarted;
@@ -131,7 +135,21 @@ internal sealed class HudHost : IDisposable
             _preview = false;
         }
         SyncWeb();
+        SyncVr();
         Refresh();
+    }
+
+    public void SyncVr()
+    {
+        if (ScreenshotRunner.Active || MonkeyRunner.Active || ControlSweep.Active || PerfProbe.File is not null) return;
+        _vr.Sync(Settings.VrOverlays, _active);
+    }
+
+    private void OnVrChanged()
+    {
+        foreach (var s in _slots.Values) s.Dirty = true;
+        if (_holding && !_timer.Enabled) SafeTick();
+        Changed?.Invoke();
     }
 
     public void SyncWeb()
@@ -165,6 +183,7 @@ internal sealed class HudHost : IDisposable
         if (_web is { Running: true } web) web.ThemeCss = HudWebRenderer.ThemeCss(CurrentPalette());
         if (save) Save();
         foreach (var s in _slots.Values) s.Dirty = true;
+        SyncVr();
         Refresh();
     }
 
@@ -305,6 +324,7 @@ internal sealed class HudHost : IDisposable
             if (!widgets.Any(w => ReferenceEquals(w, s.Config)))
             {
                 Close(s);
+                _vr.Remove(id);
                 s.Widget.Dispose();
                 _slots.Remove(id);
             }
@@ -319,6 +339,7 @@ internal sealed class HudHost : IDisposable
             if (_slots.Remove(w.Id, out var stale))
             {
                 Close(stale);
+                _vr.Remove(w.Id);
                 stale.Widget.Dispose();
             }
             if (HudCatalog.Find(w.Kind) is not { } def) continue;
@@ -352,6 +373,7 @@ internal sealed class HudHost : IDisposable
             if (!visible)
             {
                 if (s.Window?.Visible == true) { s.Window.Hide(); s.Window.ReleaseSurface(); }
+                _vr.Hide(s.Config.Id);
                 continue;
             }
             int hz = s.Config.UpdateHz > 0 ? s.Config.UpdateHz : s.Def.Hz(s.Options);
@@ -368,6 +390,7 @@ internal sealed class HudHost : IDisposable
                 if (s.Empty)
                 {
                     if (s.Window?.Visible == true) { s.Window.Hide(); s.Window.ReleaseSurface(); }
+                    _vr.Hide(s.Config.Id);
                     continue;
                 }
             }
@@ -461,6 +484,16 @@ internal sealed class HudHost : IDisposable
             LogOnce(s.Def.Kind, ex);
             if (window.Visible) { window.Hide(); window.ReleaseSurface(); }
         }
+        if (_vr.Wants(s.Config))
+        {
+            try { DrawVr(s, frame, fit, monitor); }
+            catch (Exception ex)
+            {
+                LogOnce("vr", ex);
+                _vr.Hide(s.Config.Id);
+            }
+        }
+        else _vr.Hide(s.Config.Id);
         s.Dirty = false;
         s.LastSeq = frame.Sequence;
         s.LastDraw = Stopwatch.GetTimestamp();
@@ -469,6 +502,28 @@ internal sealed class HudHost : IDisposable
         s.Draws++;
         double since = Stopwatch.GetElapsedTime(s.CountSince).TotalSeconds;
         if (since >= 2) { s.PerSecond = s.Draws / since; s.Draws = 0; s.CountSince = Stopwatch.GetTimestamp(); }
+    }
+
+    private void DrawVr(Slot s, TelemetryFrame frame, SizeF fit, HudMonitor monitor)
+    {
+        if (s.Config.VrWidth <= 0) VrPlacement.PlaceFromScreen(s.Config, HudGeometry.Place(s.Config, monitor, fit), monitor.Bounds);
+        var size = VrPlacement.Pixels(fit, VrShare.MaxPixels);
+        var target = _vr.Begin(s.Config.Id, size);
+        var painter = target.Painter;
+        float scale = size.Width / fit.Width;
+        painter.Simulated = frame.Simulated;
+        painter.Begin(target.Surface.Graphics!, scale, new SizeF(fit.Width, size.Height / scale), Palette, Settings.Appearance);
+        painter.Background = s.Config.Background;
+        s.Widget.Paint(painter, new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def });
+        painter.FinishPanels();
+        painter.End(target.Surface.Dc, size);
+        _vr.Publish(target, s.Config.Id, s.Def.Name, s.Config);
+    }
+
+    public void PlaceInVr(HudWidgetConfig config)
+    {
+        var monitor = HudGeometry.MonitorFor(config.Monitor, Monitors);
+        VrPlacement.PlaceFromScreen(config, HudGeometry.Place(config, monitor, SizeOf(config, Race)), monitor.Bounds);
     }
 
     private readonly HashSet<string> _logged = new();
@@ -501,6 +556,7 @@ internal sealed class HudHost : IDisposable
     private void CloseWindows()
     {
         foreach (var s in _slots.Values) Close(s);
+        _vr.HideAll();
         _toolbar?.Close();
     }
 
@@ -513,9 +569,6 @@ internal sealed class HudHost : IDisposable
         s.Painter = null;
         s.Dirty = true;
     }
-
-    public IReadOnlyList<HudWidgetStats> Stats() =>
-        _slots.Values.Select(s => new HudWidgetStats(s.Config.Id, s.Def.Name, s.Window?.Visible == true, s.DrawMs, s.PerSecond)).ToList();
 
     public IReadOnlyList<HudMonitor> Monitors => _monitors ??= ReadMonitors();
 
@@ -1071,6 +1124,8 @@ internal sealed class HudHost : IDisposable
         HideGrid();
         CloseWindows();
         _web?.Dispose();
+        _vr.Changed -= OnVrChanged;
+        _vr.Dispose();
         _webRenderer.Dispose();
         _previewSurface.Dispose();
         _fitPainter.Dispose();

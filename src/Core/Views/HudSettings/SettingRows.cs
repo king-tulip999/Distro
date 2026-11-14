@@ -30,7 +30,7 @@ internal static class SettingRows
     private const double UnpickedPicture = 0.5;
     private const double ComboWidth = 194;
 
-    public static FrameworkElement Build(HudSetting s, HudSettingContext c, string? groupTitle = null) => s switch
+    public static FrameworkElement Build(HudSetting s, HudSettingContext c) => s switch
     {
         PickerSetting or LanesSetting => throw new ArgumentException("Lists of items are edited in the widget panel", nameof(s)),
         MergedSetting m => Merged(m, c),

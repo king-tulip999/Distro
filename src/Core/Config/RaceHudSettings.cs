@@ -13,6 +13,8 @@ public enum HudDensity { Compact, Standard, Expanded }
 
 public enum HudAnchor { TopLeft, Top, TopRight, Left, Center, Right, BottomLeft, Bottom, BottomRight }
 
+public enum HudVrPlacement { Off, Cockpit, Head }
+
 
 public sealed class RaceHudSettings
 {
@@ -41,6 +43,8 @@ public sealed class RaceHudSettings
     public const int DefaultWebPort = 8642, MinWebPort = 1024, MaxWebPort = 65535;
 
     public bool WebOverlays { get; set; }
+
+    public bool VrOverlays { get; set; }
 
     public int WebPort { get; set; } = DefaultWebPort;
 
@@ -343,6 +347,18 @@ public sealed class HudWidgetConfig
 
     public string? Hotkey { get; set; }
 
+    public const double VrReach = 2, MinVrDistance = 0.2, MaxVrDistance = 3, MinVrWidth = 0.05, MaxVrWidth = 2;
+
+    public HudVrPlacement Vr { get; set; }
+
+    public double VrX { get; set; }
+
+    public double VrY { get; set; }
+
+    public double VrDistance { get; set; } = 1;
+
+    public double VrWidth { get; set; }
+
     public Dictionary<string, string> Options { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public static string NewId(string kind) => $"{(string.IsNullOrEmpty(kind) ? "widget" : kind)}-{Guid.NewGuid().ToString("N")[..6]}";
@@ -359,6 +375,11 @@ public sealed class HudWidgetConfig
         UpdateHz = Math.Clamp(UpdateHz, 0, 60);
         Monitor = string.IsNullOrWhiteSpace(Monitor) ? "primary" : Monitor;
         if (string.IsNullOrWhiteSpace(Hotkey)) Hotkey = null;
+        if (!Enum.IsDefined(Vr)) Vr = HudVrPlacement.Off;
+        VrX = double.IsFinite(VrX) ? Math.Clamp(VrX, -VrReach, VrReach) : 0;
+        VrY = double.IsFinite(VrY) ? Math.Clamp(VrY, -VrReach, VrReach) : 0;
+        VrDistance = double.IsFinite(VrDistance) ? Math.Clamp(VrDistance, MinVrDistance, MaxVrDistance) : 1;
+        VrWidth = double.IsFinite(VrWidth) && VrWidth > 0 ? Math.Clamp(VrWidth, MinVrWidth, MaxVrWidth) : 0;
         Sessions = (Sessions ?? new()).Where(s => !string.IsNullOrWhiteSpace(s)).Select(RaceHudSettings.SessionKind).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (k, v) in Options ?? new()) if (k is not null && v is not null) options[k] = v;

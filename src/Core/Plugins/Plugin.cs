@@ -60,8 +60,6 @@ internal abstract class Plugin
 
     public virtual void AddTrayItems(WinForms.ToolStripItemCollection items, AppServices app) { }
 
-    public virtual string? Status(AppServices app) => null;
-
     public virtual IReadOnlyCollection<int>? IracingLeagueIds(AppServices app) => null;
 
     public bool IsActive { get; private set; }

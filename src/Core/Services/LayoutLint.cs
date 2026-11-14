@@ -88,7 +88,7 @@ internal static class LayoutLint
                 catch (InvalidOperationException) { continue; }
                 bool inside = r.Top < clipper.ActualHeight - Slack && r.Left < clipper.ActualWidth - Slack && r.Bottom > Slack && r.Right > Slack;
                 double below = r.Bottom - clipper.ActualHeight, right = r.Right - clipper.ActualWidth;
-                if (inside && (below > Slack + 1 || right > Slack + 1 || r.Top < -Slack - 1 || r.Left < -Slack - 1) && FirstText(child) is { } text)
+                if (inside && (below > Slack + 1 || right > Slack + 1 || r.Top < -Slack - 1 || r.Left < -Slack - 1) && FirstText(child) is not null)
                 {
                     string side = below > Slack + 1 ? $"{below:0} px below" : right > Slack + 1 ? $"{right:0} px to the right" : "above / left";
                     found.Add(new Finding("spill", where, Short(Describe(child)), $"cut off {side} the edge of {Name(clipper)} ({clipper.ActualWidth:0}×{clipper.ActualHeight:0}) in {Ancestry(clipper)}"));

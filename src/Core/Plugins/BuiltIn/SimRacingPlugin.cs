@@ -82,17 +82,6 @@ internal sealed class SimRacingPlugin : Plugin
         items.Add(item);
     }
 
-    public override string? Status(AppServices app) =>
-        Hud is null ? null
-        : !app.Config.SimRacing.Hud.Enabled ? "iRacing Overlay off"
-        : Hud.OnScreen ? $"iRacing Overlay on screen · {Hud.LayoutName}"
-        : app.Telemetry.Status switch
-        {
-            SimRacing.Telemetry.SimStatus.Connected => "iRacing Overlay on · iRacing connected",
-            SimRacing.Telemetry.SimStatus.Waiting => "iRacing Overlay on · iRacing loading",
-            _ => "iRacing Overlay on · waiting for iRacing",
-        };
-
     public SimRacing.Shakers.ShakerHost? Shakers { get; private set; }
 
     public CompanionApp? TradingPaints { get; private set; }

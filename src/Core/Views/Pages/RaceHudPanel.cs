@@ -251,9 +251,9 @@ internal sealed partial class RaceHudWidgets
         _ => s.Label ?? def.Option(s.Keys[0])?.Label ?? s.Id,
     };
 
-    private FrameworkElement Row(HudSetting setting, string? groupTitle)
+    private FrameworkElement Row(HudSetting setting)
     {
-        var row = Linked(setting, SettingRows.Build(setting, _context!, groupTitle));
+        var row = Linked(setting, SettingRows.Build(setting, _context!));
         _rows.Add((setting, row));
         return row;
     }
@@ -262,7 +262,7 @@ internal sealed partial class RaceHudWidgets
     {
         var stack = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
         var group = editor.GroupOf(setting.Id);
-        stack.Children.Add(Row(setting, group?.Title));
+        stack.Children.Add(Row(setting));
         var rest = group?.Settings.Where(s => s.Id != setting.Id && !IsList(_context!.Def, s)).ToList() ?? new();
         if (rest.Count == 0) return stack;
         var head = string.Equals(group!.Title, SettingTitle(_context!.Def, setting), StringComparison.OrdinalIgnoreCase) ? new Border { Height = 8 } : (FrameworkElement)Ui.SubHeader(group.Title ?? "More");
@@ -270,7 +270,7 @@ internal sealed partial class RaceHudWidgets
         var rows = new List<FrameworkElement>();
         foreach (var s in rest)
         {
-            var row = Row(s, group.Title);
+            var row = Row(s);
             rows.Add(row);
             stack.Children.Add(row);
         }
@@ -288,7 +288,7 @@ internal sealed partial class RaceHudWidgets
             var rows = new List<FrameworkElement>();
             foreach (var s in g.Settings)
             {
-                var row = IsList(def, s) ? PartPanel(def, w, s, new PanelTarget(s.Id, null, null), false) : Row(s, g.Title);
+                var row = IsList(def, s) ? PartPanel(def, w, s, new PanelTarget(s.Id, null, null), false) : Row(s);
                 rows.Add(row);
                 stack.Children.Add(row);
             }
@@ -500,7 +500,7 @@ internal sealed partial class RaceHudWidgets
         stack.Children.Add(head);
         if (choice.Help is { Length: > 0 } help)
             stack.Children.Add(new TextBlock { Text = help, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) });
-        foreach (var s in ItemSettings(def, w, key, choice.Id)) stack.Children.Add(Row(s, null));
+        foreach (var s in ItemSettings(def, w, key, choice.Id)) stack.Children.Add(Row(s));
         var block = new Border { Padding = new Thickness(10, 8, 10, 8), Margin = new Thickness(0, 4, 0, 2), BorderThickness = new Thickness(3, 0, 0, 0), Child = stack };
         block.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
         block.SetResourceReference(Border.BorderBrushProperty, "Accent");

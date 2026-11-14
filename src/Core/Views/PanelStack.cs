@@ -6,7 +6,7 @@ namespace Core.Views;
 
 internal sealed class PanelStack : StackPanel
 {
-    public Func<UIElement, bool> IsPanel { get; init; } = child => child is Collapsible;
+    public Func<UIElement, bool> IsPanel { get; init; } = _ => false;
 
     protected override Size ArrangeOverride(Size arrangeSize)
     {

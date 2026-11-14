@@ -3,10 +3,6 @@ using Core.Processes;
 
 namespace Core.SimRacing.Telemetry;
 
-internal sealed record TelemetryDiagnostics(
-    SimStatus Status, bool Simulated, double FramesPerSecond, int TickRate, int Variables, int SessionUpdates,
-    int Connects, string? LastError, IReadOnlyList<string> MissingCore, DateTime? LastFrameUtc);
-
 internal sealed class TelemetryService : IDisposable
 {
     public const string SimProcess = "iracingsim64dx11";
@@ -36,8 +32,6 @@ internal sealed class TelemetryService : IDisposable
     private SimStatus _raisedStatus = SimStatus.NotRunning;
     private long _sequence;
 
-    private volatile int _tickRate, _varCount, _sessionUpdates, _connects;
-    private volatile string? _lastError;
     private string[] _missing = Array.Empty<string>();
     private double _fps;
     private long _lastFrameTicks;
@@ -78,7 +72,6 @@ internal sealed class TelemetryService : IDisposable
             }
             catch (Exception ex)
             {
-                _lastError = ex.Message;
                 int failures = _observerFailures.GetValueOrDefault(observe) + 1;
                 _observerFailures[observe] = failures;
                 if (failures == 1) App.LogError(ex);
@@ -155,9 +148,6 @@ internal sealed class TelemetryService : IDisposable
         return _frames.Front;
     }
 
-    public TelemetryDiagnostics Diagnostics() => new(_status, _simulated, Volatile.Read(ref _fps), _tickRate, _varCount, _sessionUpdates, _connects,
-        _lastError, Volatile.Read(ref _missing), Interlocked.Read(ref _lastFrameTicks) is > 0 and var t ? new DateTime(t, DateTimeKind.Utc) : null);
-
     public event Action? SimStarted;
 
     private void OnProcessStarted(string name)
@@ -227,7 +217,6 @@ internal sealed class TelemetryService : IDisposable
                         _wake.WaitOne(1000);
                         continue;
                     }
-                    _connects++;
                     session = SessionInfo.Empty;
                     sessionVersion++;
                     lastSessionUpdate = -1;
@@ -252,7 +241,6 @@ internal sealed class TelemetryService : IDisposable
                 if (mem.VarsIfChanged() is { } vars)
                 {
                     decoder.Bind(vars);
-                    _varCount = vars.Count;
                     Volatile.Write(ref _missing, CoreVars.Where(v => !vars.ContainsKey(v)).ToArray());
                 }
                 if (mem.SessionInfoUpdate is var update && update != lastSessionUpdate)
@@ -264,13 +252,11 @@ internal sealed class TelemetryService : IDisposable
                             lastSessionUpdate = update;
                             session = SessionInfo.Parse(yaml);
                             sessionVersion++;
-                            _sessionUpdates = sessionVersion;
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
                         lastSessionUpdate = update;
-                        _lastError = "Session information couldn't be read: " + ex.Message;
                     }
                 }
                 int tick = mem.CopyLatest();
@@ -281,7 +267,6 @@ internal sealed class TelemetryService : IDisposable
                 }
                 lastTick = tick;
                 lastData = Stopwatch.GetTimestamp();
-                _tickRate = mem.TickRate;
                 if (token.Stop) break;
 
                 var frame = _frames.Back;
@@ -300,7 +285,6 @@ internal sealed class TelemetryService : IDisposable
         }
         catch (Exception ex)
         {
-            _lastError = ex.Message;
             if (!logged) App.LogError(ex);
             logged = true;
             return false;

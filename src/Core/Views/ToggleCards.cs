@@ -93,17 +93,6 @@ internal static class ToggleCards
         TextAlignment = centered ? TextAlignment.Center : TextAlignment.Left, LineHeight = 18, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
     };
 
-    public static CheckBox Card(string title, string? caption, bool on, Action<bool> changed) =>
-        Dress(Ui.Switch(on, changed), Title(title, false), caption);
-
-    public static CheckBox Chip(string label, bool on, Action<bool> changed, string? tip = null)
-    {
-        var chip = Compact(Ui.Switch(on, changed), label);
-        chip.Margin = new Thickness(0, 0, 5, 5);
-        chip.ToolTip = tip;
-        return chip;
-    }
-
     public static CheckBox Compact(CheckBox box, string label)
     {
         var title = Title(label, false);

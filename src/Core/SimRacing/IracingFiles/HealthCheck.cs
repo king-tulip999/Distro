@@ -136,8 +136,4 @@ internal static class LayoutGuard
 
     public static int StageRestore(SettingsSession s, IReadOnlyDictionary<string, string> saved) =>
         Differences(s, saved).Count(d => s.SetDraft(d.Setting, d.Saved) is null);
-
-    public static double Number(SettingsSession s, string key, double fallback) =>
-        s.Find(IracingPaths.MonitorRenderer, "MonitorSetup", key) is { } x && CommentInference.TryNumber(x.Draft, out var n) ? n : fallback;
-
 }

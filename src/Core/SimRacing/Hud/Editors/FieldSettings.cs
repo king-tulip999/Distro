@@ -11,7 +11,7 @@ internal static class FieldSettings
         new("Gaps", "gap", "int", "gapme", "laps", "trend"),
         new("Lap times", "last", "best", "avglap", "delta"),
         new("Race", "lapsdone", "inc"),
-        new("Pit", "pit", "out", "stint"),
+        new("Pit", "pit", "out", "stint", "tire"),
     };
 
     public static readonly HudCategory[] StripCategories =

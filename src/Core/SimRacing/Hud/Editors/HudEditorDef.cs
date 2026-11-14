@@ -13,7 +13,6 @@ internal abstract record HudSetting(string Id)
     public bool InlineHelp { get; init; }
     public Func<HudOptions, bool>? ShowIf { get; init; }
     public bool Visible(HudOptions o) => ShowIf?.Invoke(o) ?? true;
-    public virtual bool Same(HudOptions a, HudOptions b) => Keys.All(k => a.Value(k) == b.Value(k));
 }
 
 internal sealed record OptionSetting(string Key) : HudSetting(Key)
@@ -43,10 +42,6 @@ internal sealed record TogglesSetting(string Id, string Title, IReadOnlyList<str
 internal sealed record ClassFilterSetting() : HudSetting(HudClassFilter.ScopeKey)
 {
     public override IReadOnlyList<string> Keys => new[] { HudClassFilter.ScopeKey, HudClassFilter.ListKey };
-
-    public override bool Same(HudOptions a, HudOptions b) =>
-        a.Value(HudClassFilter.ScopeKey) == b.Value(HudClassFilter.ScopeKey)
-        && (a.Choice(HudClassFilter.ScopeKey) != HudClassFilter.Pick || a.Value(HudClassFilter.ListKey) == b.Value(HudClassFilter.ListKey));
 }
 
 internal sealed record MergedChoice(string Label, IReadOnlyDictionary<string, string> Values, string? Tip = null)
@@ -74,12 +69,6 @@ internal sealed record MergedSetting(string Id, string Title, IReadOnlyList<stri
         for (int i = 0; i < list.Count; i++) if (list[i].Matches(o)) return i;
         return -1;
     }
-
-    public override bool Same(HudOptions a, HudOptions b)
-    {
-        int i = Index(a);
-        return i >= 0 && i == Index(b) && (i < Choices.Count || Keys.All(k => a.Value(k) == b.Value(k)));
-    }
 }
 
 internal sealed record HudGroup(string Id, string? Title, HudTab Tab, bool Open, params HudSetting[] Settings);
@@ -97,8 +86,6 @@ internal sealed class HudEditorDef
     public HudSetting? SettingForKey(string key) => Settings.FirstOrDefault(s => s.Keys.Contains(key, StringComparer.OrdinalIgnoreCase));
 
     public HudGroup? GroupOf(string settingId) => Groups.FirstOrDefault(g => g.Settings.Any(s => string.Equals(s.Id, settingId, StringComparison.OrdinalIgnoreCase)));
-
-    public bool Has(HudTab tab) => Groups.Any(g => g.Tab == tab);
 
     public string? SettingForRegion(string region) =>
         Regions.TryGetValue(region, out var id) ? id : SettingForKey(region)?.Id;

@@ -1,4 +1,3 @@
-using System.Windows;
 using Core.SessionStats;
 
 namespace Core.Views.Pages;
@@ -36,6 +35,4 @@ internal sealed class RaceInfo
     public double? ConsistencyOf(long id) => _consistency.TryGetValue(id, out var grade) ? grade : null;
 
     public RaceCardData Data(SessionSummary s) => new(s, LapsOf(s.Id), ConsistencyOf(s.Id), AwardsOf(s.Id), Driver);
-
-    public FrameworkElement? Card(SessionSummary? s) => s is null ? null : RaceParts.Card(Data(s), "Last race");
 }

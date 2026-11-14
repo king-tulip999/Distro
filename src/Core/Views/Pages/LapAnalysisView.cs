@@ -695,12 +695,6 @@ internal sealed class MapCursor : FrameworkElement
         s.ZoomChanged += InvalidateVisual;
     }
 
-    public void Detach()
-    {
-        _s.CursorChanged -= InvalidateVisual;
-        _s.ZoomChanged -= InvalidateVisual;
-    }
-
     protected override void OnRender(DrawingContext dc)
     {
         if (_s.Cursor is not { } d || _map.View is not { } view) return;

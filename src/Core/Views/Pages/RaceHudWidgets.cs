@@ -318,6 +318,8 @@ internal sealed partial class RaceHudWidgets
 
         var web = Card("Browser source", BrowserSourceRows(w));
         Ui.Anchor(web, RaceHudSection.WebAnchor);
+        var vr = Card("VR", VrRows(w));
+        Ui.Anchor(vr, RaceHudSection.VrAnchor);
 
         var panels = new MasonryPanel { MinColumnWidth = PanelMinWidth, MaxColumns = 4, Gap = 14, EvenBottoms = true };
         panels.Children.Add(Card("When shown", when));
@@ -326,7 +328,60 @@ internal sealed partial class RaceHudWidgets
         panels.Children.Add(web);
         panels.Children.Add(lookCard);
         panels.Children.Add(placeCard);
+        panels.Children.Add(vr);
         return (new StackPanel { Children = { panels, ActionsRow(w) } }, panels, new FrameworkElement[] { lookCard, placeCard, web });
+    }
+
+    private void PlaceInVr(HudWidgetConfig w)
+    {
+        if (Host is { } host) { host.PlaceInVr(w); return; }
+        var monitor = HudGeometry.MonitorFor(w.Monitor, HudHost.ReadMonitors());
+        SimRacing.Hud.Vr.VrPlacement.PlaceFromScreen(w, HudGeometry.Place(w, monitor), monitor.Bounds);
+    }
+
+    private List<FrameworkElement> VrRows(HudWidgetConfig w)
+    {
+        var rows = new List<FrameworkElement>();
+        var modes = new[]
+        {
+            new Choice(nameof(HudVrPlacement.Off), "Off"),
+            new Choice(nameof(HudVrPlacement.Cockpit), "Fixed in the cockpit"),
+            new Choice(nameof(HudVrPlacement.Head), "Follows your head"),
+        };
+        rows.Add(SettingRows.Row("Show in VR", null, true, Ui.Combo(modes, w.Vr.ToString(), c =>
+        {
+            w.Vr = Enum.Parse<HudVrPlacement>(c.Id!);
+            if (w.Vr != HudVrPlacement.Off && w.VrWidth <= 0) PlaceInVr(w);
+            Changed();
+            _list.Dispatcher.BeginInvoke(Fill, System.Windows.Threading.DispatcherPriority.Background);
+        }, ComboWidth)));
+        if (w.Vr == HudVrPlacement.Off) return rows;
+        FrameworkElement Slider(string label, string? help, double min, double max, double metres, Action<double> set) =>
+            SettingRows.Row(label, help, true, Ui.SliderWithValue(min, max, Math.Round(metres * 100), v => $"{v:0} {Units.Cm}", v => { set(v / 100); Changed(); }, ComboWidth - 42, 1));
+        double reach = HudWidgetConfig.VrReach * 100;
+        rows.Add(Slider("Sideways", "Right of your head is positive.", -reach, reach, w.VrX, v => w.VrX = v));
+        rows.Add(Slider("Height", "Above your eyes is positive.", -reach, reach, w.VrY, v => w.VrY = v));
+        rows.Add(Slider("Distance", null, HudWidgetConfig.MinVrDistance * 100, HudWidgetConfig.MaxVrDistance * 100, w.VrDistance, v => w.VrDistance = v));
+        rows.Add(Slider("Width", null, HudWidgetConfig.MinVrWidth * 100, HudWidgetConfig.MaxVrWidth * 100, w.VrWidth, v => w.VrWidth = v));
+        var match = Ui.LabeledButton("I.Target", "Match the screen position", () =>
+        {
+            PlaceInVr(w);
+            Changed();
+            Fill();
+        }, "GhostButton");
+        match.ToolTip = "Puts it where it sits on the monitor, as if the monitor were 1.2 m wide and 1 m ahead";
+        match.HorizontalAlignment = HorizontalAlignment.Left;
+        match.Margin = new Thickness(0, 4, 0, 4);
+        rows.Add(match);
+        if (!S.VrOverlays)
+        {
+            var off = Ui.LabeledButton("I.Settings", "Overlay settings", () => _section.ShowSettings(RaceHudSection.VrAnchor), "GhostButton");
+            off.HorizontalAlignment = HorizontalAlignment.Left;
+            off.Margin = new Thickness(0, 2, 0, 4);
+            rows.Add(new TextBlock { Text = "VR widgets are off.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 4) });
+            rows.Add(off);
+        }
+        return rows;
     }
 
     private List<FrameworkElement> BrowserSourceRows(HudWidgetConfig w)
@@ -355,7 +410,7 @@ internal sealed partial class RaceHudWidgets
         var rows = new List<FrameworkElement> { urlRow };
         if (!running)
         {
-            var off = Ui.LabeledButton("I.Settings", "Overlay settings", () => _section.ShowSettings(), "GhostButton");
+            var off = Ui.LabeledButton("I.Settings", "Overlay settings", () => _section.ShowSettings(RaceHudSection.WebAnchor), "GhostButton");
             off.HorizontalAlignment = HorizontalAlignment.Left;
             off.Margin = new Thickness(0, 2, 0, 4);
             rows.Add(new TextBlock { Text = S.WebOverlays ? "Not running." : "Browser sources are off.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 4) });

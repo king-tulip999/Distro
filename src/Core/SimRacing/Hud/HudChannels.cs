@@ -11,11 +11,15 @@ internal enum ChannelKind
     Session,
     Calculated,
     History,
+    Pits,
 }
 
 internal enum ChannelUnit { None, Speed, Temp, Pressure, Fuel, Seconds, LapTime, Percent, Rpm, G, Degrees, Count }
 
-internal sealed record HudChannel(string Id, string Label, ChannelKind Kind, ChannelUnit Unit, Func<HudView, double?> Read, int Decimals = 1);
+internal sealed record HudChannel(string Id, string Label, ChannelKind Kind, ChannelUnit Unit, Func<HudView, double?> Read, int Decimals = 1)
+{
+    public Func<double, string>? Text { get; init; }
+}
 
 internal static class HudChannels
 {
@@ -77,7 +81,55 @@ internal static class HudChannels
         new("offTracks", "Off-tracks", ChannelKind.History, ChannelUnit.Count, v => v.Frame.Status == SimStatus.Connected ? v.Race.TrackLimits.Count : null, 0),
         new("irChange", "iRating gain / loss (est.)", ChannelKind.Calculated, ChannelUnit.None, v => v.Race.IRatingChangeOf(v.Frame.PlayerCarIdx) is { } c ? Math.Round(c) : null, 0),
         new("trackTrend", "Track temperature change (10 min)", ChannelKind.Calculated, ChannelUnit.None, v => v.Race.Weather.TrackPerWindow is { } t ? (v.Units == HudUnits.Imperial ? t * 9 / 5 : t) : null, 1),
+        new("pitsOpen", "Pits open", ChannelKind.Live, ChannelUnit.None, v => v.Frame.RawValue("PitsOpen"), 0) { Text = x => x > 0 ? "Open" : "Closed" },
+        new("pitLimiter", "Pit limiter", ChannelKind.Live, ChannelUnit.None, v => v.Frame.RawValue("dcPitSpeedLimiterToggle"), 0) { Text = x => x > 0 ? "On" : "Off" },
+        new("tireSetsLeft", "Tire sets left", ChannelKind.Live, ChannelUnit.Count, v => v.Frame.RawValue("TireSetsAvailable"), 0) { Text = Sets },
+        new("tireSetsUsed", "Tire sets used", ChannelKind.Live, ChannelUnit.Count, v => v.Frame.RawValue("TireSetsUsed"), 0),
+        new("tireSetLimit", "Dry tire set limit", ChannelKind.Live, ChannelUnit.Count, v => v.Frame.RawValue("PlayerCarDryTireSetLimit"), 0) { Text = x => x <= 0 ? "None" : Sets(x) },
+        new("pitTires", "Tires changed at the next stop", ChannelKind.Live, ChannelUnit.Count, v => v.Frame.Vars.ContainsKey("PitSvFlags") ? System.Numerics.BitOperations.PopCount((uint)v.Frame.PitFlags & 0xF) : null, 0),
+        new("pitPressLF", "Pit stop pressure LF", ChannelKind.Live, ChannelUnit.Pressure, v => v.Frame.RawValue("PitSvLFP")),
+        new("pitPressRF", "Pit stop pressure RF", ChannelKind.Live, ChannelUnit.Pressure, v => v.Frame.RawValue("PitSvRFP")),
+        new("pitPressLR", "Pit stop pressure LR", ChannelKind.Live, ChannelUnit.Pressure, v => v.Frame.RawValue("PitSvLRP")),
+        new("pitPressRR", "Pit stop pressure RR", ChannelKind.Live, ChannelUnit.Pressure, v => v.Frame.RawValue("PitSvRRP")),
+        new("deltaLast", "Delta to last lap", ChannelKind.Live, ChannelUnit.Seconds, v => v.Frame.RawValue("LapDeltaToSessionLastlLap_OK") is > 0 ? v.Frame.RawValue("LapDeltaToSessionLastlLap") : null, 2),
+        new("deltaSessionOptimal", "Delta to session optimal lap", ChannelKind.Live, ChannelUnit.Seconds, v => v.Frame.RawValue("LapDeltaToSessionOptimalLap_OK") is > 0 ? v.Frame.RawValue("LapDeltaToSessionOptimalLap") : null, 2),
+        new("distAhead", "Distance to the car ahead (m)", ChannelKind.Live, ChannelUnit.None, v => v.Frame.RawValue("CarDistAhead") is > 0 and var a ? a : null, 0),
+        new("distBehind", "Distance to the car behind (m)", ChannelKind.Live, ChannelUnit.None, v => v.Frame.RawValue("CarDistBehind") is > 0 and var b ? b : null, 0),
+        new("absCut", "ABS brake cut", ChannelKind.Live, ChannelUnit.Percent, v => v.Frame.RawValue("BrakeABScutPct"), 0),
+        new("handbrake", "Handbrake", ChannelKind.Live, ChannelUnit.Percent, v => v.Frame.RawValue("HandbrakeRaw"), 0),
+        new("boost", "Manifold pressure (bar)", ChannelKind.Live, ChannelUnit.None, v => v.Frame.RawValue("ManifoldPress"), 2),
+        new("oilLevel", "Oil level (L)", ChannelKind.Live, ChannelUnit.None, v => v.Frame.RawValue("OilLevel")),
+        new("waterLevel", "Coolant level (L)", ChannelKind.Live, ChannelUnit.None, v => v.Frame.RawValue("WaterLevel")),
+        new("jokerLeft", "Joker laps left", ChannelKind.Live, ChannelUnit.Count, v => v.Frame.RawValue("SessionJokerLapsRemain"), 0),
+        new("pacing", "Pacing", ChannelKind.Live, ChannelUnit.None, v => v.Frame.RawValue("PaceMode"), 0) { Text = Pacing },
+        new("bopWeight", "Weight penalty (kg)", ChannelKind.Live, ChannelUnit.None, v => v.Frame.RawValue("PlayerCarWeightPenalty"), 0),
+        new("bopPower", "Power adjustment", ChannelKind.Live, ChannelUnit.Percent, v => v.Frame.RawValue("PlayerCarPowerAdjust") is { } pa ? pa / 100 : null, 1),
+        TirePressure("LF"), TirePressure("RF"), TirePressure("LR"), TirePressure("RR"),
+        TireTemp("LF"), TireTemp("RF"), TireTemp("LR"), TireTemp("RR"),
+        TireWear("LF", 0), TireWear("RF", 1), TireWear("LR", 2), TireWear("RR", 3),
     };
+
+    private static string Sets(double x) => x >= 255 ? "Unlimited" : x.ToString("F0", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string Pacing(double x) => (int)x switch
+    {
+        0 => "Single file start",
+        1 => "Double file start",
+        2 => "Single file restart",
+        3 => "Double file restart",
+        _ => "Not pacing",
+    };
+
+    private static HudChannel TirePressure(string corner) =>
+        new("tirePress" + corner, "Tire pressure " + corner, ChannelKind.Pits, ChannelUnit.Pressure, v => v.Frame.RawValue(corner + "pressure"));
+
+    private static HudChannel TireTemp(string corner) =>
+        new("tireSurface" + corner, "Tire surface temperature " + corner, ChannelKind.Pits, ChannelUnit.Temp,
+            v => v.Frame.RawValue(corner + "tempL") is { } l && v.Frame.RawValue(corner + "tempM") is { } m && v.Frame.RawValue(corner + "tempR") is { } r ? (l + m + r) / 3 : null, 0);
+
+    private static HudChannel TireWear(string corner, int i) =>
+        new("tireTread" + corner, "Tire tread left " + corner, ChannelKind.Pits, ChannelUnit.Percent,
+            v => v.Frame.TyreWearInner[i] is { } a && v.Frame.TyreWearMiddle[i] is { } b && v.Frame.TyreWearOuter[i] is { } c ? Math.Min(a, Math.Min(b, c)) : null, 0);
 
     public static HudChannel? Find(string id) => All.FirstOrDefault(c => c.Id == id);
 
@@ -121,6 +173,7 @@ internal static class HudChannels
         ChannelKind.Live => "live",
         ChannelKind.Session => "session",
         ChannelKind.Calculated => "calculated",
+        ChannelKind.Pits => "only updates while the car is in the pits",
         _ => "recorded",
     };
 }

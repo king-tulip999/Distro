@@ -83,10 +83,6 @@ internal sealed class SectionView
         _content.Children.Add(host);
     }
 
-    public bool Has(string id) => _entries.ContainsKey(id);
-
-    public SectionDef? Def(string id) => _entries.TryGetValue(id, out var e) ? e.Def : null;
-
     public FrameworkElement? Host(string id) => _entries.TryGetValue(id, out var e) ? e.Host : null;
 
     public bool Built(string id) => _entries.TryGetValue(id, out var e) && Done(e);
@@ -105,14 +101,6 @@ internal sealed class SectionView
     }
 
     public SectionDef? Empty { get; set; }
-
-    public void Reset(string id)
-    {
-        if (!_entries.TryGetValue(id, out var entry) || entry.Def.Id == Current) return;
-        entry.Host.Child = null;
-        entry.Built = false;
-        entry.Offset = 0;
-    }
 
     public void Build(string id)
     {

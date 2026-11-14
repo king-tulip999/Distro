@@ -613,13 +613,6 @@ internal sealed class HudPainter : IDisposable
 
     public Color LabelColor => P.Muted;
 
-    public void Stat(RectangleF r, string label, string value, Color? valueColor = null, Font? valueFont = null, HAlign align = HAlign.Left)
-    {
-        float lh = LineHeight(Label) + 1;
-        Text(LabelText(label), Label, LabelColor, new RectangleF(r.X, r.Y, r.Width, lh), align, VAlign.Top);
-        Text(value, valueFont ?? Bold, valueColor ?? P.Heading, new RectangleF(r.X, r.Y + lh, r.Width, r.Height - lh), align, VAlign.Center);
-    }
-
     public Color PanelColor => P.Surface;
 
     public int PanelAlpha => (int)Math.Round((Background ?? Look.Background) * 2.55);
@@ -883,28 +876,6 @@ internal sealed class HudPainter : IDisposable
             }
         }
         return _classColors.TryGetValue(classId, out var c) ? c : P.Faint;
-    }
-
-    public Color Readable(Color c)
-    {
-        var bg = PanelColor;
-        for (double t = 0; t <= 1.0001; t += 0.1)
-        {
-            var m = HudPalette.Mix(c, P.Text, t);
-            if (Contrast(m, bg) >= 3) return m;
-        }
-        return P.Text;
-    }
-
-    private static double Contrast(Color a, Color b)
-    {
-        static double L(Color c)
-        {
-            static double Lin(int v) { double x = v / 255.0; return x <= 0.04045 ? x / 12.92 : Math.Pow((x + 0.055) / 1.055, 2.4); }
-            return 0.2126 * Lin(c.R) + 0.7152 * Lin(c.G) + 0.0722 * Lin(c.B);
-        }
-        double la = L(a), lb = L(b);
-        return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
     }
 
     private void ClearFonts()

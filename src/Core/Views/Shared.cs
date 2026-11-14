@@ -109,176 +109,6 @@ internal sealed record Choice(string? Id, string Text, string? Extra = null)
     public override string ToString() => Text;
 }
 
-internal sealed class Collapsible : StackPanel
-{
-    private readonly Func<UIElement> _build;
-    private readonly Action<bool> _toggled;
-    private readonly Border _content = new() { Margin = new Thickness(0, 11, 0, 0) };
-    private readonly Icon _chevron = new() { Width = 13, Height = 13, VerticalAlignment = VerticalAlignment.Center };
-    private readonly Icon? _chevronEnd;
-    private readonly FrameworkElement? _tools;
-    private readonly Border? _frame, _bar, _accent;
-    private readonly TextBlock _subtitle;
-    private bool _hover;
-
-    public Collapsible(string title, string subtitle, string icon, (string Soft, string Deep) colors, bool expanded, Func<UIElement> build, Action<bool> toggled, FrameworkElement? tools = null, bool eager = false, bool framed = false)
-    {
-        _build = build;
-        _toggled = toggled;
-        _tools = tools;
-        Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
-
-        var header = new Grid();
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition());
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _chevron.Foreground = Ui.Res<Brush>("TextMuted");
-        header.Children.Add(_chevron);
-        var badge = framed ? new Tile { Width = 36, Height = 36 } : Ui.Badge(icon, colors.Soft, colors.Deep, 28, 8, 14);
-        if (framed)
-        {
-            var glyph = new NavIcon { Glyph = icon, Width = 36, Height = 36, IsActive = true };
-            glyph.SetResourceReference(NavIcon.ForegroundProperty, colors.Deep);
-            badge.Child = glyph;
-        }
-        badge.Margin = framed ? new Thickness(0, 0, 16, 0) : new Thickness(8, 0, 10, 0);
-        badge.VerticalAlignment = VerticalAlignment.Center;
-        _subtitle = new TextBlock { Text = framed ? "" : subtitle, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
-        if (framed)
-        {
-            var name = TextFit.TipWhenTrimmed(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), FontSize = Ui.CardTitleSize, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
-            name.SetResourceReference(TextBlock.ForegroundProperty, "Text");
-            var face = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 10, 0) };
-            face.Children.Add(badge);
-            face.Children.Add(name);
-            if (subtitle.Length > 0) face.ToolTip = subtitle;
-            Grid.SetColumn(face, 1);
-            Grid.SetColumnSpan(face, 2);
-            header.Children.Add(face);
-        }
-        else
-        {
-            Grid.SetColumn(badge, 1);
-            header.Children.Add(badge);
-            var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            titles.Children.Add(Ui.Text(title, "H2"));
-            titles.Children.Add(_subtitle);
-            if (subtitle.Length > 0) titles.ToolTip = subtitle;
-            Grid.SetColumn(titles, 2);
-            header.Children.Add(titles);
-        }
-        if (framed)
-        {
-            _chevronEnd = new Icon { Width = 13, Height = 13, VerticalAlignment = VerticalAlignment.Center, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(-1, 1) };
-            _chevronEnd.Foreground = _chevron.Foreground;
-            Grid.SetColumn(_chevronEnd, 3);
-            header.Children.Add(_chevronEnd);
-        }
-        if (tools is not null && !framed)
-        {
-            tools.VerticalAlignment = VerticalAlignment.Center;
-            tools.Margin = new Thickness(10, 0, 0, 0);
-            Grid.SetColumn(tools, 3);
-            header.Children.Add(tools);
-        }
-
-        Border bar = framed
-            ? new Border { MinHeight = Ui.CardRowHeight - 2, Padding = new Thickness(13, 0, 13, 0), Cursor = System.Windows.Input.Cursors.Hand, Child = header, CornerRadius = ThemeManager.Round(10), Background = Brushes.Transparent }
-            : new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13, 10, 13, 10), Cursor = System.Windows.Input.Cursors.Hand, Child = header };
-        bar.MouseLeftButtonUp += (_, e) =>
-        {
-            if (tools is not null && !framed && e.OriginalSource is DependencyObject d && IsInside(d, tools)) return;
-            Toggle();
-        };
-        Motion.Pressable(bar);
-        AutomationProperties.SetName(bar, title);
-        bar.Focusable = true;
-        bar.FocusVisualStyle = Ui.Res<Style>("FocusRing");
-        bar.KeyDown += (_, e) =>
-        {
-            if (e.Key is not (System.Windows.Input.Key.Enter or System.Windows.Input.Key.Space) || e.OriginalSource != bar) return;
-            e.Handled = true;
-            Toggle();
-        };
-        if (framed)
-        {
-            _bar = bar;
-            _content.Margin = new Thickness(6);
-            _content.Padding = new Thickness(11);
-            _content.CornerRadius = ThemeManager.Round(10);
-            _content.SetResourceReference(Border.BackgroundProperty, "Panel");
-            var inside = new StackPanel();
-            inside.Children.Add(bar);
-            _accent = new Border { Height = 2 };
-            _accent.SetResourceReference(Border.BackgroundProperty, "AccentText");
-            inside.Children.Add(_accent);
-            if (tools is not null)
-            {
-                tools.HorizontalAlignment = HorizontalAlignment.Right;
-                tools.VerticalAlignment = VerticalAlignment.Center;
-                _tools = new Border { Margin = new Thickness(6, 6, 6, 0), Child = tools };
-                inside.Children.Add(_tools);
-            }
-            inside.Children.Add(_content);
-            _frame = new Tile { CornerRadius = ThemeManager.Round(14), Child = inside };
-            _frame.SetResourceReference(Border.BackgroundProperty, "Surface");
-            bar.MouseEnter += (_, _) => { _hover = true; Paint(); };
-            bar.MouseLeave += (_, _) => { _hover = false; Paint(); };
-            Children.Add(_frame);
-        }
-        else
-        {
-            Children.Add(bar);
-            Children.Add(_content);
-        }
-        Expanded = expanded;
-        if (eager) _content.Child = _build();
-        Apply();
-    }
-
-    public bool Expanded { get; private set; }
-
-    public void Toggle()
-    {
-        Expanded = !Expanded;
-        Apply();
-        if (Expanded && IsLoaded) Motion.FadeIn(_content, Motion.RevealMs);
-        _toggled(Expanded);
-    }
-
-    private void Apply()
-    {
-        _chevron.Data = Ui.Res<Geometry>(Expanded ? "I.ChevronDown" : "I.ChevronRight");
-        if (_chevronEnd is not null) _chevronEnd.Data = _chevron.Data;
-        if (Expanded && _content.Child is null)
-            _content.Child = _build();
-        _content.Visibility = Expanded ? Visibility.Visible : Visibility.Collapsed;
-        _subtitle.Visibility = Expanded || _subtitle.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-        if (_tools is not null) _tools.Visibility = Expanded ? Visibility.Visible : Visibility.Collapsed;
-        Paint();
-    }
-
-    private void Paint()
-    {
-        if (_frame is null || _bar is null || _accent is null) return;
-        Hairline.Frame(_frame);
-        _frame.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
-        _accent.Visibility = Expanded ? Visibility.Visible : Visibility.Collapsed;
-        _bar.CornerRadius = ThemeManager.Round(Expanded ? 8 : 11);
-        if (_hover) _bar.SetResourceReference(Border.BackgroundProperty, "Hover");
-        else if (Expanded) _bar.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
-        else _bar.Background = Brushes.Transparent;
-    }
-
-    private static bool IsInside(DependencyObject d, DependencyObject ancestor)
-    {
-        for (var cur = d; cur is not null; cur = cur is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(cur) : LogicalTreeHelper.GetParent(cur))
-            if (cur == ancestor) return true;
-        return false;
-    }
-}
-
 internal static class Ui
 {
     public const double HeaderGap = 4;
@@ -1199,13 +1029,6 @@ internal static class Ui
         row.MouseLeave += (_, _) => row.Background = Brushes.Transparent;
     }
 
-    public static void HoverHighlight(Panel row)
-    {
-        row.Background = Brushes.Transparent;
-        row.MouseEnter += (_, _) => row.SetResourceReference(Panel.BackgroundProperty, "Hover");
-        row.MouseLeave += (_, _) => row.Background = Brushes.Transparent;
-    }
-
     private static double LongestWord(TextBlock tb)
     {
         double longest = 0;
@@ -1215,8 +1038,6 @@ internal static class Ui
     }
 
     public static Border Divider() => Hairline.Rule(new SettingDivider { Background = Res<Brush>("Line"), Margin = new Thickness(0, 2, 0, 2) });
-
-    public static Border AccentRule(Thickness margin) => new() { Height = 2, Margin = margin, IsHitTestVisible = false, Background = Res<Brush>("Accent") };
 
     public static System.Windows.Shapes.Rectangle CheckerStrip(double width, double height, double opacity = 0.5) => new()
     {

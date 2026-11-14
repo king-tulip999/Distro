@@ -35,12 +35,6 @@ internal sealed class DisplaysPlugin : Plugin
         new PluginPage("displays", "Displays", "I.Monitor", (app, window) => new DisplaysPage(app, window)),
     };
 
-    public override string? Status(AppServices app)
-    {
-        int profiles = app.Config.Displays.Profiles.Count;
-        return $"{SimRacing.Race.RaceFormat.Count(profiles, "display profile")}";
-    }
-
     protected override void OnStart(AppServices app) { }
 
     protected override void OnStop(AppServices app) { }

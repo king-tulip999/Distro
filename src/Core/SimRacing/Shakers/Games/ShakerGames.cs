@@ -32,6 +32,4 @@ internal static class ShakerGames
         ShakerGame.Packets("lfs", "Live for Speed", new[] { "LFS.exe" }, LfsPort,
             "In cfg.txt set OutGauge and OutSim Mode 1, IP 127.0.0.1, both on the port below, OutSim Opts 0.", () => new OutGaugeParser(beam: false)),
     };
-
-    public static ShakerGame? Find(string id) => All.FirstOrDefault(g => string.Equals(g.Id, id, StringComparison.OrdinalIgnoreCase));
 }

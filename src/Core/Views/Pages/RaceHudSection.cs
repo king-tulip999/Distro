@@ -22,7 +22,7 @@ internal interface IHudEditorHost
     string ShownLayout { get; }
     void Changed();
     Task<bool> Confirm(string title, string message, string confirmText, bool danger);
-    void ShowSettings();
+    void ShowSettings(string anchor);
 }
 
 internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdit, IHudEditorHost, IStagedBuild
@@ -226,12 +226,12 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
 
     public Task<bool> Confirm(string title, string message, string confirmText, bool danger) => _window.Confirm(title, message, confirmText, danger);
 
-    public void ShowSettings()
+    public void ShowSettings(string anchor = WebAnchor)
     {
         SelectTab(SettingsTab);
         Dispatcher.BeginInvoke(new Action(() =>
         {
-            if (Ui.FindAnchor(_body, WebAnchor) is not { } web) return;
+            if (Ui.FindAnchor(_body, anchor) is not { } web) return;
             web.UpdateLayout();
             web.BringIntoView(new Rect(0, 0, web.ActualWidth, web.ActualHeight));
             HighlightAdorner.Flash(web);
@@ -656,7 +656,50 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         var web = BrowserSources(_app, Changed);
         Ui.Anchor(web, WebAnchor);
         root.Children.Insert(Math.Min(1, root.Children.Count), web);
+        var vr = VrHeadsets(_app, Changed);
+        Ui.Anchor(vr, VrAnchor);
+        root.Children.Insert(Math.Min(2, root.Children.Count), vr);
         return root;
+    }
+
+    internal static Tile VrHeadsets(AppServices app, Action changed)
+    {
+        var S = app.Config.SimRacing.Hud;
+        HudHost? Host() => app.Plugins.Find(PluginIds.SimRacing) is SimRacingPlugin { Hud: { } hud } ? hud : null;
+        var status = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4) };
+        void Refresh()
+        {
+            var vr = Host()?.Vr;
+            string text = "";
+            bool warn = false;
+            if (S.VrOverlays && vr is not null)
+            {
+                if (vr.Problem is { } problem) { text = problem; warn = true; }
+                else
+                {
+                    string steam = vr.SteamVrConnected ? "SteamVR: connected." : vr.SteamVrRunning ? "SteamVR: " + (vr.SteamVrProblem ?? "connecting.") : "SteamVR: not running.";
+                    string xr = vr.OpenXrSeen ? "OpenXR: showing in iRacing." : "OpenXR: waiting for iRacing in VR.";
+                    text = steam + " " + xr;
+                }
+            }
+            status.Text = text;
+            if (warn) status.SetResourceReference(TextBlock.ForegroundProperty, "WarnDeep");
+            else status.ClearValue(TextBlock.ForegroundProperty);
+            status.Visibility = text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        var toggle = Ui.Switch(S.VrOverlays, on => { S.VrOverlays = on; changed(); Host()?.SyncVr(); Refresh(); });
+        Refresh();
+        var tile = Group("VR headsets", null,
+            Ui.SettingRow("VR widgets", "Widgets set to show in VR appear in SteamVR and in OpenXR games, iRacing included. Each widget's spot is on its page.", toggle),
+            status);
+        void Hook(HudHost? host, bool on)
+        {
+            if (host is null) return;
+            if (on) host.Vr.Changed += Refresh; else host.Vr.Changed -= Refresh;
+        }
+        tile.Loaded += (_, _) => { Hook(Host(), true); Refresh(); };
+        tile.Unloaded += (_, _) => Hook(Host(), false);
+        return tile;
     }
 
     internal static Tile BrowserSources(AppServices app, Action changed)
@@ -1295,7 +1338,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         Build();
     }
 
-    public const string LayoutsAnchor = "simracing.hud.layouts", AlertsAnchor = "simracing.hud.alerts", FuelAnchor = "simracing.hud.fuelformulas", SettingsAnchor = "simracing.hud.settings", WebAnchor = "simracing.hud.web";
+    public const string LayoutsAnchor = "simracing.hud.layouts", AlertsAnchor = "simracing.hud.alerts", FuelAnchor = "simracing.hud.fuelformulas", SettingsAnchor = "simracing.hud.settings", WebAnchor = "simracing.hud.web", VrAnchor = "simracing.hud.vr";
 
     public bool ShowTabFor(string anchor)
     {
@@ -1304,7 +1347,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             LayoutsAnchor => WidgetsTab,
             AlertsAnchor => AlertsTabIndex,
             FuelAnchor => FuelTabIndex,
-            SettingsAnchor or WebAnchor => SettingsTab,
+            SettingsAnchor or WebAnchor or VrAnchor => SettingsTab,
             _ => -1,
         };
         Finish();
@@ -1320,8 +1363,6 @@ internal sealed class PreviewSource
     private readonly TelemetryFrame _frame = new();
     private long _seq;
     private static Task<PreviewSource>? _warming;
-
-    public static void Warm(Func<RaceHudSettings> settings) => _warming ??= Task.Run(() => new PreviewSource(Simulation(settings)));
 
     public static PreviewSource Take(Func<RaceHudSettings> settings)
     {

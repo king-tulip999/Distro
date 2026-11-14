@@ -47,11 +47,6 @@ public partial class App : Application
             HudSheet.Run(this, sheetFolder);
             return;
         }
-        if (ArgValue(e.Args, HudProto.Arg) is { } protoFolder)
-        {
-            HudProto.Run(this, protoFolder);
-            return;
-        }
         if (ArgValue(e.Args, HudSheet.FramesArg) is { } framesFolder)
         {
             HudSheet.Run(this, framesFolder, frames: true);
@@ -251,8 +246,14 @@ public partial class App : Application
 
     internal static void RelaunchAfterExit(string args, IEnumerable<string>? steps = null, string? exe = null, string? scratch = null)
     {
-        if (!Core.Services.External.Allowed("restart")) return;
         exe ??= Environment.ProcessPath!;
+        var all = new List<string>(steps ?? Array.Empty<string>()) { $"start \"\" {BatchPath(exe)} {args}" };
+        RunAfterExit("restart", all, exe, scratch);
+    }
+
+    internal static void RunAfterExit(string what, IEnumerable<string> steps, string exe, string? scratch = null)
+    {
+        if (!Core.Services.External.Allowed(what)) return;
         int pid = Environment.ProcessId;
         var script = Path.Combine(scratch ??= Scratch(exe), $"{AppIdentity.Name}-relaunch-{pid}.cmd");
         var lines = new List<string>
@@ -262,8 +263,7 @@ public partial class App : Application
             ":wait",
             $"{SystemTool("tasklist")} /fi \"PID eq {pid}\" | {SystemTool("find")} \"{pid}\" >nul && ({WaitASecond} & goto wait)",
         };
-        if (steps is not null) lines.AddRange(steps);
-        lines.Add($"start \"\" {BatchPath(exe)} {args}");
+        lines.AddRange(steps);
         lines.Add(IsProtectedScratch(scratch) ? $"cd /d \"%SystemRoot%\" & rd /s /q {BatchPath(scratch)}" : "del \"%~f0\"");
         WriteScript(script, lines);
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(SystemExe("cmd"), $"/c \".\\{Path.GetFileName(script)}\"")

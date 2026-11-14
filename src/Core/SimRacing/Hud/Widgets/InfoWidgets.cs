@@ -721,6 +721,7 @@ internal sealed class BlockWidget : HudWidget
         string unit = HudChannels.UnitText(channel.Unit, v.Units);
         int decimals = o.Int("decimals") is >= 0 and var d ? d : channel.Decimals;
         string text = value is not { } x ? RaceFormat.Missing
+            : channel.Text is { } named ? named(x)
             : channel.Unit == ChannelUnit.LapTime ? (channel.Id is "timeLeft" or "stint" ? RaceFormat.Clock(x) : RaceFormat.LapTime(x))
             : x.ToString("F" + decimals, System.Globalization.CultureInfo.InvariantCulture);
         double warn = o.Number("warn"), crit = o.Number("crit");
@@ -735,7 +736,7 @@ internal sealed class BlockWidget : HudWidget
         double frac = value is { } fv && maxV > minV ? (fv - minV) / (maxV - minV) : 0;
         var lower = RectangleF.Empty;
         var main = visual == "number" ? body : body.Top(Math.Max(body.Height * 0.62f, Math.Min(body.Height, p.LineHeight(p.Big))), out lower);
-        string shownUnit = unit.Length > 0 && channel.Unit != ChannelUnit.LapTime ? unit : "";
+        string shownUnit = unit.Length > 0 && channel.Unit != ChannelUnit.LapTime && channel.Text is null ? unit : "";
         float unitW = shownUnit.Length > 0 ? p.Measure(shownUnit, p.SmallBold) + 4 : 0;
         var font = p.Fitting(text, main.Width - unitW, main.Height + 4, p.Huge, p.Font(26f, true), p.Big, p.Bold);
         p.Number(text, shownUnit, font, color, main, HAlign.Center, VAlign.Center);

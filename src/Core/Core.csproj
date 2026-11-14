@@ -48,6 +48,8 @@
     <EmbeddedResource Include="SimRacing\IracingFiles\demo-values.json" />
     <EmbeddedResource Include="SimRacing\Hud\Web\Pages\*" LogicalName="web/%(Filename)%(Extension)" />
     <EmbeddedResource Include="Assets\TrackMaps.zip" LogicalName="TrackMaps.zip" Condition="Exists('Assets\TrackMaps.zip')" />
+    <!-- OpenXR layer that shows VR widgets in OpenXR games (built by devtools\tools\vr-layer.cmd from src\VrLayer). -->
+    <EmbeddedResource Include="Assets\VelocitaXr.dll" LogicalName="VelocitaXr.dll" Condition="Exists('Assets\VelocitaXr.dll')" />
   </ItemGroup>
 
   <ItemGroup>
@@ -68,6 +70,8 @@
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
     <!-- Direct2D / DirectWrite: overlay text drawn by DirectWrite for crisp glyphs (Overlay/SharpText.cs). -->
     <PackageReference Include="Vortice.Direct2D1" Version="3.8.3" />
+    <!-- Direct3D 11: the textures VR widgets are handed to SteamVR in. -->
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
   </ItemGroup>
 
 </Project>

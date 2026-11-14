@@ -23,8 +23,6 @@ public sealed class WindowProfileSettings
     [System.Text.Json.Serialization.JsonIgnore]
     public IEnumerable<WindowProfile> Ungrouped => Profiles.Where(p => p.GroupId is null);
 
-    public WindowGroup? GroupOf(WindowProfile p) => p.GroupId is null ? null : Groups.FirstOrDefault(g => g.Id == p.GroupId);
-
     [System.Text.Json.Serialization.JsonIgnore]
     public IEnumerable<string> Names => Profiles.Select(p => p.Name).Concat(Groups.Select(g => g.Name));
 
@@ -149,5 +147,4 @@ public sealed class WindowGroup
     public string Name { get; set; } = "";
 
     public string? Hotkey { get; set; }
-
 }

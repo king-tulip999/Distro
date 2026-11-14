@@ -103,6 +103,8 @@ internal sealed class SessionInfo
 
     public double? PitBoxPct { get; init; }
 
+    public IReadOnlyDictionary<int, string> TireCompounds { get; init; } = new Dictionary<int, string>();
+
     public string TrackDirection { get; init; } = "";
 
     public bool StandingStart { get; init; }
@@ -200,8 +202,14 @@ internal sealed class SessionInfo
             if (list.Count > 0) results[SessionYaml.Int(s, "SessionNum") ?? 0] = list;
         }
 
+        var tires = new Dictionary<int, string>();
+        foreach (var t in SessionYaml.Items(driverInfo, "DriverTires"))
+            if (SessionYaml.Int(t, "TireIndex") is >= 0 and var tireIndex && SessionYaml.Str(t, "TireCompoundType") is { } compound)
+                tires[tireIndex] = compound;
+
         return new SessionInfo
         {
+            TireCompounds = tires,
             TrackName = SessionYaml.Str(weekend, "TrackName") ?? "",
             TrackDisplayName = SessionYaml.Str(weekend, "TrackDisplayName") ?? SessionYaml.Str(weekend, "TrackName") ?? "",
             TrackConfig = SessionYaml.Str(weekend, "TrackConfigName") ?? "",

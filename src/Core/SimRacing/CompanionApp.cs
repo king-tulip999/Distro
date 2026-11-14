@@ -224,13 +224,6 @@ internal sealed class CompanionApp
         StopIracingWatch();
     }
 
-    public void SetActive(bool on)
-    {
-        _off = !on;
-        if (on) UpdateWatch();
-        else Stop();
-    }
-
     private bool _off;
 
     private void StopIracingWatch()

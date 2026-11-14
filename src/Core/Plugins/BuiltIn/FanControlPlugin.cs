@@ -75,11 +75,6 @@ internal sealed class FanControlPlugin : Plugin
         }
     }
 
-    public override string? Status(AppServices app) =>
-        !app.Config.Fans.Enabled ? "Fan control switched off · BIOS / driver in charge"
-        : app.Hardware.Catalog?.Emergency == true ? "Emergency: fans at 100%"
-        : $"Following preset “{app.Config.Fans.ActivePreset}”";
-
     protected override void OnStart(AppServices app) => app.SetFanControlAvailable(true);
 
     protected override void OnStop(AppServices app) => app.SetFanControlAvailable(false);

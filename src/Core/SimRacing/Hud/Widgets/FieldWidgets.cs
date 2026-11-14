@@ -344,6 +344,7 @@ internal static class FieldColumns
     public static readonly HudChoice Badge = new("badge", "License and iRating badge", "The license class and safety rating, the iRating beside it");
     public static readonly HudChoice AvgLap = new("avglap", "Average lap", "Of a driver's last few laps (Laps in the average)");
     public static readonly HudChoice LapsDone = new("lapsdone", "Laps completed");
+    public static readonly HudChoice Tire = new("tire", "Tires", "The compound a car is on: S soft, M medium, H hard, D dry, W wet. Named for cars of your model; other cars show D or W");
 
     public static readonly HudOption NameFormat = HudOption.Choice("nameFormat", "Names", "full",
         new HudChoice("full", "Full name"), new HudChoice("initial", "First initial and last name"), new HudChoice("last", "Last name only"), new HudChoice("first", "First name and last initial"));
@@ -533,6 +534,16 @@ internal static class FieldColumns
                     };
                 });
             case "stint": return new Column(id, "STINT", "00 L", HAlign.Right, car => new Cell(PooledText.Number("", r.StintLapsOf(car), " L"), pal.Muted));
+            case "tire":
+                return new Column(id, "TIRE", "W", HAlign.Center, car => TireLetters.Of(f, car) is not { } letter ? None : new Cell(letter, letter switch
+                {
+                    "S" or "A" => pal.DangerText,
+                    "M" => pal.WarnText,
+                    "I" => pal.GoodText,
+                    "W" => pal.Lapped,
+                    "H" => pal.Heading,
+                    _ => pal.Text,
+                }, true));
             case "out": return new Column(id, "", "OUT", HAlign.Center, car => r.OnOutLap(car) ? new Cell("OUT", pal.Text, Pill: pal.Slate) : None);
             case "inc": return new Column(id, "INC", "00x", HAlign.Right, car => D(car)?.Incidents is { } i ? new Cell(PooledText.Number("", i, "x"), pal.Muted) : None);
             case "trend":
@@ -573,7 +584,7 @@ internal sealed class RelativeWidget : HudWidget
         HudOption.Columns("columns", "Columns", "cpos,num,badge,name,out,last,gap",
             FieldColumns.Pos, FieldColumns.ClassPos, FieldColumns.Change, FieldColumns.Number, FieldColumns.Name, FieldColumns.Team,
             FieldColumns.Badge, FieldColumns.IRatingChange, FieldColumns.Last, FieldColumns.Best, FieldColumns.AvgLap,
-            FieldColumns.PaceDelta, FieldColumns.Laps, FieldColumns.LapsDone, FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Incidents, FieldColumns.Trend,
+            FieldColumns.PaceDelta, FieldColumns.Laps, FieldColumns.LapsDone, FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Tire, FieldColumns.Incidents, FieldColumns.Trend,
             new HudChoice("gap", "Gap (seconds)")),
         Editors.HudClassFilter.Scope,
         Editors.HudClassFilter.List,
@@ -789,7 +800,7 @@ internal sealed class StandingsWidget : HudWidget
             FieldColumns.Pos, FieldColumns.ClassPos, FieldColumns.Change, FieldColumns.Number, FieldColumns.Name, FieldColumns.Team,
             FieldColumns.Badge, FieldColumns.IRatingChange, new HudChoice("gap", "Gap"), new HudChoice("int", "Interval (car ahead)"),
             new HudChoice("gapme", "Gap to you"), FieldColumns.LapsDone, FieldColumns.Last, FieldColumns.Best, FieldColumns.AvgLap, FieldColumns.PaceDelta,
-            FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Incidents),
+            FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Tire, FieldColumns.Incidents),
         HudOption.Bool("group", "Group by class", true, "Multiclass: one block per class, positions within the class."),
         HudOption.Choice("classOrder", "Class order", "fastest", new HudChoice("position", "By their leader's position"), new HudChoice("fastest", "Fastest class first")),
         HudOption.Set("classInfo", "Class headings", "cars,sof,laps", null,

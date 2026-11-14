@@ -10,7 +10,8 @@ internal sealed class TimingWidget : HudWidget
 {
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
-        HudOption.Choice("reference", "Delta to", "optimal", new HudChoice("best", "My best lap"), new HudChoice("session", "Session best"), new HudChoice("optimal", "My optimal lap", "Best sectors combined")),
+        HudOption.Choice("reference", "Delta to", "optimal", new HudChoice("best", "My best lap"), new HudChoice("session", "Session best"), new HudChoice("optimal", "My optimal lap", "Best sectors combined"),
+            new HudChoice("lastlap", "My last lap"), new HudChoice("sessionOptimal", "Session optimal lap", "The best sectors of the session combined")),
         HudOption.Bool("bar", "Delta bar", true),
         HudOption.Number("range", "Bar range", 1.0, 0.2, 5, 0.1, Units.S),
         HudOption.Columns("fields", "Times", "last,current,best,predicted",
@@ -36,11 +37,13 @@ internal sealed class TimingWidget : HudWidget
         {
             "session" => (f.DeltaSessionBest, f.DeltaSessionBestOk, FieldOrder.FastestLap(f)?.Time),
             "optimal" => (f.DeltaOptimal, f.DeltaOptimalOk, LapMath.Theoretical(LapMath.BestSectors(v.Race.Laps.Laps, v.Race.Laps.SectorCount))),
+            "lastlap" => (f.RawValue("LapDeltaToSessionLastlLap"), f.RawValue("LapDeltaToSessionLastlLap_OK") is > 0, f.LapLast),
+            "sessionOptimal" => (f.RawValue("LapDeltaToSessionOptimalLap"), f.RawValue("LapDeltaToSessionOptimalLap_OK") is > 0, null),
             _ => (f.DeltaBest, f.DeltaBestOk, f.LapBest),
         };
         double? d = ok ? delta : null;
         var color = d is null ? p.P.Muted : d < 0 ? p.P.GoodText : p.P.DangerText;
-        string refLabel = reference switch { "session" => "Δ SESSION BEST", "optimal" => "Δ OPTIMAL", _ => "Δ MY BEST" };
+        string refLabel = reference switch { "session" => "Δ SESSION BEST", "optimal" => "Δ OPTIMAL", "lastlap" => "Δ LAST LAP", "sessionOptimal" => "Δ SESSION OPTIMAL", _ => "Δ MY BEST" };
         var fields = v.Options.Columns("fields");
         bool bar = v.Options.Bool("bar");
         bool sectors = v.Options.Bool("sectors") && v.Race.Laps.SectorCount > 1;

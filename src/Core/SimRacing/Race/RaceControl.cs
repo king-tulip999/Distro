@@ -88,20 +88,6 @@ internal static class RaceControl
         _ => AlertLevel.Info,
     };
 
-    public static string? PitStatus(int? status) => status switch
-    {
-        null or 0 => null,
-        1 => "Service in progress",
-        2 => "Service complete",
-        100 => "Too far left",
-        101 => "Too far right",
-        102 => "Too far forward",
-        103 => "Too far back",
-        104 => "Bad angle",
-        105 => "Can't repair that",
-        _ => "Pit status " + status,
-    };
-
     public static string SessionPhaseLabel(SessionPhase p) => p switch
     {
         SessionPhase.GetInCar => "Get in car",

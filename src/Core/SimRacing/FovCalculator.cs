@@ -8,7 +8,6 @@ internal readonly record struct V2(double X, double Y)
     public static V2 operator -(V2 a, V2 b) => new(a.X - b.X, a.Y - b.Y);
     public static V2 operator *(V2 a, double k) => new(a.X * k, a.Y * k);
     public double Length => Math.Sqrt(X * X + Y * Y);
-    public double Dot(V2 b) => X * b.X + Y * b.Y;
 }
 
 internal sealed record ScreenSize(double WidthCm, double HeightCm, double Aspect, double ChordCm, double? RadiusCm);
@@ -200,5 +199,4 @@ internal static class FovCalculator
 
     private static List<V2> Mirror(List<V2> rightHalf) =>
         rightHalf.Skip(1).Reverse().Select(p => new V2(-p.X, p.Y)).Concat(rightHalf).ToList();
-
 }

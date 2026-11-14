@@ -41,11 +41,11 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         new(GeneralId, "General", "I.Tune"),
     };
 
-    internal static SectionList SectionsFor(AppServices app) => new(SidebarViews, GeneralId, Movable: false);
+    internal static SectionList SectionsFor() => new(SidebarViews, GeneralId, Movable: false);
 
-    public IReadOnlyList<PageSection> Sections => SectionsFor(_app).Sections;
+    public IReadOnlyList<PageSection> Sections => SectionsFor().Sections;
 
-    public string? CurrentSection => SectionsFor(_app).Current;
+    public string? CurrentSection => SectionsFor().Current;
 
     public bool SectionsMovable => false;
 
@@ -611,6 +611,8 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         }
         section.Children.Add(ResetRow());
         section.Children.Add(Ui.Divider());
+        section.Children.Add(UninstallRow());
+        section.Children.Add(Ui.Divider());
         BuildDiagnostics(section);
     }
 
@@ -972,6 +974,47 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             return;
         }
         App.RelaunchAfterExit("");
+    }
+
+    private Grid UninstallRow()
+    {
+        var button = Ui.LabeledButton("I.Trash", $"Uninstall {AppIdentity.Name}", () => _ = UninstallAsync(), "DangerButton");
+        button.ToolTip = "Asks first. Nothing is kept.";
+        var row = Ui.ControlBelow(Ui.SettingRow("Uninstall",
+            $"Deletes {AppIdentity.ExeName}, your settings and everything {AppIdentity.Name} saved on this PC.",
+            button));
+        Ui.Anchor(row, "settings.uninstall");
+        return row;
+    }
+
+    private async Task UninstallAsync()
+    {
+        if (_app.Demo)
+        {
+            _app.Notify("Demo mode", "Demo mode never changes this PC, so there's nothing to uninstall.", NoticeKind.Info);
+            return;
+        }
+        string data = AppIdentity.IsTecnica
+            ? "window profiles, display profiles, fan curves and calibration, overlay layouts"
+            : "overlay layouts, session stats, lap traces, setups, liveries and the iRacing backups it made";
+        string kept = AppIdentity.IsTecnica
+            ? "Fan control stops and the fans go back to the BIOS / driver. Kept: the PawnIO driver (Windows Settings → Apps → Installed apps → PawnIO) and changes already made to Windows (displays, sound)."
+            : "Kept: iRacing's own files in Documents.";
+        if (!await _window.Confirm($"Uninstall {AppIdentity.Name}?",
+                $"{AppIdentity.Name} closes, then {AppIdentity.ExeName} ({Environment.ProcessPath}) and everything it saved are deleted: " +
+                $"your settings, {data}, the error log, settings backups and the Start with Windows task.\n\n" +
+                $"This can't be undone; export your settings first to keep a copy. {kept}",
+                "Uninstall", danger: true) || !External.Allowed(Uninstaller.Action))
+            return;
+        try
+        {
+            var steps = await Task.Run(Uninstaller.Prepare);
+            App.RunAfterExit(Uninstaller.Action, steps, Environment.ProcessPath!);
+        }
+        catch (Exception ex)
+        {
+            _app.Notify("Couldn't uninstall", ex.Message, NoticeKind.Error, important: true);
+        }
     }
 
     private static Tile WithAction(Tile notice, Button action)

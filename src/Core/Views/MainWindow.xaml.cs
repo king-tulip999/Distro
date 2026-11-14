@@ -29,7 +29,6 @@ public partial class MainWindow : Window, IModalHost
     private readonly Dictionary<string, string> _nav = new();
     private readonly Dictionary<string, Func<FrameworkElement>> _factories = new();
     private readonly Dictionary<string, FrameworkElement> _pages = new();
-    internal FrameworkElement? PageOf(string key) => _pages.GetValueOrDefault(key);
     private string? _current;
 
     public string? CurrentPage => _current;
@@ -274,7 +273,7 @@ public partial class MainWindow : Window, IModalHost
     internal SectionList? SectionsOf(string key)
     {
         if (_pages.GetValueOrDefault(key) is ISectionedPage page) return new SectionList(page.Sections, page.CurrentSection, page.SectionsMovable);
-        if (key == "settings") return SettingsPage.SectionsFor(_app);
+        if (key == "settings") return SettingsPage.SectionsFor();
         return _app.Plugins.PageOwner(key) is { Page.Sections: { } sections } ? sections(_app) : null;
     }
 
@@ -665,8 +664,6 @@ public partial class MainWindow : Window, IModalHost
         page.UpdateLayout();
     }
 
-    internal bool Showing(FrameworkElement page) => ReferenceEquals(page.Parent, _pageHost) && page.Visibility == Visibility.Visible;
-
     private void RemovePage(string key)
     {
         if (_pages.Remove(key, out var page)) _pageHost.Children.Remove(page);
@@ -704,8 +701,6 @@ public partial class MainWindow : Window, IModalHost
             {
                 if (p is ISectionedPage sectioned) sectioned.ShowSectionOf(target);
                 if (p is IShowAnchor shows) shows.ShowAnchor(target);
-                for (DependencyObject? cur = target; cur is not null; cur = LogicalTreeHelper.GetParent(cur))
-                    if (cur is Collapsible { Expanded: false } section) section.Toggle();
                 target.UpdateLayout();
                 target.BringIntoView();
                 if (flash) HighlightAdorner.Flash(target);

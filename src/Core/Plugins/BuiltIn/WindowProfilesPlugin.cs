@@ -64,16 +64,6 @@ internal sealed class WindowProfilesPlugin : Plugin
         items.Add(menu);
     }
 
-    public override string? Status(AppServices app)
-    {
-        var s = app.Config.WindowProfiles;
-        int n = s.Profiles.Count;
-        if (n == 0) return "No profiles yet";
-        int auto = s.Profiles.Count(p => p.Auto);
-        string count = SimRacing.Race.RaceFormat.Count(n, "profile");
-        return !s.AutoApply ? $"{count} · applying automatically is off" : auto == 0 ? count : $"{count}, {auto} automatic";
-    }
-
     protected override void OnStart(AppServices app) => app.WindowProfiles.Refresh();
 
     protected override void OnStop(AppServices app) => app.WindowProfiles.Refresh();
