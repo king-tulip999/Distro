@@ -73,8 +73,12 @@ internal sealed partial class RaceHudWidgets
         _previewWell.SetResourceReference(Border.BorderBrushProperty, "Line");
 
         var hint = new TextBlock { Text = "Click a part of the widget to change it; drag items to reorder", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
-        var all = Ui.LabeledButton("I.Sliders", "All settings", () => OpenPanel(new PanelTarget(null, null, null)));
+        var all = Ui.LabeledButton("I.Sliders", "All settings", () =>
+        {
+            if (_openPanel is { SettingId: null }) ClosePanel(); else OpenPanel(new PanelTarget(null, null, null));
+        });
         all.ToolTip = "Every setting of this widget in one panel";
+        _allButton = all;
         var head = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(all, Dock.Right);
         all.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
@@ -134,6 +138,17 @@ internal sealed partial class RaceHudWidgets
         if (_well is not null) _well.Height = WellHeight();
         _pin = (null, null);
         Highlight(null);
+        ShowAllOpen();
+    }
+
+    private Button? _allButton;
+
+    private void ShowAllOpen()
+    {
+        if (_allButton is null) return;
+        bool open = _openPanel is { SettingId: null };
+        _allButton.Content = open ? Ui.IconLabel("I.Tick", "Done") : Ui.IconLabel("I.Sliders", "All settings");
+        Ui.SetToggled(_allButton, open);
     }
 
     private void RebuildPanel()
@@ -167,6 +182,7 @@ internal sealed partial class RaceHudWidgets
             content = IsList(def, setting) ? PartPanel(def, w, setting, target, _panelWide) : OptionPanel(editor, setting);
         }
         RefreshVisibility();
+        ShowAllOpen();
 
         var close = Ui.IconButton("I.X", "Close", ClosePanel, "QuietIconButton");
         var name = TextFit.TipWhenTrimmed(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
