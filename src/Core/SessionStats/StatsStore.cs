@@ -309,7 +309,7 @@ internal sealed class StatsStore : IDisposable
                 InsertLaps(target.Id, newLaps, null);
                 return;
             }
-            MergeTotals(target.Id, Since(row, target.Last), row.Laps - (target.Last?.Laps ?? 0), target.LapOffset);
+            MergeTotals(target.Id, Since(row, target.Last), row.Laps - (target.Last?.Laps ?? 0), target.LapOffset, target.RunOffset);
             target.Last = row.Copy();
             InsertLaps(target.Id, newLaps, target.LapOffset, target.RunOffset);
         });
@@ -411,13 +411,15 @@ internal sealed class StatsStore : IDisposable
     {
         int offset = Convert.ToInt32(_db.Scalar("SELECT COALESCE(MAX(lap), 0) FROM laps WHERE session_id = ?1", id) ?? 0L);
         int runs = Convert.ToInt32(_db.Scalar("SELECT COALESCE(MAX(run), 0) FROM laps WHERE session_id = ?1", id) ?? 0L);
-        MergeTotals(id, r, laps.Count, offset);
+        MergeTotals(id, r, laps.Count, offset, runs);
         InsertLaps(id, laps, offset, runs);
         return offset;
     }
 
-    private void MergeTotals(long id, SessionRow r, int lapCount, int lapOffset = 0)
+    private void MergeTotals(long id, SessionRow r, int lapCount, int lapOffset = 0, int runOffset = 0)
     {
+        var saved = TyreWear.Parse(_db.Scalar("SELECT tyre_wear FROM sessions WHERE id = ?1", id) as string);
+        var tyres = r.Tyres?.Where(t => t.Laps > 0 || !saved.Any(x => x.Now.Zip(t.Now).All(p => Math.Abs(p.First - p.Second) < TyreWearTracker.Same))).ToList();
         _db.Run("""
             UPDATE sessions SET start_utc = MIN(start_utc, ?2), end_utc = MAX(end_utc, ?3), laps = laps + ?4, incidents = COALESCE(MAX(incidents, ?5), incidents, ?5),
             start_pos = COALESCE(start_pos, ?6), finish_pos = COALESCE(?7, finish_pos), finished = MAX(finished, ?8),
@@ -443,7 +445,7 @@ internal sealed class StatsStore : IDisposable
             """, id, Unix(r.StartUtc), Unix(r.EndUtc), lapCount, r.Incidents, r.StartPos, r.FinishPos, r.Finished,
             r.DriveS, r.GarageS, r.LongestStintS, r.RainS, r.NightS, r.TrackTempMin, r.TrackTempMax, r.DistanceKm, r.PitStops, r.PitS,
             r.AirTemp, r.WindKph, r.WindDir, r.Humidity, r.Pressure, r.AirDensity, r.Skies, r.RainMax, r.WetnessMax, r.Rubber, r.SimStart,
-            r.TrackId, r.TrackName, r.TankL, TyreWear.Text(r.Tyres, lapOffset), r.Tier, r.TierPos, r.LapsLed, r.Field,
+            r.TrackId, r.TrackName, r.TankL, TyreWear.Text(tyres, lapOffset, runOffset), r.Tier, r.TierPos, r.LapsLed, r.Field,
             r.AirTempMin, r.AirTempMax, r.WindMin, r.WindMax, r.HumidityMin, r.HumidityMax, r.TierStart);
     }
 
@@ -458,6 +460,24 @@ internal sealed class StatsStore : IDisposable
         if (r.SessionType != "Race" || !r.Official) return;
         var after = _db.Query(RatedPick + " AND start_utc > ?4 ORDER BY start_utc LIMIT 1", r.DriverId, r.Category, r.Id, Unix(r.StartUtc));
         if (after.Count > 0) SetDelta(r.Id, r.IrStart, r.SrStart, after[0][2], after[0][3]);
+    }
+
+    private void FixTyreRuns()
+    {
+        if (Meta("tyre_runs") is not null) return;
+        _db.Transaction(() =>
+        {
+            foreach (var session in _db.Query("SELECT id, tyre_wear FROM sessions WHERE tyre_wear IS NOT NULL"))
+            {
+                var runs = _db.Query("SELECT lap, run FROM laps WHERE session_id = ?1 AND run IS NOT NULL", session[0])
+                    .ToDictionary(r => Convert.ToInt32(r[0]), r => Convert.ToInt32(r[1]));
+                var readings = TyreWear.Parse(session[1] as string);
+                var fixedReadings = TyreWear.WithLapRuns(readings, runs);
+                if (!ReferenceEquals(fixedReadings, readings))
+                    _db.Run("UPDATE sessions SET tyre_wear = ?2 WHERE id = ?1", session[0], TyreWear.Text(fixedReadings));
+            }
+            SetMeta("tyre_runs", "1");
+        });
     }
 
     private const string RatingsVersion = "2";

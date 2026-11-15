@@ -44,7 +44,12 @@ internal static class StatsSessionView
         if (ticked.Count == 0 && laps.Where(l => d.Traced.Contains(l.Lap)).OrderByDescending(l => l.Clean).ThenBy(l => l.Time).FirstOrDefault() is { } first) ticked.Add(first.Lap);
 
         var analyzeButton = Ui.LabeledButton("I.Activity", "Analyze", () => analyze(ticked.OrderBy(x => x).ToList()), "PrimaryButton");
-        void Sync() => analyzeButton.IsEnabled = ticked.Count is > 0 and <= MaxLaps;
+        var tickBoxes = new List<(CheckBox Box, int Lap, bool Traced)>();
+        void Sync()
+        {
+            analyzeButton.IsEnabled = ticked.Count is > 0 and <= MaxLaps;
+            foreach (var (box, lap, traced) in tickBoxes) box.IsEnabled = traced && (ticked.Contains(lap) || ticked.Count < MaxLaps);
+        }
         Sync();
         analyzeButton.ToolTip = d.Traced.Count == 0 ? noTraceReason : $"Compare up to {SimRacing.Race.RaceFormat.Count(MaxLaps, "ticked lap")}: line, inputs and time gained or lost";
 
@@ -53,30 +58,20 @@ internal static class StatsSessionView
         cols.Add(("Fuel", true));
         cols.Add(("Top speed", true));
         cols.Add(("", false));
-        bool hasTyres = d.Tyres is { Count: > 0 };
         Grid NewGrid()
         {
             var g = new Grid();
             for (int c = 0; c < cols.Count; c++) g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "LapCol" + c });
-            if (!hasTyres) g.ColumnDefinitions[^1] = new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) };
+            g.ColumnDefinitions[^1] = new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) };
             return g;
         }
         FrameworkElement Section(Grid left, FrameworkElement? right)
         {
-            if (!hasTyres) return left;
-            var g = new Grid();
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 211 });
-            left.VerticalAlignment = VerticalAlignment.Top;
+            if (right is null) return left;
+            right.Margin = new Thickness(6, 6, 0, 12);
+            var g = new StackPanel();
             g.Children.Add(left);
-            if (right is not null)
-            {
-                right.Margin = new Thickness(Ui.PanelSpacing, 8, 0, 8);
-                right.MaxWidth = 502;
-                right.HorizontalAlignment = HorizontalAlignment.Left;
-                Grid.SetColumn(right, 1);
-                g.Children.Add(right);
-            }
+            g.Children.Add(right);
             return g;
         }
         var lapsTable = new StackPanel();
@@ -98,8 +93,9 @@ internal static class StatsSessionView
         var tyresOf = new Dictionary<int, List<TyreReading>>();
         foreach (var reading in d.Tyres ?? Array.Empty<TyreReading>())
         {
-            int gi = runs ? groups.FindLastIndex(g => (g[0].Run ?? 1) == reading.Run) : 0;
-            if (gi < 0) gi = groups.Count - 1;
+            int gi = groups.FindIndex(g => g.Any(l => l.Lap == reading.Lap));
+            if (gi < 0) gi = groups.FindLastIndex(g => g[0].Lap <= reading.Lap);
+            if (gi < 0) gi = 0;
             if (!tyresOf.TryGetValue(gi, out var list)) tyresOf[gi] = list = new List<TyreReading>();
             list.Add(reading);
         }
@@ -153,14 +149,12 @@ internal static class StatsSessionView
                 System.Windows.Automation.AutomationProperties.SetName(tick, $"Lap {lap.Lap}");
                 var tickHost = new Border { Child = tick, Background = Brushes.Transparent, ToolTip = traced ? "Tick to analyze (up to 4)" : "No trace for this lap (not in a telemetry file, or not kept)" };
                 int number = lap.Lap;
+                tickBoxes.Add((tick, number, traced));
                 tick.Click += (_, _) =>
                 {
-                    if (tick.IsChecked == true)
-                    {
-                        if (ticked.Count >= MaxLaps) { tick.IsChecked = false; return; }
-                        ticked.Add(number);
-                    }
+                    if (tick.IsChecked == true && ticked.Count < MaxLaps) ticked.Add(number);
                     else ticked.Remove(number);
+                    tick.IsChecked = ticked.Contains(number);
                     Sync();
                 };
                 if (d.Traced.Count == 0) tickHost.Visibility = Visibility.Collapsed;
@@ -223,6 +217,7 @@ internal static class StatsSessionView
             }
             lapsTable.Children.Add(Section(table, tyresOf.TryGetValue(gi, out var readings) ? StatsSessionTools.TyreRun(readings) : null));
         }
+        Sync();
         var tableScroll = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = lapsTable };
         FrameworkElement lapsBody = tableScroll;
         if (d.Traced.Count == 0)

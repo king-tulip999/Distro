@@ -25,7 +25,19 @@ internal static class FieldOrder
 
     public static int ClassOf(TelemetryFrame f, int car) => f.Session.ByCar.TryGetValue(car, out var d) ? d.ClassId : 0;
 
-    public static double? GapSeconds(TelemetryFrame f, int player, int car, EstProfile? profile = null)
+    private const double BoxStretch = 1.01;
+
+    public static double PaceScale(TelemetryFrame f, int player)
+    {
+        if (f.LapBest is not { } best || best <= 0) return 1;
+        if (!f.Session.ByCar.TryGetValue(player, out var d) || d.ClassEstLapTime is not { } est || est <= 0) return 1;
+        return Math.Clamp(best / est * BoxStretch, 0.85, 1.2);
+    }
+
+    public static double? GapSeconds(TelemetryFrame f, int player, int car, EstProfile? profile = null) =>
+        EstGapSeconds(f, player, car, profile) * PaceScale(f, player);
+
+    private static double? EstGapSeconds(TelemetryFrame f, int player, int car, EstProfile? profile)
     {
         double pp = f.CarLapDistPct[player], cp = f.CarLapDistPct[car];
         if (pp < 0 || cp < 0) return null;

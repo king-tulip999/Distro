@@ -145,7 +145,7 @@ internal static class StatsSessionTools
                 Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center,
             });
             body.Children.Add(head);
-            var grid = new UniformGrid { Columns = 2 };
+            var grid = new UniformGrid { Columns = 4 };
             for (int c = 0; c < 4; c++)
             {
                 double low = r.Lowest(c);
@@ -184,7 +184,7 @@ internal static class StatsSessionTools
                 grid.Children.Add(tile);
             }
             for (int i = 0; i < grid.Children.Count; i++)
-                ((FrameworkElement)grid.Children[i]).Margin = new Thickness(0, 0, i % 2 == 0 ? 6 : 0, i < 2 ? 6 : 0);
+                ((FrameworkElement)grid.Children[i]).Margin = new Thickness(0, 0, i < 3 ? 6 : 0, 0);
             body.Children.Add(grid);
         }
         var legend = new TextBlock { Text = "Green = 90% or more left, amber = 75% or more, red = less", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };

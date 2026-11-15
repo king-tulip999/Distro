@@ -35,6 +35,7 @@ internal sealed class TyreWearTracker
             now.CopyTo(_last);
             now.CopyTo(_start);
             _startLaps = _lastLaps = laps;
+            foreach (double v in now) if (v < 1 - Same) return new TyreReading(laps, run, 0, now.ToArray(), now.ToArray());
             return null;
         }
         bool changed = false, fresh = true;
@@ -95,19 +96,26 @@ internal static class TyreWear
         return readings;
     }
 
-    public static string? Text(IReadOnlyList<TyreReading>? readings, int lapOffset = 0)
+    public static string? Text(IReadOnlyList<TyreReading>? readings, int lapOffset = 0, int runOffset = 0)
     {
         if (readings is not { Count: > 0 }) return null;
         var sb = new StringBuilder();
         foreach (var r in readings)
         {
+            if (r.Lap + lapOffset <= 0) continue;
             if (sb.Length > 0) sb.Append(';');
-            sb.Append(r.Lap + lapOffset).Append('|').Append(r.Run).Append('|').Append(r.Laps).Append('|');
+            sb.Append(r.Lap + lapOffset).Append('|').Append(r.Run + runOffset).Append('|').Append(r.Laps).Append('|');
             sb.AppendJoin(',', r.Start.Select(v => v.ToString("0.####", CultureInfo.InvariantCulture)));
             sb.Append('|');
             sb.AppendJoin(',', r.Now.Select(v => v.ToString("0.####", CultureInfo.InvariantCulture)));
         }
-        return sb.ToString();
+        return sb.Length > 0 ? sb.ToString() : null;
+    }
+
+    public static List<TyreReading> WithLapRuns(List<TyreReading> readings, IReadOnlyDictionary<int, int> runOfLap)
+    {
+        if (!readings.Any(r => runOfLap.TryGetValue(r.Lap, out int run) && run != r.Run)) return readings;
+        return readings.Select(r => runOfLap.TryGetValue(r.Lap, out int run) ? r with { Run = run } : r).ToList();
     }
 
     public static List<TyreReading> Parse(string? text)

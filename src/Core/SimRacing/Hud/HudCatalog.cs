@@ -8,7 +8,7 @@ internal static class HudCatalog
     {
         new("relative", "Relative", "The cars nearest to you on track, with gaps in seconds, laps ahead / behind, classes, license badges, pit stops and battles.", 448, 300, () => new RelativeWidget())
             { MinW = 180, MinH = 90, DefaultHz = 15, Options = RelativeWidget.Options, Editor = Editors.RelativeEditor.Def,
-              Limits = "Gaps are iRacing's own time-behind estimates for cars in your class, and distance × that car's pace for other classes." },
+              Limits = "Gaps are iRacing's own time estimates, stretched to your best lap so they read in your pace." },
         new("standings", "Standings", "The whole field: overall and class positions, gaps, laps, pit stops, out laps, licenses and more, grouped by class.", 488, 520, () => new StandingsWidget())
             { MinW = 200, MinH = 120, DefaultHz = 5, Options = StandingsWidget.Options, Editor = Editors.StandingsEditor.Def,
               Limits = "Pit stop counts, stints and out laps start when the overlay first sees the session. Other drivers' incidents come from iRacing's session information, which it updates every so often." },

@@ -1479,7 +1479,7 @@ internal sealed class ReplayCardRow : Panel
             int count = Math.Min(perRow, InternalChildren.Count - start);
             double rowHeight = 0;
             for (int k = 0; k < count; k++) rowHeight = Math.Max(rowHeight, InternalChildren[start + k].DesiredSize.Height);
-            double x = (final.Width - (count * w + Gap * (count - 1))) / 2;
+            double x = (final.Width - (count * w + Gap * (count - 1))) / (InternalChildren.Count == 1 ? 1 : 2);
             for (int k = 0; k < count; k++) InternalChildren[start + k].Arrange(new Rect(x + k * (w + Gap), y, w, rowHeight));
             y += rowHeight + Gap;
         }

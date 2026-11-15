@@ -12,9 +12,8 @@ internal sealed class LedBoardWidget : HudWidget
 
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
-        HudOption.Choice("show", "Shows", "auto",
-            new HudChoice("auto", "Auto", "The gear; a flag takes over the board while it is out"),
-            new HudChoice("gear", "Gear"), new HudChoice("lap", "Lap"), new HudChoice("pos", "Position"), new HudChoice("left", "Laps left")),
+        HudOption.Choice("show", "Shows", "gear",
+            new HudChoice("gear", "Gear"), new HudChoice("flag", "Flag", "Blank until a flag is out"), new HudChoice("lap", "Lap"), new HudChoice("pos", "Position"), new HudChoice("left", "Laps left")),
         HudOption.Choice("frame", "Frame color", "yellow",
             new HudChoice("yellow", "Yellow"), new HudChoice("white", "White"), new HudChoice("custom", "Custom"),
             new HudChoice("off", "Off", "The number fills the board")),
@@ -26,7 +25,7 @@ internal sealed class LedBoardWidget : HudWidget
         if (DrawWaiting(p, v)) return;
         var f = v.Frame;
         string show = v.Options.Choice("show");
-        var flag = show == "auto" ? LedBoard.FlagOf(HudFlags.BannerKind(f.Flags)) : LedFlag.None;
+        var flag = show == "flag" ? LedBoard.FlagOf(HudFlags.BannerKind(f.Flags)) : LedFlag.None;
         string frame = v.Options.Choice("frame");
         bool blinkOn = (long)Math.Floor(v.Now / 0.4) % 2 == 0;
         LedBoard.Build(_dots, Text(v, show), flag, frame != "off", blinkOn);
@@ -44,7 +43,7 @@ internal sealed class LedBoardWidget : HudWidget
             "left" => v.Race.LapsToGo(f) is { } togo ? (int)Math.Ceiling(togo) : null,
             _ => null,
         };
-        if (show is "auto" or "gear") return f.Gear is { } g ? InputsWidget.GearText(g) : "";
+        if (show == "gear") return f.Gear is { } g ? InputsWidget.GearText(g) : "";
         return n is >= 0 and < 1000 ? n.Value.ToString(CultureInfo.InvariantCulture) : "";
     }
 

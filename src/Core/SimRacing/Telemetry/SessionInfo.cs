@@ -130,6 +130,22 @@ internal sealed class SessionInfo
             : SessionKind.Other;
     }
 
+    internal static bool Unreadable(string name) =>
+        name.Contains('?') && name.All(c => c == '?' || char.IsWhiteSpace(c));
+
+    internal static DriverEntry NameOrCarNumber(DriverEntry d)
+    {
+        if (!Unreadable(d.Name) || d.CarNumber.Length == 0) return d;
+        string car = "#" + d.CarNumber;
+        return d with
+        {
+            Name = car,
+            AbbrevName = car,
+            Initials = d.CarNumber,
+            TeamName = Unreadable(d.TeamName) ? car : d.TeamName,
+        };
+    }
+
     public static SessionInfo Parse(string yaml)
     {
         var root = SessionYaml.Parse(yaml);
@@ -170,7 +186,7 @@ internal sealed class SessionInfo
             IsAi = SessionYaml.Int(d, "CarIsAI") == 1,
             Incidents = SessionYaml.Int(d, "CurDriverIncidentCount"),
             TeamIncidents = SessionYaml.Int(d, "TeamIncidentCount"),
-        }).Where(d => d.CarIdx >= 0).ToList();
+        }).Where(d => d.CarIdx >= 0).Select(NameOrCarNumber).ToList();
         var byCar = new Dictionary<int, DriverEntry>();
         foreach (var d in drivers) byCar[d.CarIdx] = d;
 
