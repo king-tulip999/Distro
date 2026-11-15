@@ -55,6 +55,9 @@ internal static class HudCatalog
         new("inputs", "Inputs", "Throttle, brake, clutch and steering with gear, speed and shift lights: as a trace or a low shift-light bar.", 420, 110, () => new InputsWidget())
             { MinW = 225, MinH = 50, DefaultHz = 30, Options = InputsWidget.Options, Editor = Editors.InputsEditor.Def, Natural = InputsWidget.Natural,
               Limits = "The shift point, limiter flash and RPM scale come from iRacing's figures for your car." },
+        new("ledboard", "LED board", "A square of lit dots like a trackside board: your gear, lap, position or laps left in big digits, and the flag that's out filling the board.", 150, 150, () => new LedBoardWidget())
+            { FixedSize = true, MinW = 60, MinH = 60, DefaultHz = 10, Background = 0, Options = LedBoardWidget.Options, Editor = Editors.LedBoardEditor.Def,
+              Limits = "Shows up to three digits." },
         new("block", "Data block", "Any single value (live, session or calculated) as a number, bar or graph.", 170, 80, () => new BlockWidget())
             { FixedSize = true, MinW = 150, MinH = 72, DefaultHz = 10, Options = BlockWidget.Options, Editor = Editors.BlockEditor.Def },
     };

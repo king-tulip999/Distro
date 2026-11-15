@@ -107,6 +107,8 @@ internal static class SettingRows
                     if (now) on.Add(id); else on.Remove(id);
                     c.SetOne(s.Key, string.Join(",", o.Choices.Select(ch => ch.Id).Where(on.Contains)));
                 }));
+            case HudOptionKind.Color:
+                return Row(label, o.Help, true, Pages.RaceHudSection.HexField(() => c.Options.Value(s.Key), v => c.SetOne(s.Key, v)));
             case HudOptionKind.Bool:
                 return Row(label, o.Help, true, Ui.Switch(current == "true", v => c.SetOne(s.Key, v ? "true" : "false")));
             case HudOptionKind.Int:

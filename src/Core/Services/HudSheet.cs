@@ -74,7 +74,7 @@ internal static class HudSheet
             race.Frame.Flags = flags;
 
             var inputs = HudCatalog.Find("inputs")!;
-            foreach (var (file, style, show) in new[] { ("inputs-lights", "lights", ""), ("inputs-trimmed", "trace", "throttle,brake,speed"), ("inputs-lights-trimmed", "lights", "throttle,brake,rpm") })
+            foreach (var (file, style, show) in new[] { ("inputs-lights", "lights", ""), ("inputs-trimmed", "trace", "throttle,brake,speed"), ("inputs-lights-trimmed", "lights", "throttle,brake,rpm"), ("inputs-bare", "bare", ""), ("inputs-no-gear", "trace", "throttle,brake,clutch,steering,speed,rpm,trace,abs"), ("inputs-lights-no-gear", "lights", "throttle,brake,clutch,speed,rpm,abs") })
             {
                 var config = new HudWidgetConfig { Options = { ["style"] = style } };
                 if (show.Length > 0) config.Options["show"] = show;

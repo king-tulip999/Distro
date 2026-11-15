@@ -843,7 +843,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             yield return row(label, null, HexField(get, v => { set(v); changed(); }), null);
     }
 
-    private static StackPanel HexField(Func<string> get, Action<string> set)
+    internal static StackPanel HexField(Func<string> get, Action<string> set)
     {
         var swatch = new Border { Width = 28, Height = 28, BorderThickness = Hairline.Edges(), Margin = new Thickness(0, 0, 8, 0), Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Pick a color" };
         swatch.SetResourceReference(Border.BorderBrushProperty, "LineStrong");

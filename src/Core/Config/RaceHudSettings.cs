@@ -18,7 +18,7 @@ public enum HudVrPlacement { Off, Cockpit, Head }
 
 public sealed class RaceHudSettings
 {
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 6;
 
     public int Version { get; set; }
 
@@ -188,10 +188,11 @@ public sealed class RaceHudSettings
             Layouts.AddRange(defaults());
             Rules.AddRange(defaultRules());
         }
-        bool before2 = Version < 2, before3 = Version < 3, before4 = Version < 4;
+        bool before2 = Version < 2, before3 = Version < 3, before4 = Version < 4, before5 = Version < 5, before6 = Version < 6;
         Version = CurrentVersion;
         Appearance ??= new();
         if (before4) { Appearance.Colors = HudAppearance.DefaultColors; Appearance.Custom = new(); }
+        if (before5 && Appearance.Corner == 0) Appearance.Corner = HudAppearance.DefaultCorner;
         if (WebPort is < MinWebPort or > MaxWebPort) WebPort = DefaultWebPort;
         var builtIn = defaults();
         if (!Layouts.Any(l => l is not null && IsDefaultName(l.Name ?? ""))) Layouts.Add(builtIn[0]);
@@ -209,6 +210,7 @@ public sealed class RaceHudSettings
                 if (string.IsNullOrWhiteSpace(w.Id) || !ids.Add(w.Id)) { w.Id = HudWidgetConfig.NewId(w.Kind); ids.Add(w.Id); }
                 SideBannerToTop(w);
                 OldInputStyles(w);
+                if (before6) InputsShowGear(w);
                 if (before2) ShowClassesInsteadOfHiding(w);
                 if (before3) ScaleFromNaturalSize(w);
                 w.Clamp();
@@ -254,6 +256,12 @@ public sealed class RaceHudSettings
         if (SimRacing.Hud.HudCatalog.Find(w.Kind) is not { Natural: { } natural } def || w.Options is null) return;
         var size = natural(new SimRacing.Hud.HudOptions(def, w));
         if (size.Height > 0 && double.IsFinite(w.H)) w.Scale = w.H / size.Height;
+    }
+
+    internal static void InputsShowGear(HudWidgetConfig w)
+    {
+        if (!string.Equals(w.Kind, "inputs", StringComparison.OrdinalIgnoreCase) || w.Options is null || !w.Options.TryGetValue("show", out var show) || show is null) return;
+        if (!show.Split(',').Contains("gear")) w.Options["show"] = show.Length == 0 ? "gear" : show + ",gear";
     }
 
     internal static void OldInputStyles(HudWidgetConfig w)
@@ -479,7 +487,9 @@ public sealed class HudAppearance
 
     public HudDensity Density { get; set; } = HudDensity.Compact;
 
-    public int Corner { get; set; }
+    public const int DefaultCorner = 8;
+
+    public int Corner { get; set; } = DefaultCorner;
 
     public bool ReducedMotion { get; set; }
 

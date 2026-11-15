@@ -16,6 +16,7 @@ internal enum HudOptionKind
 
     Classes,
     Set,
+    Color,
 }
 
 internal sealed record HudChoice(string Id, string Label, string? Help = null);
@@ -41,6 +42,8 @@ internal sealed record HudOption(string Key, string Label, HudOptionKind Kind, s
 
     public static HudOption Columns(string key, string label, string on, params HudChoice[] choices) =>
         new(key, label, HudOptionKind.Columns, on) { Choices = choices };
+
+    public static HudOption Color(string key, string label, string? help = null) => new(key, label, HudOptionKind.Color, "", help);
 
     public static HudOption Classes(string key, string label, string? help = null) => new(key, label, HudOptionKind.Classes, "", help);
 
@@ -117,11 +120,18 @@ internal sealed class HudOptions
                 return Math.Clamp(n, o.Min, o.Max).ToString("0.###", CultureInfo.InvariantCulture);
             case HudOptionKind.Choice:
                 return o.Choices.Any(c => c.Id == raw) ? raw : o.Default;
+            case HudOptionKind.Color:
+                return ParseColor(raw) is { } rgb ? "#" + rgb.ToString("X6", CultureInfo.InvariantCulture) : o.Default;
             default:
                 return string.Join(",", raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                     .Where(id => o.Kind == HudOptionKind.Classes || o.Choices.Any(c => c.Id == id)).Distinct());
         }
     }
+
+    public static int? ParseColor(string? raw) =>
+        raw is { Length: 7 } && raw[0] == '#' && int.TryParse(raw.AsSpan(1), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var rgb) ? rgb : null;
+
+    public Color? ColorOf(string key) => ParseColor(Raw(key)) is { } rgb ? System.Drawing.Color.FromArgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF) : null;
 
     public bool Bool(string key) => bool.TryParse(Raw(key), out var b) ? b : _def.Option(key)?.Default == "true";
 

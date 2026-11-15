@@ -422,7 +422,7 @@ internal sealed class HudPainter : IDisposable
     public void Panel(RectangleF r)
     {
         int alpha = PanelAlpha;
-        float radius = Math.Min(Look.Corner, 4);
+        float radius = Look.Corner;
         r = Snap(r);
         if (r.Width <= 1 || r.Height <= 1) return;
         if (radius <= 0.5f && !(Simulated && MarkSimulated))
