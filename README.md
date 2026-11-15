@@ -49,7 +49,7 @@ Two separate apps: take one or both. Neither needs the other.
 
 ### iRacing Overlay
 
-19 widgets: relative, standings, fuel and strategy, delta, radar, track map, inputs, tires, weather and more. Drag them around in the car with `Ctrl+Alt+E`, save layouts per car or track, add any widget to OBS as a browser source, or show them in your VR headset.
+20 widgets: relative, standings, fuel and strategy, delta, radar, track map, inputs, tires, weather and more. Drag them around in the car with `Ctrl+Alt+E`, save layouts per car or track, add any widget to OBS as a browser source, or show them in your VR headset.
 
 <details>
 <summary><b>See every widget</b></summary>
@@ -97,36 +97,12 @@ Your iRacing history, kept on your PC: result cards, goals, ratings, personal be
 
 ### iRacing tools
 
-Setup Manager, FOV calculator, iRacing's settings and keybinds in plain language, bass shakers, and Trading Paints / Garage 61 start and stop.
-
-<details>
-<summary><b>See the tools</b></summary>
-<br>
-
-**Setup Manager:** every setup sorted by car and class, with new downloads picked up.
-
-<img src="screenshots/velocita-setups.jpg" alt="Setup Manager">
-
-**FOV calculator:** single or triple screens, compared side by side and written straight into iRacing.
-
-<img src="screenshots/velocita-fov.jpg" alt="FOV calculator">
-
-**iRacing settings:** every iRacing setting in plain language, searchable, with what you changed from the defaults and one-click undo.
-
-<img src="screenshots/velocita-iracing-settings.jpg" alt="iRacing settings">
-
-**iRacing keybinds:** every in-sim keybind per profile, with what's set, missing or changed.
-
-<img src="screenshots/velocita-keybinds.jpg" alt="iRacing keybinds">
-
-**Bass shakers:** engine, shifts, ABS, curbs and the rev limiter through any sound output.
-
-<img src="screenshots/velocita-shakers.jpg" alt="Bass shakers">
-
-**Trading Paints and Garage 61:** start them with Velocita or when iRacing starts, and see your own paint on car pictures across the app.
-
-<img src="screenshots/velocita-companions.jpg" alt="Trading Paints and Garage 61">
-</details>
+- **Setup Manager:** every setup sorted by car and class, with new downloads picked up.
+- **FOV calculator:** single or triple screens, compared side by side and written straight into iRacing.
+- **iRacing settings:** every iRacing setting in plain language, searchable, with what you changed from the defaults and one-click undo.
+- **iRacing keybinds:** every in-sim keybind per profile, with what's set, missing or changed.
+- **Bass shakers:** engine, shifts, ABS, curbs and the rev limiter through any sound output.
+- **Trading Paints and Garage 61:** start them with Velocita or when iRacing starts, and see your own paint on car pictures across the app.
 
 ### GRR League
 
