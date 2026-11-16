@@ -10,6 +10,8 @@
 
 [![Download](https://img.shields.io/github/v/release/king-tulip999/Distro?label=Download&style=for-the-badge&color=e0157a)](https://github.com/king-tulip999/Distro/releases/latest)
 &nbsp;
+[![Website](https://img.shields.io/badge/Website-distrotv.pages.dev-49c8f5?style=for-the-badge)](https://distrotv.pages.dev)
+&nbsp;
 ![Windows 10 / 11](https://img.shields.io/badge/Windows-10%20%2F%2011-2b2b3a?style=for-the-badge)
 &nbsp;
 ![Free](https://img.shields.io/badge/Free-no%20subscription-2b2b3a?style=for-the-badge)
@@ -19,6 +21,8 @@
 <br>
 
 I got sick of setting everything up by hand every time I went from my desk to my sim rig, and of paying for a handful of subscriptions just to race. So I built it myself. Now you can use it too.
+
+See every widget, Session Stats and Tecnica feature on the **[website](https://distrotv.pages.dev)**.
 
 <div align="center">
 <table>
