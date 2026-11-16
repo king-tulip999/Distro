@@ -12,6 +12,261 @@ internal static class HudSheet
     public const string Arg = "--hud-sheet";
     public const string FramesArg = "--hud-frames";
     public const string OptionsArg = "--hud-options";
+    public const string SiteArg = "--hud-site";
+
+    public static void RunSite(App app, string folder)
+    {
+        Running = true;
+        try
+        {
+            Directory.CreateDirectory(folder);
+            RenderSite(folder);
+        }
+        catch (Exception ex)
+        {
+            try { File.WriteAllText(Path.Combine(folder, "error.txt"), ex.ToString()); } catch { }
+        }
+        app.Shutdown();
+    }
+
+    private sealed record SiteShot(string Kind, string Label, (string Key, string Value)[] Options, RaceFlags? Flags = null, double? WindFrom = null, double At = 0, bool Fit = false, float H = 0);
+
+    private sealed class SiteRace
+    {
+        public readonly RaceHudSettings Settings = new();
+        public readonly RaceState Race;
+        private readonly DemoTelemetry _demo = new();
+        private readonly TelemetryFrame _frame = new();
+        private long _seq;
+        public double T = -1500;
+
+        public SiteRace()
+        {
+            Race = new RaceState(() => Settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
+        }
+
+        public void To(double at)
+        {
+            for (; T <= at; T += 0.25)
+            {
+                _demo.Fill(_frame, T);
+                _frame.Sequence = ++_seq;
+                Race.Update(_frame);
+            }
+        }
+
+        public void Settle()
+        {
+            Thread.Sleep(300);
+            _demo.Fill(_frame, T);
+            _frame.Sequence = ++_seq;
+            Race.Update(_frame);
+        }
+    }
+
+    private const float SiteScale = 2;
+
+    private static void RenderSite(string folder)
+    {
+        static (string, string)[] O(params (string, string)[] o) => o;
+        const double Ahead = 0, Cross = Math.PI / 2, Behind = Math.PI;
+        var shots = new List<SiteShot>
+        {
+            new("relative", "Default", O()),
+            new("relative", "Different header and footer", O(("header", "lap,best,delta,sof,air,track"), ("footer", "wind,humidity,wetness,cars,csof"))),
+            new("relative", "Six cars each way", O(("ahead", "6"), ("behind", "6")), H: 360),
+            new("relative", "Blue flag banner", O(("flagBanner", "top")), RaceFlags.Blue),
+            new("relative", "Checkered flag banner", O(("flagBanner", "top")), RaceFlags.Checkered),
+            new("standings", "Grouped by class", O()),
+            new("standings", "One list, gap to the car ahead", O(("group", "false"), ("gapTo", "interval")), H: 330),
+            new("standings", "Only my class", O(("classes", "mine")), H: 300),
+            new("timing", "Delta to my optimal lap", O()),
+            new("timing", "Delta to the session best", O(("reference", "session"))),
+            new("timing", "Delta to my best lap", O(("reference", "best"))),
+            new("fuel", "Default", O(), At: 600),
+            new("fuel", "Pit exit", O(("parts", "header,figures"), ("head", "togo,pitexit,stops,add"), ("top", "pitexit,level,laps")), At: 600, H: 122),
+            new("fuel", "Fuel saving", O(("parts", "header,save")), At: 600, H: 122),
+            new("fuel", "Every section", O(("parts", "header,gauge,plan,save,figures,table,grid"), ("head", "togo,nextpit,stops,pitby,add,pitexit,level"), ("gridRows", "curr,avg,max,min,last")), At: 600, Fit: true),
+            new("session", "Default", O()),
+            new("session", "Time, position, phase and track", O(("fields", "remain,elapsed,pos,cpos,phase,track"))),
+            new("map", "Whole track", O()),
+            new("map", "Zoomed in on you", O(("zoom", "4"))),
+            new("map", "Turns with the car", O(("rotate", "true"), ("zoom", "3"))),
+            new("tyres", "Default", O()),
+            new("tyres", "Without wear", O(("wear", "false"))),
+            new("weather", "°C", O(("temp", "c"))),
+            new("weather", "°F", O(("temp", "f"))),
+            new("weather", "°C and °F", O(("temp", "both"))),
+            new("wind", "Headwind", O(("title", "true")), WindFrom: Ahead),
+            new("wind", "Crosswind", O(("title", "true")), WindFrom: Cross),
+            new("wind", "Tailwind", O(("title", "true")), WindFrom: Behind),
+            new("wind", "Accent color", O(("colors", "accent")), WindFrom: Cross + 0.6),
+            new("laps", "Last 10 laps", O()),
+            new("laps", "Last 3 laps, no statistics", O(("count", "3"), ("stats", "false")), Fit: true),
+            new("events", "Default", O()),
+            new("events", "Longer timeline", O(("count", "14")), H: 330),
+            new("goals", "Lap list", O()),
+            new("goals", "Counters", O(("look", "counters"))),
+            new("goals", "Six goals", O(("goals", "clean,consistent,near,under,total,minutes")), Fit: true),
+            new("goals", "Six counters", O(("look", "counters"), ("goals", "clean,consistent,near,under,total,minutes")), Fit: true),
+            new("notes", "Default", O()),
+            new("alerts", "Default", O()),
+            new("result", "Card", O()),
+            new("result", "Banner", O(("look", "banner")), Fit: true),
+            new("result", "Stamp", O(("look", "stamp")), Fit: true),
+            new("result", "Lap story", O(("look", "story")), Fit: true),
+            new("inputs", "Trace", O()),
+            new("inputs", "Shift-light bar", O(("style", "lights"))),
+            new("inputs", "Pedals and speed", O(("show", "throttle,brake,speed"))),
+            new("inputs", "Shift lights, pedals and RPM", O(("style", "lights"), ("show", "throttle,brake,rpm"))),
+            new("block", "Speed", O(("source", "speed"))),
+            new("block", "RPM with a bar", O(("source", "rpm"), ("visual", "bar"))),
+            new("block", "Fuel", O(("source", "fuel"))),
+            new("block", "Throttle with a bar", O(("source", "throttle"), ("visual", "bar"))),
+            new("block", "Gear", O(("source", "gear"))),
+            new("ledboard", "Gear", O(("show", "gear"))),
+            new("ledboard", "Position, white frame", O(("show", "pos"), ("frame", "white"))),
+            new("ledboard", "Laps left, no frame", O(("show", "left"), ("frame", "off"))),
+            new("ledboard", "Green flag", O(("show", "flag")), RaceFlags.Green | RaceFlags.StartGo, At: 0.4),
+            new("ledboard", "Yellow flag", O(("show", "flag")), RaceFlags.Yellow),
+            new("ledboard", "Blue flag", O(("show", "flag")), RaceFlags.Blue),
+            new("ledboard", "White flag", O(("show", "flag")), RaceFlags.White, At: 0.4),
+            new("ledboard", "Checkered flag", O(("show", "flag")), RaceFlags.Checkered),
+            new("ledboard", "Black flag", O(("show", "flag")), RaceFlags.Black),
+            new("ledboard", "Red flag", O(("show", "flag")), RaceFlags.Red),
+            new("ledboard", "Safety car", O(("show", "flag")), RaceFlags.Caution),
+        };
+        foreach (var (kind, options, count, name) in new[]
+        {
+            ("traffic", O(("window", "30"), ("max", "6")), 2, "Wider window"), ("traffic", O(("window", "30"), ("max", "6"), ("sameClass", "true")), 1, "Wider window, my class too"),
+            ("radar", O(), 2, "Default"), ("radar", O(("range", "40")), 1, "Longer range"), 
+        })
+        {
+            var moments = Busiest(kind, options, count);
+            for (int i = 0; i < moments.Count; i++)
+                shots.Add(new SiteShot(kind, moments.Count > 1 ? $"{name}, moment {i + 1}" : name, options, At: moments[i].At, Fit: false));
+        }
+
+        var json = new System.Text.StringBuilder("[");
+        var races = new Dictionary<double, SiteRace>();
+        using var painter = new HudPainter();
+        int n = 0;
+        foreach (var shot in shots)
+        {
+            if (!races.TryGetValue(shot.At, out var site))
+            {
+                site = new SiteRace();
+                site.To(shot.At);
+                site.Settle();
+                races[shot.At] = site;
+            }
+            var def = HudCatalog.Find(shot.Kind)!;
+            var config = new HudWidgetConfig { Id = "site-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
+            foreach (var (key, value) in shot.Options) config.Options[key] = value;
+            var frame = site.Race.Frame;
+            var (flags, windDir, windSpeed, yaw) = (frame.Flags, frame.WindDir, frame.WindSpeed, frame.YawNorth);
+            if (shot.Flags is { } f) frame.Flags = f;
+            if (shot.WindFrom is { } from) (frame.WindDir, frame.WindSpeed, frame.YawNorth) = (from, 6.5, 0);
+            var view = new HudOptions(def, config);
+            SizeF size = def.Natural?.Invoke(view) is { Width: > 0, Height: > 0 } natural ? natural
+                : shot.H > 0 ? new SizeF((float)def.W, shot.H) : shot.Fit ? Fit(def, config, site, painter) : new SizeF((float)def.W, (float)def.H);
+            if (config.Options.TryGetValue("flagBanner", out var where))
+            {
+                var (fl, ft, fr, fb) = HudFlags.Room(where);
+                size = new SizeF(size.Width + fl + fr, size.Height + ft + fb);
+            }
+            string file = $"{def.Kind}-{n++:00}.png";
+            using (var surface = new Core.Overlay.DibSurface())
+            {
+                var g = surface.Ensure(new Size((int)Math.Ceiling(size.Width * SiteScale), (int)Math.Ceiling(size.Height * SiteScale)));
+                painter.Simulated = true;
+                painter.MarkSimulated = false;
+                painter.IsPreview = true;
+                painter.Begin(g, SiteScale, size, HudPalette.Of(site.Settings.Appearance), site.Settings.Appearance);
+                def.Create().Draw(painter, new HudView { Frame = frame, Race = site.Race, Settings = site.Settings, Config = config, Options = view, Def = def });
+                painter.FinishPanels();
+                painter.End(surface.Dc, surface.Size);
+                surface.Bitmap!.Save(Path.Combine(folder, file));
+            }
+            (frame.Flags, frame.WindDir, frame.WindSpeed, frame.YawNorth) = (flags, windDir, windSpeed, yaw);
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            json.Append(json.Length > 1 ? "," : "").Append(string.Format(inv, "{{\"kind\":\"{0}\",\"label\":\"{1}\",\"file\":\"{2}\",\"w\":{3:0},\"h\":{4:0}}}",
+                def.Kind, System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping.Encode(shot.Label), file, Math.Ceiling(size.Width), Math.Ceiling(size.Height)));
+        }
+        File.WriteAllText(Path.Combine(folder, "site.json"), json.Append(']').ToString());
+
+        static SizeF Fit(HudWidgetDef def, HudWidgetConfig config, SiteRace site, HudPainter painter)
+        {
+            using var fit = new HudPainter { Overflow = new() };
+            using var surface = new Core.Overlay.DibSurface();
+            var widget = def.Create();
+            var palette = HudPalette.Of(site.Settings.Appearance);
+            bool Clean(float w, float h)
+            {
+                var g = surface.Ensure(new Size((int)Math.Ceiling(w), (int)Math.Ceiling(h)));
+                fit.Overflow!.Clear();
+                fit.Simulated = true;
+                fit.IsPreview = true;
+                fit.Begin(g, 1, new SizeF(w, h), palette, site.Settings.Appearance);
+                widget.Draw(fit, new HudView { Frame = site.Race.Frame, Race = site.Race, Settings = site.Settings, Config = config, Options = new HudOptions(def, config), Def = def });
+                fit.FinishPanels();
+                return fit.Overflow!.Count == 0 && !fit.Spilled && fit.MinWidth <= w + 0.5f;
+            }
+            const float Tall = 2400;
+            Clean((float)def.W, Tall);
+            float width = Math.Max((float)def.W, fit.MinWidth);
+            Clean(width, Tall);
+            width = Math.Max(width, fit.MinWidth);
+            float lo = (float)def.MinH, hi = Tall;
+            while (hi - lo > 1)
+            {
+                float mid = MathF.Round((lo + hi) / 2);
+                if (mid <= lo || mid >= hi) break;
+                if (Clean(width, mid)) hi = mid; else lo = mid;
+            }
+            return new SizeF(width, MathF.Ceiling(hi));
+        }
+
+        static List<(double At, string Label)> Busiest(string kind, (string, string)[] options, int count)
+        {
+            var def = HudCatalog.Find(kind)!;
+            var config = new HudWidgetConfig { Id = "busy-" + kind, Kind = kind, W = def.W, H = def.H };
+            foreach (var (key, value) in options) config.Options[key] = value;
+            var site = new SiteRace();
+            using var painter = new HudPainter();
+            using var surface = new Core.Overlay.DibSurface();
+            var size = new Size((int)def.W, (int)def.H);
+            var palette = HudPalette.Of(site.Settings.Appearance);
+            var scored = new List<(double At, int Lit)>();
+            var pixels = new int[size.Width * size.Height];
+            for (double at = 60; at <= 1500; at += 5)
+            {
+                site.To(at);
+                var g = surface.Ensure(size);
+                painter.Simulated = true;
+                painter.IsPreview = true;
+                painter.Begin(g, 1, new SizeF(size.Width, size.Height), palette, site.Settings.Appearance);
+                def.Create().Draw(painter, new HudView { Frame = site.Race.Frame, Race = site.Race, Settings = site.Settings, Config = config, Options = new HudOptions(def, config), Def = def });
+                painter.FinishPanels();
+                painter.End(surface.Dc, surface.Size);
+                var data = surface.Bitmap!.LockBits(new Rectangle(Point.Empty, size), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                for (int y = 0; y < size.Height; y++)
+                    System.Runtime.InteropServices.Marshal.Copy(data.Scan0 + y * data.Stride, pixels, y * size.Width, size.Width);
+                surface.Bitmap!.UnlockBits(data);
+                int lit = 0;
+                foreach (var px in pixels) if (((px >> 16) & 0xFF) + ((px >> 8) & 0xFF) + (px & 0xFF) > 330) lit++;
+                scored.Add((at, lit));
+            }
+            var picked = new List<(double, string)>();
+            foreach (var (at, _) in scored.OrderByDescending(s => s.Lit))
+            {
+                if (picked.Any(p => Math.Abs(p.Item1 - at) < 90)) continue;
+                picked.Add((at, "Busy moment " + (picked.Count + 1)));
+                if (picked.Count == count) break;
+            }
+            return picked;
+        }
+    }
 
     public static void RunOptions(App app, string folder)
     {
