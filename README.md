@@ -114,9 +114,7 @@ Your league's next race, standings and results, if you race with GRR. Off unless
 
 **Every series:** a countdown to the next race, the schedule, your championship position and season form, the title fight and the latest results.
 
-<img src="screenshots/velocita-grr-cup.jpg" alt="GRR Cup Series">
-<br><br>
-<img src="screenshots/velocita-grr-gt.jpg" alt="GRR GT League">
+<img src="screenshots/velocita-grr-cup.jpg" alt="GRR League">
 </details>
 
 <br>
