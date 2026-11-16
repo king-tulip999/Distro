@@ -11,7 +11,6 @@ internal static class HudSheet
 {
     public const string Arg = "--hud-sheet";
     public const string FramesArg = "--hud-frames";
-    public const string OptionsArg = "--hud-options";
     public const string SiteArg = "--hud-site";
 
     public static void RunSite(App app, string folder)
@@ -144,7 +143,7 @@ internal static class HudSheet
         {
             var moments = Busiest(kind, options, count);
             for (int i = 0; i < moments.Count; i++)
-                shots.Add(new SiteShot(kind, moments.Count > 1 ? $"{name}, moment {i + 1}" : name, options, At: moments[i].At, Fit: false));
+                shots.Add(new SiteShot(kind, moments.Count > 1 ? $"{name}, moment {i + 1}" : name, options, At: moments[i]));
         }
 
         var json = new System.Text.StringBuilder("[");
@@ -169,7 +168,7 @@ internal static class HudSheet
             if (shot.WindFrom is { } from) (frame.WindDir, frame.WindSpeed, frame.YawNorth) = (from, 6.5, 0);
             var view = new HudOptions(def, config);
             SizeF size = def.Natural?.Invoke(view) is { Width: > 0, Height: > 0 } natural ? natural
-                : shot.H > 0 ? new SizeF((float)def.W, shot.H) : shot.Fit ? Fit(def, config, site, painter) : new SizeF((float)def.W, (float)def.H);
+                : shot.H > 0 ? new SizeF((float)def.W, shot.H) : shot.Fit ? Fit(def, config, site) : new SizeF((float)def.W, (float)def.H);
             if (config.Options.TryGetValue("flagBanner", out var where))
             {
                 var (fl, ft, fr, fb) = HudFlags.Room(where);
@@ -195,7 +194,7 @@ internal static class HudSheet
         }
         File.WriteAllText(Path.Combine(folder, "site.json"), json.Append(']').ToString());
 
-        static SizeF Fit(HudWidgetDef def, HudWidgetConfig config, SiteRace site, HudPainter painter)
+        static SizeF Fit(HudWidgetDef def, HudWidgetConfig config, SiteRace site)
         {
             using var fit = new HudPainter { Overflow = new() };
             using var surface = new Core.Overlay.DibSurface();
@@ -227,7 +226,7 @@ internal static class HudSheet
             return new SizeF(width, MathF.Ceiling(hi));
         }
 
-        static List<(double At, string Label)> Busiest(string kind, (string, string)[] options, int count)
+        static List<double> Busiest(string kind, (string, string)[] options, int count)
         {
             var def = HudCatalog.Find(kind)!;
             var config = new HudWidgetConfig { Id = "busy-" + kind, Kind = kind, W = def.W, H = def.H };
@@ -257,126 +256,15 @@ internal static class HudSheet
                 foreach (var px in pixels) if (((px >> 16) & 0xFF) + ((px >> 8) & 0xFF) + (px & 0xFF) > 330) lit++;
                 scored.Add((at, lit));
             }
-            var picked = new List<(double, string)>();
+            var picked = new List<double>();
             foreach (var (at, _) in scored.OrderByDescending(s => s.Lit))
             {
-                if (picked.Any(p => Math.Abs(p.Item1 - at) < 90)) continue;
-                picked.Add((at, "Busy moment " + (picked.Count + 1)));
+                if (picked.Any(p => Math.Abs(p - at) < 90)) continue;
+                picked.Add(at);
                 if (picked.Count == count) break;
             }
             return picked;
         }
-    }
-
-    public static void RunOptions(App app, string folder)
-    {
-        Running = true;
-        try
-        {
-            Directory.CreateDirectory(folder);
-            RenderOptions(folder);
-        }
-        catch (Exception ex)
-        {
-            try { File.WriteAllText(Path.Combine(folder, "error.txt"), ex.ToString()); } catch { }
-        }
-        app.Shutdown();
-    }
-
-    private static void RenderOptions(string folder)
-    {
-        var settings = new RaceHudSettings();
-        var race = new RaceState(() => settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
-        var demo = new DemoTelemetry();
-        var frame = new TelemetryFrame();
-        long seq = 0;
-        for (double t = -1500; t <= 0.25; t += 0.25)
-        {
-            demo.Fill(frame, t);
-            frame.Sequence = ++seq;
-            race.Update(frame);
-        }
-        var palette = HudPalette.Of(settings.Appearance);
-        using var painter = new HudPainter();
-        var json = new System.Text.StringBuilder("[");
-        bool firstWidget = true;
-        foreach (var def in HudCatalog.All)
-        {
-            string dir = Path.Combine(folder, def.Kind);
-            Directory.CreateDirectory(dir);
-            int count = 0;
-            var options = new List<string>();
-            string defaultFile = Save(def, Array.Empty<(string, string)>());
-            foreach (var o in def.Options)
-            {
-                var values = new List<(string Value, string Label, string File)>();
-                foreach (var (value, label) in Values(o))
-                    values.Add((value, label, value == o.Default ? defaultFile : Save(def, new[] { (o.Key, value) })));
-                if (values.Count == 0) continue;
-                options.Add("{" + Field("key", o.Key) + "," + Field("label", o.Label) + "," + Field("kind", o.Kind.ToString()) + "," + Field("default", o.Default) + ","
-                    + Field("help", o.Help ?? "") + ",\"values\":[" + string.Join(",", values.Select(v => "{" + Field("value", v.Value) + "," + Field("label", v.Label) + "," + Field("file", v.File) + "}")) + "]}");
-            }
-            json.Append(firstWidget ? "" : ",").Append('{').Append(Field("kind", def.Kind)).Append(',').Append(Field("name", def.Name)).Append(',').Append(Field("file", defaultFile))
-                .Append(",\"options\":[").Append(string.Join(",", options)).Append("]}");
-            firstWidget = false;
-
-            string Save(HudWidgetDef widget, (string Key, string Value)[] set)
-            {
-                var config = new HudWidgetConfig { Id = "options-" + widget.Kind, Kind = widget.Kind, W = widget.W, H = widget.H };
-                foreach (var (key, value) in set) config.Options[key] = value;
-                var view = new HudOptions(widget, config);
-                var size = widget.Natural?.Invoke(view) is { Width: > 0, Height: > 0 } natural ? natural : new SizeF((float)widget.W, (float)widget.H);
-                string file = Path.Combine(widget.Kind, $"{count++:000}.png");
-                using var surface = new Core.Overlay.DibSurface();
-                var g = surface.Ensure(new Size((int)Math.Ceiling(size.Width), (int)Math.Ceiling(size.Height)));
-                painter.Simulated = true;
-                painter.MarkSimulated = false;
-                painter.IsPreview = true;
-                painter.Begin(g, 1, size, palette, settings.Appearance);
-                widget.Create().Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = view, Def = widget });
-                painter.FinishPanels();
-                painter.End(surface.Dc, surface.Size);
-                surface.Bitmap!.Save(Path.Combine(folder, file));
-                return file.Replace('\\', '/');
-            }
-        }
-        File.WriteAllText(Path.Combine(folder, "options.json"), json.Append(']').ToString());
-
-        static IEnumerable<(string Value, string Label)> Values(HudOption o)
-        {
-            var inv = System.Globalization.CultureInfo.InvariantCulture;
-            switch (o.Kind)
-            {
-                case HudOptionKind.Bool:
-                    yield return ("true", "On");
-                    yield return ("false", "Off");
-                    break;
-                case HudOptionKind.Choice:
-                    foreach (var c in o.Choices) yield return (c.Id, c.Label);
-                    break;
-                case HudOptionKind.Int:
-                case HudOptionKind.Number:
-                    var picks = new SortedSet<double> { o.Min, o.Max, double.Parse(o.Default, inv) };
-                    foreach (var v in picks)
-                    {
-                        string text = v.ToString("0.###", inv);
-                        yield return (text, o.Unit is { Length: > 0 } unit ? text + " " + unit : text);
-                    }
-                    break;
-                case HudOptionKind.Columns:
-                case HudOptionKind.Set:
-                    var on = o.Default.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-                    yield return (o.Default, "Default");
-                    foreach (var c in o.Choices)
-                    {
-                        var next = on.Contains(c.Id) ? on.Where(id => id != c.Id) : on.Append(c.Id);
-                        yield return (string.Join(",", next), (on.Contains(c.Id) ? "Without " : "With ") + c.Label);
-                    }
-                    break;
-            }
-        }
-
-        static string Field(string name, string value) => "\"" + name + "\":\"" + System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping.Encode(value) + "\"";
     }
 
     public static bool Running { get; private set; }

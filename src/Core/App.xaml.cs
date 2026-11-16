@@ -57,11 +57,6 @@ public partial class App : Application
             HudSheet.RunSite(this, siteFolder);
             return;
         }
-        if (ArgValue(e.Args, HudSheet.OptionsArg) is { } optionsFolder)
-        {
-            HudSheet.RunOptions(this, optionsFolder);
-            return;
-        }
         if (ArgValue(e.Args, FuelReplay.Arg) is { } replayFolder)
         {
             int at = Array.FindIndex(e.Args, a => string.Equals(a, FuelReplay.Arg, StringComparison.OrdinalIgnoreCase));

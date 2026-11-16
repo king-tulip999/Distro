@@ -727,42 +727,6 @@ internal static class ScreenshotRunner
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
         bitmap.Render(visual);
         SavePng(bitmap, path);
-        CapturePanels(window, content, path);
-    }
-
-    private const double PanelScale = 2;
-
-    private static void CapturePanels(Window window, FrameworkElement content, string path)
-    {
-        if (!Environment.GetCommandLineArgs().Contains("--panels", StringComparer.OrdinalIgnoreCase))
-            return;
-        var panels = new List<FrameworkElement>();
-        void Walk(DependencyObject node)
-        {
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
-            {
-                var child = VisualTreeHelper.GetChild(node, i);
-                if (child is FrameworkElement { IsVisible: true, ActualWidth: > 0, ActualHeight: > 0 } element && Controls.Tile.GetLifted(element))
-                    panels.Add(element);
-                else
-                    Walk(child);
-            }
-        }
-        Walk(content);
-        double width = content.ActualWidth, height = content.ActualHeight;
-        var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
-        {
-            dc.DrawRectangle((Brush)window.FindResource("Bg"), null, new Rect(0, 0, width, height));
-            dc.DrawRectangle(new VisualBrush(content) { ViewboxUnits = BrushMappingMode.Absolute, Viewbox = new Rect(0, 0, width, height), Stretch = Stretch.Fill }, null, new Rect(0, 0, width, height));
-        }
-        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(width * PanelScale), (int)Math.Ceiling(height * PanelScale), 96 * PanelScale, 96 * PanelScale, PixelFormats.Pbgra32);
-        bitmap.Render(visual);
-        SavePng(bitmap, path.Replace("-full.png", "-full2x.png"));
-        var inv = System.Globalization.CultureInfo.InvariantCulture;
-        var lines = panels.Select(p => p.TransformToAncestor(content).TransformBounds(new Rect(0, 0, p.ActualWidth, p.ActualHeight)))
-            .Select(r => string.Format(inv, "{0:0.##} {1:0.##} {2:0.##} {3:0.##}", r.X * PanelScale, r.Y * PanelScale, r.Width * PanelScale, r.Height * PanelScale));
-        File.WriteAllLines(path.Replace("-full.png", "-panels.txt"), lines);
     }
 
     internal static void CaptureWindow(Window window, string path) => Capture(window, path);
