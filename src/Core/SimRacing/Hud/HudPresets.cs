@@ -50,6 +50,7 @@ internal static class HudPresets
                 || a.OnlyWhenNeeded != b.OnlyWhenNeeded || a.OnlyOnTrack != b.OnlyOnTrack || a.Background != b.Background
                 || a.Vr != b.Vr || Math.Abs(a.VrX - b.VrX) > 0.0005 || Math.Abs(a.VrY - b.VrY) > 0.0005
                 || Math.Abs(a.VrDistance - b.VrDistance) > 0.0005 || Math.Abs(a.VrWidth - b.VrWidth) > 0.0005
+                || Math.Abs(a.VrTurn - b.VrTurn) > 0.05 || Math.Abs(a.VrTilt - b.VrTilt) > 0.05 || a.VrCurve != b.VrCurve || a.VrOnly != b.VrOnly
                 || !a.Sessions.Order(StringComparer.OrdinalIgnoreCase).SequenceEqual(b.Sessions.Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase)
                 || !SameOptions(a, b))
                 return false;

@@ -5,6 +5,62 @@ namespace Core.SimRacing.Hud.Vr;
 
 internal readonly record struct VrSpot(double X, double Y, double Distance, double Width);
 
+internal readonly record struct VrPose(double X, double Y, double Distance, double Width, double Turn, double Tilt, double CurveRadius)
+{
+    public float[] Matrix() => VrPlacement.Matrix(X, Y, Distance, Turn, Tilt);
+
+    public float Curvature => CurveRadius > 0 ? (float)Math.Min(1, Width / (2 * Math.PI * CurveRadius)) : 0;
+}
+
+internal enum VrAdjustSetting { Move, DistanceAndWidth, Angle }
+
+internal static class VrAdjust
+{
+    public const double Step = 0.01, AngleStep = 2;
+
+    public static string Label(VrAdjustSetting setting) => setting switch
+    {
+        VrAdjustSetting.DistanceAndWidth => "up / down: distance, left / right: width",
+        VrAdjustSetting.Angle => "left / right: turn, up / down: tilt",
+        _ => "move",
+    };
+
+    public static VrAdjustSetting Next(VrAdjustSetting setting, bool all) =>
+        all ? setting == VrAdjustSetting.Move ? VrAdjustSetting.DistanceAndWidth : VrAdjustSetting.Move
+            : (VrAdjustSetting)(((int)setting + 1) % 3);
+
+    public static void Nudge(HudWidgetConfig? widget, RaceHudSettings settings, VrAdjustSetting setting, int right, int up)
+    {
+        if (widget is null)
+        {
+            if (setting == VrAdjustSetting.Move)
+            {
+                settings.VrShiftX += right * Step;
+                settings.VrShiftY += up * Step;
+            }
+            else settings.VrShiftDistance += up * Step;
+            settings.ClampVrShift();
+            return;
+        }
+        switch (setting)
+        {
+            case VrAdjustSetting.Move:
+                widget.VrX += right * Step;
+                widget.VrY += up * Step;
+                break;
+            case VrAdjustSetting.DistanceAndWidth:
+                widget.VrDistance += up * Step;
+                widget.VrWidth += right * Step;
+                break;
+            default:
+                widget.VrTurn += right * AngleStep;
+                widget.VrTilt += up * AngleStep;
+                break;
+        }
+        widget.Clamp();
+    }
+}
+
 internal static class VrPlacement
 {
     public const double ScreenWidth = 1.2, ScreenDistance = 1.0;
@@ -47,8 +103,48 @@ internal static class VrPlacement
         return new Size(w, h);
     }
 
-    public static float[] Matrix(double x, double y, double distance) =>
-        new[] { 1f, 0, 0, (float)x, 0, 1f, 0, (float)y, 0, 0, 1f, (float)-distance };
+    public static VrPose Pose(HudWidgetConfig c, RaceHudSettings? settings)
+    {
+        double x = c.VrX, y = c.VrY, distance = c.VrDistance;
+        if (c.Vr == HudVrPlacement.Cockpit && settings is not null)
+        {
+            x += settings.VrShiftX;
+            y += settings.VrShiftY;
+            distance += settings.VrShiftDistance;
+        }
+        distance = Math.Clamp(distance, HudWidgetConfig.MinVrDistance, HudWidgetConfig.MaxVrDistance);
+        double radius = c.VrCurve ? Math.Max(distance, c.VrWidth / Math.PI) : 0;
+        return new VrPose(x, y, distance, c.VrWidth, c.VrTurn, c.VrTilt, radius);
+    }
+
+    public static float[] Matrix(double x, double y, double distance, double turn = 0, double tilt = 0)
+    {
+        double yaw = turn * Math.PI / 180, pitch = -tilt * Math.PI / 180;
+        double cy = Math.Cos(yaw), sy = Math.Sin(yaw), cp = Math.Cos(pitch), sp = Math.Sin(pitch);
+        return new[]
+        {
+            (float)cy, (float)(sy * sp), (float)(sy * cp), (float)x,
+            0, (float)cp, (float)-sp, (float)y,
+            (float)-sy, (float)(cy * sp), (float)(cy * cp), (float)-distance,
+        };
+    }
+
+    public static (float X, float Y, float Z, float W) Rotation(double turn, double tilt)
+    {
+        double yaw = turn * Math.PI / 360, pitch = -tilt * Math.PI / 360;
+        double cy = Math.Cos(yaw), sy = Math.Sin(yaw), cp = Math.Cos(pitch), sp = Math.Sin(pitch);
+        return ((float)(cy * sp), (float)(sy * cp), (float)(-sy * sp), (float)(cy * cp));
+    }
+
+    public static (double Turn, double Tilt) FacingHead(double x, double y, double distance)
+    {
+        double length = Math.Sqrt(x * x + y * y + distance * distance);
+        if (length <= 0) return (0, 0);
+        double turn = Math.Atan2(-x, distance) * 180 / Math.PI;
+        double tilt = Math.Asin(Math.Clamp(-y / length, -1, 1)) * 180 / Math.PI;
+        return (Math.Round(Math.Clamp(turn, -HudWidgetConfig.MaxVrAngle, HudWidgetConfig.MaxVrAngle)),
+            Math.Round(Math.Clamp(tilt, -HudWidgetConfig.MaxVrAngle, HudWidgetConfig.MaxVrAngle)));
+    }
 
     public static void Fade(Span<byte> premultiplied, int opacity)
     {

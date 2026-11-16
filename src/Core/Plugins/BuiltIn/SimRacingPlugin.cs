@@ -48,6 +48,18 @@ internal sealed class SimRacingPlugin : Plugin
         yield return new PluginHotkey("hud.layout", "Next iRacing Overlay layout", () => h.NextLayoutHotkey, k => h.NextLayoutHotkey = k, () => Hud?.NextLayout(), "iRacing Overlay", Page: OverlayPage);
         yield return new PluginHotkey("hud.layout.previous", "Previous iRacing Overlay layout", () => h.PreviousLayoutHotkey, k => h.PreviousLayoutHotkey = k, () => Hud?.PreviousLayout(), "iRacing Overlay", Page: OverlayPage);
         yield return new PluginHotkey("hud.dismiss", "Dismiss iRacing Overlay alerts", () => h.DismissHotkey, k => h.DismissHotkey = k, () => Hud?.DismissAlerts(), "iRacing Overlay", Page: OverlayPage);
+        if (h.VrOverlays)
+        {
+            const string vr = "iRacing Overlay in VR";
+            bool Adjusting() => Hud?.VrAdjusting == true;
+            yield return new PluginHotkey("hud.vr.adjust", "Edit VR widgets in the headset", () => h.VrAdjustHotkey, k => h.VrAdjustHotkey = k, () => Hud?.ToggleVrAdjust(), vr, Config.RaceHudSettings.VrAdjustDefault, OverlayPage);
+            yield return new PluginHotkey("hud.vr.next", "Next VR widget (while adjusting)", () => h.VrNextHotkey, k => h.VrNextHotkey = k, () => Hud?.VrNext(), vr, Config.RaceHudSettings.VrNextDefault, OverlayPage, Adjusting);
+            yield return new PluginHotkey("hud.vr.setting", "Next VR setting (while adjusting)", () => h.VrSettingHotkey, k => h.VrSettingHotkey = k, () => Hud?.VrNextSetting(), vr, Config.RaceHudSettings.VrSettingDefault, OverlayPage, Adjusting);
+            yield return new PluginHotkey("hud.vr.left", "Nudge left (while adjusting)", () => h.VrLeftHotkey, k => h.VrLeftHotkey = k, () => Hud?.VrNudge(-1, 0), vr, Config.RaceHudSettings.VrLeftDefault, OverlayPage, Adjusting);
+            yield return new PluginHotkey("hud.vr.right", "Nudge right (while adjusting)", () => h.VrRightHotkey, k => h.VrRightHotkey = k, () => Hud?.VrNudge(1, 0), vr, Config.RaceHudSettings.VrRightDefault, OverlayPage, Adjusting);
+            yield return new PluginHotkey("hud.vr.up", "Nudge up (while adjusting)", () => h.VrUpHotkey, k => h.VrUpHotkey = k, () => Hud?.VrNudge(0, 1), vr, Config.RaceHudSettings.VrUpDefault, OverlayPage, Adjusting);
+            yield return new PluginHotkey("hud.vr.down", "Nudge down (while adjusting)", () => h.VrDownHotkey, k => h.VrDownHotkey = k, () => Hud?.VrNudge(0, -1), vr, Config.RaceHudSettings.VrDownDefault, OverlayPage, Adjusting);
+        }
         foreach (var layout in h.Layouts)
         {
             string group = $"Show / hide widgets in “{layout.Name}”";

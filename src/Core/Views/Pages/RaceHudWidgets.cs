@@ -135,6 +135,17 @@ internal sealed partial class RaceHudWidgets
         _list.Dispatcher.BeginInvoke(ScrollToPicked, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
+    internal void ShowInVr(string kind)
+    {
+        if (Layout?.Widgets.FirstOrDefault(w => w.Kind == kind) is not { } w) return;
+        w.Vr = HudVrPlacement.Cockpit;
+        if (w.VrWidth <= 0) PlaceInVr(w);
+        _selected = w.Id;
+        _openPanel = null;
+        Fill();
+        _list.Dispatcher.BeginInvoke(() => { if (PageOf(_pickedCard) is { } page) page.ScrollToEnd(); }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+    }
+
     internal void ScrollPageBy(double dy)
     {
         if (PageOf(_pickedCard) is { } page) page.ScrollToVerticalOffset(page.VerticalOffset + dy);
@@ -363,6 +374,10 @@ internal sealed partial class RaceHudWidgets
         rows.Add(Slider("Height", "Above your eyes is positive.", -reach, reach, w.VrY, v => w.VrY = v));
         rows.Add(Slider("Distance", null, HudWidgetConfig.MinVrDistance * 100, HudWidgetConfig.MaxVrDistance * 100, w.VrDistance, v => w.VrDistance = v));
         rows.Add(Slider("Width", null, HudWidgetConfig.MinVrWidth * 100, HudWidgetConfig.MaxVrWidth * 100, w.VrWidth, v => w.VrWidth = v));
+        FrameworkElement Angle(string label, string help, double degrees, Action<double> set) =>
+            SettingRows.Row(label, help, true, Ui.SliderWithValue(-HudWidgetConfig.MaxVrAngle, HudWidgetConfig.MaxVrAngle, Math.Round(degrees), v => $"{v:0}°", v => { set(v); Changed(); }, ComboWidth - 42, 1));
+        rows.Add(Angle("Turn", "Positive turns the face to the right.", w.VrTurn, v => w.VrTurn = v));
+        rows.Add(Angle("Tilt", "Positive tilts the face up.", w.VrTilt, v => w.VrTilt = v));
         var match = Ui.LabeledButton("I.Target", "Match the screen position", () =>
         {
             PlaceInVr(w);
@@ -373,6 +388,18 @@ internal sealed partial class RaceHudWidgets
         match.HorizontalAlignment = HorizontalAlignment.Left;
         match.Margin = new Thickness(0, 4, 0, 4);
         rows.Add(match);
+        var face = Ui.LabeledButton("I.Rotate", "Face my head", () =>
+        {
+            (w.VrTurn, w.VrTilt) = SimRacing.Hud.Vr.VrPlacement.FacingHead(w.VrX, w.VrY, w.VrDistance);
+            Changed();
+            Fill();
+        }, "GhostButton");
+        face.ToolTip = "Turns and tilts it to point straight at your head from where it sits";
+        face.HorizontalAlignment = HorizontalAlignment.Left;
+        face.Margin = new Thickness(0, 0, 0, 4);
+        rows.Add(face);
+        rows.Add(SettingRows.Row("Curve around your head", "In OpenXR games only where the headset supports curved panels.", true, Ui.Switch(w.VrCurve, v => { w.VrCurve = v; Changed(); })));
+        rows.Add(SettingRows.Row("Hide on the monitor", "Only while the headset shows it. Still shown while arranging.", true, Ui.Switch(w.VrOnly, v => { w.VrOnly = v; Changed(); })));
         if (!S.VrOverlays)
         {
             var off = Ui.LabeledButton("I.Settings", "Overlay settings", () => _section.ShowSettings(RaceHudSection.VrAnchor), "GhostButton");

@@ -43,7 +43,7 @@ internal sealed class VrShare : IDisposable
         v.Write(24, (uint)Math.Clamp(count, 0, MaxSlots));
     }
 
-    public void Publish(int slot, uint id, HudVrPlacement mode, HudWidgetConfig c, int width, int height, IntPtr pixels)
+    public void Publish(int slot, uint id, HudVrPlacement mode, VrPose pose, int opacity, int width, int height, IntPtr pixels)
     {
         if (_view is not { } v || slot is < 0 or >= MaxSlots) return;
         int bytes = width * height * 4;
@@ -55,19 +55,25 @@ internal sealed class VrShare : IDisposable
         Thread.MemoryBarrier();
         v.Write(at + 8, id);
         v.Write(at + 12, (uint)mode);
-        v.Write(at + 16, (float)c.VrX);
-        v.Write(at + 20, (float)c.VrY);
-        v.Write(at + 24, (float)c.VrDistance);
-        v.Write(at + 28, (float)c.VrWidth);
+        v.Write(at + 16, (float)pose.X);
+        v.Write(at + 20, (float)pose.Y);
+        v.Write(at + 24, (float)pose.Distance);
+        v.Write(at + 28, (float)pose.Width);
         v.Write(at + 32, (uint)width);
         v.Write(at + 36, (uint)height);
+        var q = VrPlacement.Rotation(pose.Turn, pose.Tilt);
+        v.Write(at + 40, q.X);
+        v.Write(at + 44, q.Y);
+        v.Write(at + 48, q.Z);
+        v.Write(at + 52, q.W);
+        v.Write(at + 56, (float)pose.CurveRadius);
         IntPtr target = _base + HeaderBytes + slot * SlotPixelBytes;
-        if (c.Opacity >= 100) CopyMemory(target, pixels, (UIntPtr)bytes);
+        if (opacity >= 100) CopyMemory(target, pixels, (UIntPtr)bytes);
         else
         {
             if (_faded.Length < bytes) _faded = new byte[SlotPixelBytes];
             Marshal.Copy(pixels, _faded, 0, bytes);
-            VrPlacement.Fade(_faded.AsSpan(0, bytes), c.Opacity);
+            VrPlacement.Fade(_faded.AsSpan(0, bytes), opacity);
             Marshal.Copy(_faded, 0, target, bytes);
         }
         Thread.MemoryBarrier();

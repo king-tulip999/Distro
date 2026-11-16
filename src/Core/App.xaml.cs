@@ -52,6 +52,11 @@ public partial class App : Application
             HudSheet.Run(this, framesFolder, frames: true);
             return;
         }
+        if (ArgValue(e.Args, HudSheet.OptionsArg) is { } optionsFolder)
+        {
+            HudSheet.RunOptions(this, optionsFolder);
+            return;
+        }
         if (ArgValue(e.Args, FuelReplay.Arg) is { } replayFolder)
         {
             int at = Array.FindIndex(e.Args, a => string.Equals(a, FuelReplay.Arg, StringComparison.OrdinalIgnoreCase));
@@ -118,6 +123,7 @@ public partial class App : Application
             Shutdown();
             return;
         }
+        if (!demo) NotificationIdentity.Register();
         bool tookOverFans = !demo && FanService.StopRunning(TimeSpan.FromSeconds(12));
 
         DispatcherUnhandledException += OnUiException;
@@ -221,8 +227,15 @@ public partial class App : Application
             {
                 config.Ui.TrayTipShown = true;
                 _services.Save();
-                trayIcon.ShowBalloon($"{AppIdentity.Name} is running in the background",
+                void ShowTip() => trayIcon.ShowBalloon($"{AppIdentity.Name} is running in the background",
                     $"Click the {AppIdentity.Name} icon in the system tray to open it, or right-click it to quit. (Settings → Start in background)", NoticeKind.Info);
+                if (NotificationIdentity.JustCreated)
+                {
+                    var wait = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+                    wait.Tick += (_, _) => { wait.Stop(); ShowTip(); };
+                    wait.Start();
+                }
+                else ShowTip();
             }
         }
         else

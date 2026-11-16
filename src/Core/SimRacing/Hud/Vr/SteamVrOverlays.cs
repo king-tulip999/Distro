@@ -10,6 +10,7 @@ namespace Core.SimRacing.Hud.Vr;
 
 internal sealed class SteamVrOverlays : IDisposable
 {
+    private const int MouseMoveEvent = 300, MouseDownEvent = 301, MouseUpEvent = 302, InputMouse = 1;
     private const int ApplicationOverlay = 2, UniverseSeated = 0, HeadDevice = 0, EventQuit = 700, EventSize = 64;
     private const int TextureDirectX = 0, ColorSpaceGamma = 1;
     private const uint FlagPremultiplied = 1u << 21;
@@ -28,6 +29,9 @@ internal sealed class SteamVrOverlays : IDisposable
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int TextureFn(ulong handle, ref Texture texture);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] [return: MarshalAs(UnmanagedType.I1)] private delegate bool PollFn(byte[] buffer, uint size);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void QuitFn();
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int InputFn(ulong handle, int method);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int ScaleFn(ulong handle, float[] scale);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] [return: MarshalAs(UnmanagedType.I1)] private delegate bool OverlayPollFn(ulong handle, byte[] buffer, uint size);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Texture
@@ -42,8 +46,8 @@ internal sealed class SteamVrOverlays : IDisposable
         public ulong Handle;
         public ID3D11Texture2D? Texture;
         public int W, H;
-        public bool Shown;
-        public (HudVrPlacement Mode, double X, double Y, double Distance, double Width, int Opacity) Placed;
+        public bool Shown, Pointer;
+        public (HudVrPlacement Mode, VrPose Pose, int Opacity) Placed;
     }
 
     private IntPtr _library, _core;
@@ -51,13 +55,17 @@ internal sealed class SteamVrOverlays : IDisposable
     private CreateFn? _create;
     private HandleFn? _destroy, _show, _hide;
     private FlagFn? _flag;
-    private FloatFn? _alpha, _width;
+    private FloatFn? _alpha, _width, _curvature;
     private UintFn? _sort;
     private AbsoluteFn? _absolute;
     private RelativeFn? _relative;
     private TextureFn? _texture;
     private PollFn? _poll;
     private QuitFn? _quit;
+    private InputFn? _input;
+    private ScaleFn? _mouseScale;
+    private OverlayPollFn? _pollOverlay;
+    private readonly byte[] _pointerEvent = new byte[EventSize];
     private ID3D11Device? _device;
     private ID3D11DeviceContext? _context;
     private readonly Dictionary<string, Overlay> _overlays = new(StringComparer.OrdinalIgnoreCase);
@@ -136,11 +144,15 @@ internal sealed class SteamVrOverlays : IDisposable
         _alpha = At<FloatFn>(16);
         _sort = At<UintFn>(20);
         _width = At<FloatFn>(22);
+        _curvature = At<FloatFn>(24);
         _absolute = At<AbsoluteFn>(33);
         _relative = At<RelativeFn>(35);
         _show = At<HandleFn>(43);
         _hide = At<HandleFn>(44);
         _texture = At<TextureFn>(60);
+        _pollOverlay = At<OverlayPollFn>(48);
+        _input = At<InputFn>(50);
+        _mouseScale = At<ScaleFn>(52);
     }
 
     public void Pump()
@@ -155,7 +167,7 @@ internal sealed class SteamVrOverlays : IDisposable
             }
     }
 
-    public void Show(string id, string name, HudWidgetConfig c, int width, int height, IntPtr pixels)
+    public void Show(string id, string name, HudVrPlacement mode, VrPose pose, int opacity, int width, int height, IntPtr pixels, bool pointer = false)
     {
         if (!Connected || _create is null || _device is null || _context is null) return;
         if (!_overlays.TryGetValue(id, out var o))
@@ -172,25 +184,44 @@ internal sealed class SteamVrOverlays : IDisposable
             o.Texture = _device.CreateTexture2D(new Texture2DDescription(Format.B8G8R8A8_UNorm, (uint)width, (uint)height, 1, 1, BindFlags.ShaderResource));
             o.W = width;
             o.H = height;
+            if (pointer)
+            {
+                _input?.Invoke(o.Handle, InputMouse);
+                _mouseScale?.Invoke(o.Handle, new[] { (float)width, height });
+                o.Pointer = true;
+            }
         }
         _context.UpdateSubresource(o.Texture, 0, null, pixels, (uint)(width * 4), 0);
         _context.Flush();
         var tex = new Texture { Handle = o.Texture.NativePointer, Type = TextureDirectX, ColorSpace = ColorSpaceGamma };
         _texture!(o.Handle, ref tex);
-        var placed = (c.Vr, c.VrX, c.VrY, c.VrDistance, c.VrWidth, c.Opacity);
+        var placed = (mode, pose, opacity);
         if (placed != o.Placed)
         {
             o.Placed = placed;
-            _width!(o.Handle, (float)c.VrWidth);
-            _alpha!(o.Handle, c.Opacity / 100f);
-            var m = VrPlacement.Matrix(c.VrX, c.VrY, c.VrDistance);
-            if (c.Vr == HudVrPlacement.Head) _relative!(o.Handle, HeadDevice, m);
+            _width!(o.Handle, (float)pose.Width);
+            _curvature!(o.Handle, pose.Curvature);
+            _alpha!(o.Handle, opacity / 100f);
+            var m = pose.Matrix();
+            if (mode == HudVrPlacement.Head) _relative!(o.Handle, HeadDevice, m);
             else _absolute!(o.Handle, UniverseSeated, m);
         }
         if (!o.Shown)
         {
             _show!(o.Handle);
             o.Shown = true;
+        }
+    }
+
+    public void PollPointer(string id, Action<int, float, float> pointed)
+    {
+        if (!Connected || _pollOverlay is null || !_overlays.TryGetValue(id, out var o) || !o.Pointer) return;
+        for (int i = 0; i < 64 && _pollOverlay(o.Handle, _pointerEvent, EventSize); i++)
+        {
+            int type = (int)BitConverter.ToUInt32(_pointerEvent, 0);
+            if (type is not (MouseMoveEvent or MouseDownEvent or MouseUpEvent)) continue;
+            float x = BitConverter.ToSingle(_pointerEvent, 16), y = BitConverter.ToSingle(_pointerEvent, 20);
+            pointed(type - MouseMoveEvent, x, o.H - y);
         }
     }
 
@@ -226,11 +257,14 @@ internal sealed class SteamVrOverlays : IDisposable
         _create = null;
         _destroy = _show = _hide = null;
         _flag = null;
-        _alpha = _width = null;
+        _alpha = _width = _curvature = null;
         _sort = null;
         _absolute = null;
         _relative = null;
         _texture = null;
+        _input = null;
+        _mouseScale = null;
+        _pollOverlay = null;
         _poll = null;
         _quit = null;
         Unload();

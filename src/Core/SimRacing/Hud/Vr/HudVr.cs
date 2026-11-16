@@ -136,12 +136,14 @@ internal sealed class HudVr : IDisposable
 
     public bool Wants(HudWidgetConfig c) => _on && c.Vr != HudVrPlacement.Off && (_steam.Connected || _share.ReaderAlive);
 
-    public Target Begin(string id, Size size)
+    public bool Showing => _on && (_steam.Connected || _share.ReaderAlive);
+
+    public Target Begin(string id, Size size, bool top = false)
     {
         if (!_targets.TryGetValue(id, out var t)) _targets[id] = t = new Target();
         if (t.Slot < 0)
         {
-            int free = Array.IndexOf(_used, false);
+            int free = top ? Array.LastIndexOf(_used, false) : Array.IndexOf(_used, false);
             if (free >= 0)
             {
                 _used[free] = true;
@@ -154,12 +156,12 @@ internal sealed class HudVr : IDisposable
         return t;
     }
 
-    public void Publish(Target t, string id, string name, HudWidgetConfig c)
+    public void Publish(Target t, string id, string name, HudWidgetConfig c, VrPose pose, bool pointer = false)
     {
         GdiFlush();
         if (_steam.Connected)
         {
-            try { _steam.Show(id, name, c, t.Size.Width, t.Size.Height, t.Surface.Bits); }
+            try { _steam.Show(id, name, c.Vr, pose, c.Opacity, t.Size.Width, t.Size.Height, t.Surface.Bits, pointer); }
             catch (Exception ex)
             {
                 LogOnce("steamvr", ex);
@@ -170,10 +172,16 @@ internal sealed class HudVr : IDisposable
         }
         if (t.Slot >= 0 && _share.ReaderAlive)
         {
-            _share.Publish(t.Slot, t.Id, c.Vr, c, t.Size.Width, t.Size.Height, t.Surface.Bits);
+            _share.Publish(t.Slot, t.Id, c.Vr, pose, c.Opacity, t.Size.Width, t.Size.Height, t.Surface.Bits);
             _share.Beat(SlotCount());
         }
         t.Shown = true;
+    }
+
+    public void PollPointer(string id, Action<int, float, float> pointed)
+    {
+        try { _steam.PollPointer(id, pointed); }
+        catch (Exception ex) when (ex is SEHException or InvalidOperationException) { LogOnce("pointer", ex); }
     }
 
     public void Hide(string id)

@@ -133,6 +133,7 @@ internal sealed class HudHost : IDisposable
         if (!active)
         {
             if (_editing) EndEdit(keep: true);
+            EndVrAdjust();
             _preview = false;
         }
         SyncWeb();
@@ -144,6 +145,7 @@ internal sealed class HudHost : IDisposable
     {
         if (ScreenshotRunner.Active || MonkeyRunner.Active || ControlSweep.Active || PerfProbe.File is not null) return;
         _vr.Sync(Settings.VrOverlays, _active);
+        if (!_vr.On) EndVrAdjust();
     }
 
     private void OnVrChanged()
@@ -432,58 +434,63 @@ internal sealed class HudHost : IDisposable
         long start = Stopwatch.GetTimestamp();
         var monitor = HudGeometry.MonitorFor(s.Config.Monitor, Monitors);
         var fit = SizeOf(s.Config, Race);
-        if (s.Window is null)
+        bool onMonitor = !(s.Config.VrOnly && !_editing && _vr.Wants(s.Config));
+        if (!onMonitor && s.Window?.Visible == true) { s.Window.Hide(); s.Window.ReleaseSurface(); }
+        if (onMonitor)
         {
-            var w = new HudWindow("Velocita · " + s.Def.Name) { Tag = s.Config.Id };
-            w.Dragging += OnDragging;
-            w.Dropped += OnDropped;
-            w.Picked += win => WidgetPicked?.Invoke((string)win.Tag!);
-            w.Clicked += OnClicked;
-            s.Window = w;
-            s.Painter = new HudPainter();
-        }
-        float band = _editing ? EditBand(s.Painter!) : 0;
-        s.Fit = fit;
-        RectangleF rect;
-        if (s.Window is { } w0 && w0.Visible && _dragging == s) rect = w0.Rect;
-        else
-        {
-            var placed = HudGeometry.Place(s.Config, monitor, fit);
-            float px = band * placed.Width / fit.Width;
-            s.BandTop = placed.Bottom + px > monitor.Bounds.Bottom + 0.5f;
-            rect = new RectangleF(placed.X, s.BandTop ? placed.Y - px : placed.Y, placed.Width, placed.Height + px);
-        }
-        var window = s.Window;
-        window.Rect = rect;
-        window.Editing = _editing;
-        window.Locked = s.Config.Locked;
-        window.Grip = 14 * monitor.Scale;
-        window.ClickThrough = !_editing && !Settings.Interactive;
-        var size = new Size(Math.Max(1, (int)Math.Round(rect.Width)), Math.Max(1, (int)Math.Round(rect.Height)));
-        try
-        {
-            var g = window.Surface(size);
-            var painter = s.Painter!;
-            float scale = size.Width / fit.Width;
-            s.BandPx = band * scale;
-            painter.Simulated = frame.Simulated;
-            painter.Begin(g, scale, new SizeF(fit.Width, size.Height / scale), Palette, Settings.Appearance);
-            painter.Background = s.Config.Background;
-            var view = new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def };
-            painter.Inset(0, s.BandTop ? band : 0, 0, s.BandTop ? 0 : band);
-            s.Widget.Paint(painter, view);
-            painter.EndInset();
-            painter.FinishPanels();
-            if (_editing) EditFrame(painter, s, _picked == s.Config.Id, band, s.BandTop);
-            painter.End(window.SurfaceDc, size);
-            if (!window.Visible) window.Show();
-            window.Present(new Point((int)Math.Round(rect.X), (int)Math.Round(rect.Y)), (byte)Math.Round(s.Config.Opacity * 2.55));
-            if (Stopwatch.GetElapsedTime(s.LastTop).TotalSeconds >= 3) { s.LastTop = Stopwatch.GetTimestamp(); window.KeepOnTop(); }
-        }
-        catch (Exception ex)
-        {
-            LogOnce(s.Def.Kind, ex);
-            if (window.Visible) { window.Hide(); window.ReleaseSurface(); }
+            if (s.Window is null)
+            {
+                var w = new HudWindow("Velocita · " + s.Def.Name) { Tag = s.Config.Id };
+                w.Dragging += OnDragging;
+                w.Dropped += OnDropped;
+                w.Picked += win => WidgetPicked?.Invoke((string)win.Tag!);
+                w.Clicked += OnClicked;
+                s.Window = w;
+                s.Painter = new HudPainter();
+            }
+            float band = _editing ? EditBand(s.Painter!) : 0;
+            s.Fit = fit;
+            RectangleF rect;
+            if (s.Window is { } w0 && w0.Visible && _dragging == s) rect = w0.Rect;
+            else
+            {
+                var placed = HudGeometry.Place(s.Config, monitor, fit);
+                float px = band * placed.Width / fit.Width;
+                s.BandTop = placed.Bottom + px > monitor.Bounds.Bottom + 0.5f;
+                rect = new RectangleF(placed.X, s.BandTop ? placed.Y - px : placed.Y, placed.Width, placed.Height + px);
+            }
+            var window = s.Window;
+            window.Rect = rect;
+            window.Editing = _editing;
+            window.Locked = s.Config.Locked;
+            window.Grip = 14 * monitor.Scale;
+            window.ClickThrough = !_editing && !Settings.Interactive;
+            var size = new Size(Math.Max(1, (int)Math.Round(rect.Width)), Math.Max(1, (int)Math.Round(rect.Height)));
+            try
+            {
+                var g = window.Surface(size);
+                var painter = s.Painter!;
+                float scale = size.Width / fit.Width;
+                s.BandPx = band * scale;
+                painter.Simulated = frame.Simulated;
+                painter.Begin(g, scale, new SizeF(fit.Width, size.Height / scale), Palette, Settings.Appearance);
+                painter.Background = s.Config.Background;
+                var view = new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def };
+                painter.Inset(0, s.BandTop ? band : 0, 0, s.BandTop ? 0 : band);
+                s.Widget.Paint(painter, view);
+                painter.EndInset();
+                painter.FinishPanels();
+                if (_editing) EditFrame(painter, s, _picked == s.Config.Id, band, s.BandTop);
+                painter.End(window.SurfaceDc, size);
+                if (!window.Visible) window.Show();
+                window.Present(new Point((int)Math.Round(rect.X), (int)Math.Round(rect.Y)), (byte)Math.Round(s.Config.Opacity * 2.55));
+                if (Stopwatch.GetElapsedTime(s.LastTop).TotalSeconds >= 3) { s.LastTop = Stopwatch.GetTimestamp(); window.KeepOnTop(); }
+            }
+            catch (Exception ex)
+            {
+                LogOnce(s.Def.Kind, ex);
+                if (window.Visible) { window.Hide(); window.ReleaseSurface(); }
+            }
         }
         if (_vr.Wants(s.Config))
         {
@@ -517,8 +524,222 @@ internal sealed class HudHost : IDisposable
         painter.Background = s.Config.Background;
         s.Widget.Paint(painter, new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def });
         painter.FinishPanels();
+        if (VrAdjustLabel(s) is { } label) AdjustFrame(painter, label);
         painter.End(target.Surface.Dc, size);
-        _vr.Publish(target, s.Config.Id, s.Def.Name, s.Config);
+        _vr.Publish(target, s.Config.Id, s.Def.Name, s.Config, VrPlacement.Pose(s.Config, Settings));
+    }
+
+    private const string EditorId = "vr-editor";
+    private static readonly HudWidgetConfig EditorConfig = new() { Vr = HudVrPlacement.Cockpit, Opacity = 100 };
+    private VrEditor? _editor;
+    private VrAdjustSetting _vrSetting;
+    private readonly MouseCapture _mouse = new();
+    private System.Windows.Threading.DispatcherTimer? _editorTimer;
+    private bool _editorDirty, _editorChanged;
+
+    public bool VrAdjusting => _editor is not null;
+
+    private HudWidgetConfig? VrPick => _editor?.Picked;
+
+    private List<HudWidgetConfig?> VrCandidates()
+    {
+        var list = new List<HudWidgetConfig?>();
+        if (Settings.Layout(_layoutName) is { } layout)
+            list.AddRange(layout.Widgets.Where(w => w.Enabled && w.Vr != HudVrPlacement.Off && HudCatalog.Find(w.Kind) is not null));
+        if (list.Any(w => w!.Vr == HudVrPlacement.Cockpit)) list.Add(null);
+        return list;
+    }
+
+    public void ToggleVrAdjust()
+    {
+        if (_editor is not null) { EndVrAdjust(); return; }
+        var candidates = VrCandidates();
+        if (!_vr.Showing || candidates.Count == 0)
+        {
+            _app.Notify("Nothing to edit in VR", !_vr.On ? "VR widgets are off in Overlay settings." : !_vr.Showing ? "No headset is showing VR widgets right now." : "No widget in this layout is set to show in VR.", NoticeKind.Info);
+            return;
+        }
+        _editor = new VrEditor(Settings);
+        _editor.SetCandidates(candidates);
+        _vrSetting = VrAdjustSetting.Move;
+        _mouse.Moved += OnMouseMoved;
+        _mouse.LeftButton += OnMouseButton;
+        _mouse.RightClick += EndVrAdjust;
+        _mouse.Wheeled += OnMouseWheel;
+        if (!_app.Demo) _mouse.Start();
+        _editorTimer ??= new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
+        _editorTimer.Tick += OnEditorTick;
+        _editorTimer.Start();
+        _editorDirty = true;
+        _app.Hotkeys.RegisterAll();
+        _app.Notify("Editing VR widgets", "The mouse moves the cursor in the headset. Right-click or Done gives it back.", NoticeKind.Info);
+        VrRedraw();
+    }
+
+    private void EndVrAdjust()
+    {
+        if (_editor is null) return;
+        _mouse.Stop();
+        _mouse.Moved -= OnMouseMoved;
+        _mouse.LeftButton -= OnMouseButton;
+        _mouse.RightClick -= EndVrAdjust;
+        _mouse.Wheeled -= OnMouseWheel;
+        if (_editorTimer is not null)
+        {
+            _editorTimer.Stop();
+            _editorTimer.Tick -= OnEditorTick;
+        }
+        _editor = null;
+        _vr.Remove(EditorId);
+        _app.Hotkeys.RegisterAll();
+        Save();
+        VrRedraw();
+    }
+
+    private void OnMouseMoved(int dx, int dy) => Apply(_editor?.MoveBy(dx, dy));
+
+    private void OnMouseButton(bool down)
+    {
+        if (_editor is null) return;
+        if (down) Apply(_editor.Press());
+        else _editor.Release();
+    }
+
+    private void OnMouseWheel(int notches) => Apply(_editor?.Wheel(notches));
+
+    private void OnPointer(int kind, float x, float y)
+    {
+        if (_editor is null) return;
+        float scale = _editorScale > 0 ? _editorScale : 1;
+        var at = new PointF(x / scale, y / scale);
+        if (kind == 0) Apply(_editor.MoveTo(at, false));
+        else if (kind == 1) Apply(_editor.Press(at));
+        else _editor.Release();
+    }
+
+    private void Apply(VrEditorResult? result)
+    {
+        switch (result)
+        {
+            case VrEditorResult.Close:
+                System.Windows.Application.Current?.Dispatcher.BeginInvoke(EndVrAdjust);
+                break;
+            case VrEditorResult.Changed:
+                _editorDirty = _editorChanged = true;
+                break;
+            case VrEditorResult.Redraw:
+                _editorDirty = true;
+                break;
+        }
+    }
+
+    private float _editorScale;
+
+    private void OnEditorTick(object? sender, EventArgs e)
+    {
+        if (_editor is null) return;
+        try
+        {
+            if (!_vr.Showing) { EndVrAdjust(); return; }
+            _vr.PollPointer(EditorId, OnPointer);
+            if (_editor is null) return;
+            var candidates = VrCandidates();
+            if (candidates.Count == 0) { EndVrAdjust(); return; }
+            if (!candidates.SequenceEqual(_editor.Candidates, ReferenceEqualityComparer.Instance))
+            {
+                _editor.SetCandidates(candidates);
+                _editorDirty = true;
+            }
+            if (_editorChanged)
+            {
+                _editorChanged = false;
+                _app.Save();
+                foreach (var s in _slots.Values) s.Dirty = true;
+                Refresh();
+                Changed?.Invoke();
+            }
+            if (_editorDirty)
+            {
+                _editorDirty = false;
+                DrawEditor();
+            }
+        }
+        catch (Exception ex)
+        {
+            LogOnce("vr-editor", ex);
+            EndVrAdjust();
+        }
+    }
+
+    private void DrawEditor()
+    {
+        if (_editor is not { } editor) return;
+        var layout = new SizeF(VrEditor.Width, editor.Height);
+        var size = VrPlacement.Pixels(layout, VrShare.MaxPixels);
+        _editorScale = size.Width / layout.Width;
+        var target = _vr.Begin(EditorId, size, top: true);
+        var painter = target.Painter;
+        painter.Begin(target.Surface.Graphics!, _editorScale, new SizeF(layout.Width, size.Height / _editorScale), Palette, Settings.Appearance);
+        VrEditorPainter.Paint(painter, editor, editor.PickedName(w => HudCatalog.Find(w.Kind)?.Name ?? w.Kind));
+        painter.End(target.Surface.Dc, size);
+        _vr.Publish(target, EditorId, "VR widgets", EditorConfig, EditorPose(), pointer: true);
+    }
+
+    public static VrPose EditorPose()
+    {
+        const double y = -0.12, distance = 0.55, width = 0.42;
+        var (turn, tilt) = VrPlacement.FacingHead(0, y, distance);
+        return new VrPose(0, y, distance, width, turn, tilt, 0);
+    }
+
+    public void VrNext()
+    {
+        if (_editor is null) return;
+        _editor.Step(1);
+        if (_editor.AllPicked && _vrSetting == VrAdjustSetting.Angle) _vrSetting = VrAdjustSetting.Move;
+        _editorDirty = true;
+        VrRedraw();
+    }
+
+    public void VrNextSetting()
+    {
+        if (_editor is null) return;
+        _vrSetting = VrAdjust.Next(_vrSetting, _editor.AllPicked);
+        VrRedraw();
+    }
+
+    public void VrNudge(int right, int up)
+    {
+        if (_editor is null) return;
+        VrAdjust.Nudge(VrPick, Settings, _vrSetting, right, up);
+        _app.Save();
+        _editorDirty = true;
+        VrRedraw();
+    }
+
+    private void VrRedraw()
+    {
+        foreach (var s in _slots.Values) s.Dirty = true;
+        Refresh();
+        Changed?.Invoke();
+    }
+
+    private string? VrAdjustLabel(Slot s)
+    {
+        if (_editor is null) return null;
+        if (_editor.AllPicked) return s.Config.Vr == HudVrPlacement.Cockpit ? "All cockpit widgets" : null;
+        return ReferenceEquals(VrPick, s.Config) ? s.Def.Name + " · keys: " + VrAdjust.Label(_vrSetting) : null;
+    }
+
+    private static void AdjustFrame(HudPainter p, string label)
+    {
+        var b = p.Bounds;
+        p.Outline(new RectangleF(b.X + 1.5f, b.Y + 1.5f, b.Width - 3, b.Height - 3), p.P.Accent, 3, p.Look.Corner);
+        float h = p.LineHeight(p.SmallBold) + 6;
+        float w = Math.Min(b.Width - 8, p.Measure(label, p.SmallBold) + 14);
+        var tag = new RectangleF(4, 4, w, h);
+        p.Fill(tag, p.P.Accent, 4);
+        p.Text(label, p.SmallBold, p.P.OnAccent, tag, HAlign.Center, VAlign.Center);
     }
 
     public void PlaceInVr(HudWidgetConfig config)
@@ -1127,6 +1348,8 @@ internal sealed class HudHost : IDisposable
         HideGrid();
         CloseWindows();
         _web?.Dispose();
+        _mouse.Dispose();
+        _editorTimer?.Stop();
         _vr.Changed -= OnVrChanged;
         _vr.Dispose();
         _webRenderer.Dispose();

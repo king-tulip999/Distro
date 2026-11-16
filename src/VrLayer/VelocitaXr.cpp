@@ -25,6 +25,7 @@ typedef XrResult (*PFN_xrGetInstanceProcAddr)(XrInstance, const char*, PFN_xrVoi
 constexpr XrResult XR_SUCCESS = 0;
 constexpr XrResult XR_ERROR_INITIALIZATION_FAILED = -6;
 constexpr XrResult XR_ERROR_FUNCTION_UNSUPPORTED = -7;
+constexpr XrResult XR_ERROR_EXTENSION_NOT_PRESENT = -9;
 
 constexpr int XR_TYPE_SYSTEM_PROPERTIES = 5;
 constexpr int XR_TYPE_SWAPCHAIN_CREATE_INFO = 9;
@@ -36,6 +37,8 @@ constexpr int XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO = 56;
 constexpr int XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO = 57;
 constexpr int XR_TYPE_GRAPHICS_BINDING_D3D11_KHR = 1000027000;
 constexpr int XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR = 1000027001;
+constexpr int XR_TYPE_COMPOSITION_LAYER_CYLINDER_KHR = 1000017000;
+constexpr const char* CylinderExtension = "XR_KHR_composition_layer_cylinder";
 
 constexpr uint32_t XR_LOADER_INTERFACE_STRUCT_LOADER_INFO = 1;
 constexpr uint32_t XR_LOADER_INTERFACE_STRUCT_API_LAYER_REQUEST = 2;
@@ -51,7 +54,13 @@ struct XrOffset2Di { int32_t x, y; };
 struct XrExtent2Di { int32_t width, height; };
 struct XrRect2Di { XrOffset2Di offset; XrExtent2Di extent; };
 
-struct XrInstanceCreateInfo;
+struct XrApplicationInfo { char applicationName[128]; uint32_t applicationVersion; char engineName[128]; uint32_t engineVersion; XrVersion apiVersion; };
+struct XrInstanceCreateInfo
+{
+    int type; const void* next; XrFlags64 createFlags; XrApplicationInfo applicationInfo;
+    uint32_t enabledApiLayerCount; const char* const* enabledApiLayerNames;
+    uint32_t enabledExtensionCount; const char* const* enabledExtensionNames;
+};
 struct XrApiLayerNextInfo;
 typedef XrResult (*PFN_xrCreateApiLayerInstance)(const XrInstanceCreateInfo*, const struct XrApiLayerCreateInfo*, XrInstance*);
 
@@ -123,6 +132,11 @@ struct XrCompositionLayerQuad
     int type; const void* next; XrFlags64 layerFlags; XrSpace space; int eyeVisibility;
     XrSwapchainSubImage subImage; XrPosef pose; XrExtent2Df size;
 };
+struct XrCompositionLayerCylinderKHR
+{
+    int type; const void* next; XrFlags64 layerFlags; XrSpace space; int eyeVisibility;
+    XrSwapchainSubImage subImage; XrPosef pose; float radius, centralAngle, aspectRatio;
+};
 struct XrFrameEndInfo
 {
     int type; const void* next; XrTime displayTime; int environmentBlendMode;
@@ -172,7 +186,9 @@ namespace
         uint32_t mode;
         float x, y, distance, width;
         uint32_t w, h;
-        uint32_t pad[6];
+        XrQuaternionf rotation;
+        float curveRadius;
+        uint32_t pad;
     };
 
     static_assert(sizeof(SharedHeader) == 32, "header");
@@ -226,6 +242,9 @@ namespace
     ULONGLONG g_lastOpenTry = 0;
     std::vector<const XrBaseHeader*> g_layers;
     XrCompositionLayerQuad g_quadLayers[MaxSlots];
+    XrCompositionLayerCylinderKHR g_cylinderLayers[MaxSlots];
+    const XrBaseHeader* g_built[MaxSlots];
+    bool g_cylinder = false;
     std::vector<uint8_t> g_scratch;
 
     bool IsTargetProcess()
@@ -395,18 +414,46 @@ namespace
             if (!q.ready) continue;
             SharedSlot s = *slot;
             if (s.mode == 0 || s.w != q.w || s.h != q.h) continue;
-            XrCompositionLayerQuad& layer = g_quadLayers[built];
-            layer = {};
-            layer.type = XR_TYPE_COMPOSITION_LAYER_QUAD;
-            layer.layerFlags = 0x2;
-            layer.space = s.mode == 2 ? g_view : g_local;
-            layer.eyeVisibility = 0;
-            layer.subImage.swapchain = q.swapchain;
-            layer.subImage.imageRect = { { 0, 0 }, { int32_t(q.w), int32_t(q.h) } };
-            layer.pose.orientation = { 0, 0, 0, 1 };
-            layer.pose.position = { s.x, s.y, -s.distance };
-            layer.size = { s.width, s.width * float(q.h) / float(q.w) };
-            if (!layer.space) continue;
+            XrSpace space = s.mode == 2 ? g_view : g_local;
+            if (!space) continue;
+            XrSwapchainSubImage sub{};
+            sub.swapchain = q.swapchain;
+            sub.imageRect = { { 0, 0 }, { int32_t(q.w), int32_t(q.h) } };
+            float turned = s.rotation.x * s.rotation.x + s.rotation.y * s.rotation.y + s.rotation.z * s.rotation.z + s.rotation.w * s.rotation.w;
+            XrQuaternionf r = turned > 0.5f && turned < 1.5f ? s.rotation : XrQuaternionf{ 0, 0, 0, 1 };
+            XrVector3f at = { s.x, s.y, -s.distance };
+            if (g_cylinder && s.curveRadius > 0.01f && s.width > 0)
+            {
+                XrCompositionLayerCylinderKHR& layer = g_cylinderLayers[built];
+                layer = {};
+                layer.type = XR_TYPE_COMPOSITION_LAYER_CYLINDER_KHR;
+                layer.layerFlags = 0x2;
+                layer.space = space;
+                layer.subImage = sub;
+                layer.pose.orientation = r;
+                float k = s.curveRadius;
+                layer.pose.position = {
+                    at.x + 2 * (r.x * r.z + r.y * r.w) * k,
+                    at.y + 2 * (r.y * r.z - r.x * r.w) * k,
+                    at.z + (1 - 2 * (r.x * r.x + r.y * r.y)) * k };
+                layer.radius = k;
+                layer.centralAngle = s.width / k;
+                layer.aspectRatio = float(q.w) / float(q.h);
+                g_built[built] = reinterpret_cast<const XrBaseHeader*>(&layer);
+            }
+            else
+            {
+                XrCompositionLayerQuad& layer = g_quadLayers[built];
+                layer = {};
+                layer.type = XR_TYPE_COMPOSITION_LAYER_QUAD;
+                layer.layerFlags = 0x2;
+                layer.space = space;
+                layer.subImage = sub;
+                layer.pose.orientation = r;
+                layer.pose.position = at;
+                layer.size = { s.width, s.width * float(q.h) / float(q.w) };
+                g_built[built] = reinterpret_cast<const XrBaseHeader*>(&layer);
+            }
             built++;
         }
         return built;
@@ -428,7 +475,7 @@ namespace
         if (quads > room) quads = room;
         if (quads == 0) return g_next.endFrame(session, info);
         g_layers.assign(info->layers, info->layers + info->layerCount);
-        for (uint32_t i = 0; i < quads; i++) g_layers.push_back(reinterpret_cast<const XrBaseHeader*>(&g_quadLayers[i]));
+        for (uint32_t i = 0; i < quads; i++) g_layers.push_back(g_built[i]);
         XrFrameEndInfo copy = *info;
         copy.layerCount = uint32_t(g_layers.size());
         copy.layers = g_layers.data();
@@ -537,13 +584,36 @@ namespace
             return XR_ERROR_INITIALIZATION_FAILED;
         XrApiLayerCreateInfo nextInfo = *layerInfo;
         nextInfo.nextInfo = layerInfo->nextInfo->next;
-        XrResult result = layerInfo->nextInfo->nextCreateApiLayerInstance(info, &nextInfo, instance);
-        if (result != XR_SUCCESS) return result;
+        bool cylinder = false;
+        XrResult result = XR_ERROR_EXTENSION_NOT_PRESENT;
+        if (info && IsTargetProcess())
+        {
+            bool asked = false;
+            for (uint32_t i = 0; i < info->enabledExtensionCount; i++)
+                if (info->enabledExtensionNames[i] && strcmp(info->enabledExtensionNames[i], CylinderExtension) == 0) asked = true;
+            if (asked) cylinder = true;
+            else
+            {
+                std::vector<const char*> names(info->enabledExtensionNames, info->enabledExtensionNames + info->enabledExtensionCount);
+                names.push_back(CylinderExtension);
+                XrInstanceCreateInfo withCylinder = *info;
+                withCylinder.enabledExtensionCount = uint32_t(names.size());
+                withCylinder.enabledExtensionNames = names.data();
+                result = layerInfo->nextInfo->nextCreateApiLayerInstance(&withCylinder, &nextInfo, instance);
+                cylinder = result == XR_SUCCESS;
+            }
+        }
+        if (result != XR_SUCCESS)
+        {
+            result = layerInfo->nextInfo->nextCreateApiLayerInstance(info, &nextInfo, instance);
+            if (result != XR_SUCCESS) return result;
+        }
         std::lock_guard<std::mutex> guard(g_lock);
         g_next = Next{};
         g_next.getInstanceProcAddr = layerInfo->nextInfo->nextGetInstanceProcAddr;
         g_instance = *instance;
         g_active = false;
+        g_cylinder = cylinder;
         Load("xrDestroyInstance", g_next.destroyInstance);
         Load("xrGetInstanceProperties", g_next.getInstanceProperties);
         Load("xrGetSystemProperties", g_next.getSystemProperties);

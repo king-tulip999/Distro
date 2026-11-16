@@ -46,6 +46,21 @@ public sealed class RaceHudSettings
 
     public bool VrOverlays { get; set; }
 
+    public const double MaxVrShiftDistance = 1;
+
+    public double VrShiftX { get; set; }
+
+    public double VrShiftY { get; set; }
+
+    public double VrShiftDistance { get; set; }
+
+    public void ClampVrShift()
+    {
+        VrShiftX = double.IsFinite(VrShiftX) ? Math.Clamp(VrShiftX, -HudWidgetConfig.VrReach, HudWidgetConfig.VrReach) : 0;
+        VrShiftY = double.IsFinite(VrShiftY) ? Math.Clamp(VrShiftY, -HudWidgetConfig.VrReach, HudWidgetConfig.VrReach) : 0;
+        VrShiftDistance = double.IsFinite(VrShiftDistance) ? Math.Clamp(VrShiftDistance, -MaxVrShiftDistance, MaxVrShiftDistance) : 0;
+    }
+
     public int WebPort { get; set; } = DefaultWebPort;
 
     public const int MinGrid = 2, MaxGrid = 64, GridStep = 2;
@@ -103,6 +118,15 @@ public sealed class RaceHudSettings
     public string? DismissHotkey { get; set; }
     public string? QuickEditHotkey { get; set; } = QuickEditDefault;
     public const string QuickEditDefault = "Ctrl+Alt+E";
+    public string? VrAdjustHotkey { get; set; } = VrAdjustDefault;
+    public string? VrNextHotkey { get; set; } = VrNextDefault;
+    public string? VrSettingHotkey { get; set; } = VrSettingDefault;
+    public string? VrLeftHotkey { get; set; } = VrLeftDefault;
+    public string? VrRightHotkey { get; set; } = VrRightDefault;
+    public string? VrUpHotkey { get; set; } = VrUpDefault;
+    public string? VrDownHotkey { get; set; } = VrDownDefault;
+    public const string VrAdjustDefault = "Ctrl+Alt+V", VrNextDefault = "Ctrl+Alt+N", VrSettingDefault = "Ctrl+Alt+M",
+        VrLeftDefault = "Ctrl+Alt+Left", VrRightDefault = "Ctrl+Alt+Right", VrUpDefault = "Ctrl+Alt+Up", VrDownDefault = "Ctrl+Alt+Down";
 
     public HudLayout? Layout(string? name) => Layouts.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase));
 
@@ -194,6 +218,7 @@ public sealed class RaceHudSettings
         if (before4) { Appearance.Colors = HudAppearance.DefaultColors; Appearance.Custom = new(); }
         if (before5 && Appearance.Corner == 0) Appearance.Corner = HudAppearance.DefaultCorner;
         if (WebPort is < MinWebPort or > MaxWebPort) WebPort = DefaultWebPort;
+        ClampVrShift();
         var builtIn = defaults();
         if (!Layouts.Any(l => l is not null && IsDefaultName(l.Name ?? ""))) Layouts.Add(builtIn[0]);
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -355,7 +380,7 @@ public sealed class HudWidgetConfig
 
     public string? Hotkey { get; set; }
 
-    public const double VrReach = 2, MinVrDistance = 0.2, MaxVrDistance = 3, MinVrWidth = 0.05, MaxVrWidth = 2;
+    public const double VrReach = 2, MinVrDistance = 0.2, MaxVrDistance = 3, MinVrWidth = 0.05, MaxVrWidth = 2, MaxVrAngle = 80;
 
     public HudVrPlacement Vr { get; set; }
 
@@ -366,6 +391,14 @@ public sealed class HudWidgetConfig
     public double VrDistance { get; set; } = 1;
 
     public double VrWidth { get; set; }
+
+    public double VrTurn { get; set; }
+
+    public double VrTilt { get; set; }
+
+    public bool VrCurve { get; set; }
+
+    public bool VrOnly { get; set; }
 
     public Dictionary<string, string> Options { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -388,6 +421,8 @@ public sealed class HudWidgetConfig
         VrY = double.IsFinite(VrY) ? Math.Clamp(VrY, -VrReach, VrReach) : 0;
         VrDistance = double.IsFinite(VrDistance) ? Math.Clamp(VrDistance, MinVrDistance, MaxVrDistance) : 1;
         VrWidth = double.IsFinite(VrWidth) && VrWidth > 0 ? Math.Clamp(VrWidth, MinVrWidth, MaxVrWidth) : 0;
+        VrTurn = double.IsFinite(VrTurn) ? Math.Clamp(VrTurn, -MaxVrAngle, MaxVrAngle) : 0;
+        VrTilt = double.IsFinite(VrTilt) ? Math.Clamp(VrTilt, -MaxVrAngle, MaxVrAngle) : 0;
         Sessions = (Sessions ?? new()).Where(s => !string.IsNullOrWhiteSpace(s)).Select(RaceHudSettings.SessionKind).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (k, v) in Options ?? new()) if (k is not null && v is not null) options[k] = v;

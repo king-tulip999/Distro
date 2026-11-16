@@ -687,11 +687,33 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             else status.ClearValue(TextBlock.ForegroundProperty);
             status.Visibility = text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
-        var toggle = Ui.Switch(S.VrOverlays, on => { S.VrOverlays = on; changed(); Host()?.SyncVr(); Refresh(); });
+        var toggle = Ui.Switch(S.VrOverlays, on => { S.VrOverlays = on; changed(); Host()?.SyncVr(); app.Hotkeys.RegisterAll(); Refresh(); });
         Refresh();
+        FrameworkElement Shift(string label, string? help, double max, double metres, Action<double> set) =>
+            Ui.SettingRow(label, help, Ui.SliderWithValue(-max * 100, max * 100, Math.Round(metres * 100), v => $"{v:0} {Units.Cm}", v => { set(v / 100); S.ClampVrShift(); changed(); Host()?.SettingsChanged(save: false); }, 190, 1));
+        string adjustKey = Core.Hotkeys.Hotkey.Display(S.VrAdjustHotkey);
         var tile = Group("VR headsets", null,
             Ui.SettingRow("VR widgets", "Widgets set to show in VR appear in SteamVR and in OpenXR games, iRacing included. Each widget's spot is on its page.", toggle),
-            status);
+            status,
+            Ui.SubHeader("Move every cockpit widget"),
+            Shift("Sideways", "Right is positive.", HudWidgetConfig.VrReach, S.VrShiftX, v => S.VrShiftX = v),
+            Shift("Height", "Up is positive.", HudWidgetConfig.VrReach, S.VrShiftY, v => S.VrShiftY = v),
+            Shift("Distance", "Further is positive.", RaceHudSettings.MaxVrShiftDistance, S.VrShiftDistance, v => S.VrShiftDistance = v),
+            Ui.SubHeader("Edit in the headset"),
+            EditInHeadset(),
+            new TextBlock
+            {
+                Text = (string.IsNullOrWhiteSpace(S.VrAdjustHotkey) ? "" : $"{adjustKey} also opens it. ")
+                    + "A panel opens in front of you: the mouse or a SteamVR controller picks a widget and moves it. Right-click or Done gives the mouse back.",
+                Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4),
+            });
+        FrameworkElement EditInHeadset()
+        {
+            var open = Ui.LabeledButton("I.Move", "Edit VR widgets in the headset", () => Host()?.ToggleVrAdjust(), "GhostButton");
+            open.HorizontalAlignment = HorizontalAlignment.Left;
+            open.Margin = new Thickness(0, 4, 0, 0);
+            return open;
+        }
         void Hook(HudHost? host, bool on)
         {
             if (host is null) return;
@@ -1327,6 +1349,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         yield return ("hud-fuel", () => { SelectTab(FuelTabIndex); return Task.CompletedTask; });
         yield return ("hud-settings", () => { SelectTab(SettingsTab); return Task.CompletedTask; });
         yield return ("hud-settings-back", () => { SelectTab(WidgetsTab); return Task.CompletedTask; });
+        yield return ("hud-vr-settings", () => { ShowSettings(VrAnchor); return Task.CompletedTask; });
+        yield return ("hud-vr-widget", async () => { SelectTab(WidgetsTab); await Task.Delay(300); _widgets?.ShowInVr("standings"); });
     }
 
     public bool CancelEdit() => _rules?.Cancel() == true;

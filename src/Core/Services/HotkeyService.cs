@@ -35,7 +35,7 @@ internal sealed class HotkeyService : IDisposable
             var target = profile;
             Register(profile.Hotkey, () => _ = _app.DisplayProfiles.ApplyAsync(target), "Display profile " + profile.Name);
         }
-        foreach (var hotkey in PluginHotkeys())
+        foreach (var hotkey in PluginHotkeys().Where(h => h.Live?.Invoke() != false))
             Register(hotkey.Get(), hotkey.Invoke, hotkey.Label);
         if (windows)
         {
