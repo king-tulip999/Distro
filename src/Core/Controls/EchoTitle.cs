@@ -41,6 +41,15 @@ public sealed class EchoTitle : FrameworkElement
     private Pen? _pen;
     private double _width, _height, _reserve;
 
+    public double DrawnWidth
+    {
+        get
+        {
+            Shape();
+            return _width;
+        }
+    }
+
     private static void Reshape(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         var title = (EchoTitle)d;

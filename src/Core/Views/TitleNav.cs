@@ -140,6 +140,21 @@ internal sealed class TitleNav : Grid
         Children.Add(_end);
         AutomationProperties.SetName(this, "Tools");
         _drag = new DragList(_groups, keys => GroupsMoved?.Invoke(keys), across: true);
+        _back = Ui.LabeledButton("I.ChevronLeft", "Back", () => _backAction?.Invoke());
+        _back.ToolTip = "Back (Esc)";
+        _back.VerticalAlignment = VerticalAlignment.Center;
+        _back.Margin = new Thickness(PartGap * 3, 0, 0, 0);
+        _back.Visibility = Visibility.Collapsed;
+        WindowChrome.SetIsHitTestVisibleInChrome(_back, true);
+    }
+
+    private readonly Button _back;
+    private Action? _backAction;
+
+    public void ShowBack(Action? back)
+    {
+        _backAction = back;
+        _back.Visibility = back is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     public const string SettingsIcon = "I.Settings";
@@ -168,6 +183,7 @@ internal sealed class TitleNav : Grid
         updateButton.Margin = new Thickness(PartGap, 0, 0, 0);
         WindowChrome.SetIsHitTestVisibleInChrome(updateButton, true);
         _end.Children.Add(updateButton);
+        _end.Children.Add(_back);
         Paint();
     }
 

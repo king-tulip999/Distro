@@ -22,7 +22,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     private readonly TextBlock _number = new() { FontSize = 13.5, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     private readonly Tile _numberPlate = new() { MinWidth = 36, Height = 24, Padding = new Thickness(7, 0, 7, 0), BorderThickness = new Thickness(1.5), Margin = new Thickness(0, 0, 8, 0) };
     private readonly StackPanel _driverPlate = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
-    private readonly StackPanel _crumbs = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+    private readonly DockPanel _crumbs = new() { LastChildFill = true, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
     private readonly TextBlock _sessionsCount = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(11, 0, 0, 0) };
     private readonly StackPanel _tools = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly ContentControl _progress = new() { Focusable = false }, _content = new() { Focusable = false };
@@ -58,10 +58,10 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         _crumbs.HorizontalAlignment = HorizontalAlignment.Left;
         _crumbs.ClipToBounds = true;
         left.Children.Add(_crumbs);
-        if (title.Children[0] is FrameworkElement titleText)
+        if (title.Children[0] is EchoTitle titleText)
             title.SizeChanged += (_, _) =>
             {
-                double at = Math.Ceiling(titleText.DesiredSize.Width) + 23;
+                double at = Math.Ceiling(titleText.DrawnWidth) + 16;
                 if (Math.Abs(_crumbs.Margin.Left - at) > 0.5) _crumbs.Margin = new Thickness(at, 0, 0, 0);
             };
         _driverPlate.Margin = new Thickness(0, 0, 16, 0);
@@ -157,6 +157,8 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         menu.IsOpen = true;
     }
 
+    private const double CrumbSize = 15.5;
+
     private void ShowCrumbs(SessionSummary? session)
     {
         bool drilled = _sessionId is not null;
@@ -164,28 +166,25 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         _crumbs.Visibility = drilled ? Visibility.Visible : Visibility.Collapsed;
         _driverPlate.Visibility = !drilled && _driver.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         _tools.Visibility = drilled ? Visibility.Collapsed : Visibility.Visible;
+        if (_shown) _window.Nav.ShowBack(drilled ? Back : null);
         if (!drilled) return;
-        var back = Ui.LabeledButton("I.ChevronLeft", "Back", Back);
-        back.ToolTip = "Back (Esc)";
-        back.VerticalAlignment = VerticalAlignment.Center;
-        back.Margin = new Thickness(0, 0, 13, 0);
-        _crumbs.Children.Add(back);
         void Crumb(string text, Action? go)
         {
-            if (_crumbs.Children.Count > 1)
+            if (_crumbs.Children.Count > 0)
             {
-                var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronRight"), Width = 11, Height = 11, Margin = new Thickness(3, 0, 3, 0), VerticalAlignment = VerticalAlignment.Center };
-                chevron.SetResourceReference(Control.ForegroundProperty, "TextFaint");
+                var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronRight"), Width = 13, Height = 13, Margin = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
+                chevron.SetResourceReference(Control.ForegroundProperty, "TextMuted");
                 _crumbs.Children.Add(chevron);
             }
             if (go is null)
             {
-                var here = new TextBlock { Text = text, Style = Ui.Res<Style>("Body"), FontSize = 12, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+                var here = new TextBlock { Text = text, Style = Ui.Res<Style>("Body"), FontSize = CrumbSize, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
                 here.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
                 _crumbs.Children.Add(here);
                 return;
             }
-            var button = new Button { Style = Ui.Res<Style>("QuietButton"), Content = text, VerticalAlignment = VerticalAlignment.Center, ToolTip = "Back (Esc)" };
+            var button = new Button { Style = Ui.Res<Style>("QuietButton"), Content = text, FontSize = CrumbSize, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, ToolTip = "Back (Esc)" };
+            button.SetResourceReference(Control.ForegroundProperty, "Text");
             button.Click += (_, _) => go();
             _crumbs.Children.Add(button);
         }
@@ -199,9 +198,10 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             if (session is null) return;
             var about = TextFit.TipWhenTrimmed(new TextBlock
             {
-                Text = $"{session.Car} · {session.Place} · {Dates.Day(session.StartUtc.ToLocalTime())}", Style = Ui.Res<Style>("Caption"),
+                Text = $"{session.Car} · {session.Place} · {Dates.Day(session.StartUtc.ToLocalTime())}", Style = Ui.Res<Style>("Body"), TextWrapping = TextWrapping.NoWrap,
                 TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 640, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 0, 0),
             });
+            about.SetResourceReference(TextBlock.ForegroundProperty, "Text");
             _crumbs.Children.Add(about);
         }
     }
@@ -220,6 +220,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     public void OnShown()
     {
         _shown = true;
+        _window.Nav.ShowBack(_sessionId is not null ? Back : null);
         if (Stats is { } stats)
         {
             stats.Changed += OnStatsChanged;
@@ -236,6 +237,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     public void OnHidden()
     {
         _shown = false;
+        _window.Nav.ShowBack(null);
         if (Stats is { } stats) stats.Changed -= OnStatsChanged;
     }
 
