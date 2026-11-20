@@ -95,6 +95,7 @@ internal sealed class DemoTelemetry
             MaxFuelPct = 1,
 
             PlayerEstLapTime = 108.5,
+            ForwardGears = 6,
             ShiftLightFirstRpm = 6500,
             ShiftRpm = 8400,
             BlinkRpm = 8650,
@@ -268,7 +269,7 @@ internal sealed class DemoTelemetry
         f.Fuel = Math.Max(1.2, 92 - stintLaps * 3.05);
         f.FuelPct = f.Fuel / 120;
         f.FuelUsePerHour = 72;
-        f.Incidents = Math.Min(8, (int)(raceT / 420) * 2);
+        f.Incidents = DemoIncidents(raceT);
         f.TeamIncidents = f.Incidents;
         f.DriverIncidents = f.Incidents;
         f.OilTemp = 104 + 3 * Math.Sin(t / 60);
@@ -339,4 +340,8 @@ internal sealed class DemoTelemetry
         f.Flags = flags;
         f.Sides = left && right ? CarSides.LeftRight : left ? CarSides.Left : right ? CarSides.Right : CarSides.Clear;
     }
+
+    private static readonly int[] DemoIncidentTotals = { 0, 1, 3, 3, 7, 8, 10 };
+
+    private static int DemoIncidents(double raceT) => DemoIncidentTotals[Math.Clamp((int)(raceT / 230), 0, DemoIncidentTotals.Length - 1)];
 }

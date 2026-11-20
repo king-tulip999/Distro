@@ -23,6 +23,7 @@ internal sealed class HudHost : IDisposable
     private readonly List<Places> _undo = new(), _redo = new();
     private readonly Dictionary<HudLayout, Places> _editStart = new(ReferenceEqualityComparer.Instance);
     private HudToolbar? _toolbar;
+    private HudSimBar? _simBar;
     private bool _toolbarDirty;
     private bool _active, _holding, _hidden, _editing, _editSimulated, _preview, _overrideRules;
     private readonly HashSet<HudWidgetConfig> _hiddenWidgets = new(ReferenceEqualityComparer.Instance);
@@ -70,6 +71,8 @@ internal sealed class HudHost : IDisposable
 
     private readonly record struct WidgetPlace(string Id, string Monitor, HudAnchor Anchor, double X, double Y, double W, double H, double Scale);
 
+    private SimStatus _lastStatus;
+
     public HudHost(AppServices app)
     {
         _app = app;
@@ -86,6 +89,10 @@ internal sealed class HudHost : IDisposable
 
     private void OnStatusChanged(SimStatus status)
     {
+        if (status == SimStatus.Connected && _lastStatus != SimStatus.Connected && Settings.HideAppOnConnect && !_app.Demo && _app.Tray is not null
+            && System.Windows.Application.Current?.MainWindow is { IsVisible: true } window)
+            window.Hide();
+        _lastStatus = status;
         if (_holding && !_timer.Enabled) SafeTick();
         Changed?.Invoke();
     }
@@ -173,7 +180,7 @@ internal sealed class HudHost : IDisposable
                 Refresh();
             });
         }
-        string? problem = _web.Start(Settings.WebPort);
+        string? problem = _web.Start(Settings.WebPort, Settings.WebRemote && !_app.Demo);
         if (problem is not null && problem != WebProblem) _app.Notify("Browser sources didn't start", problem, NoticeKind.Warning);
         WebProblem = problem;
         _web.ThemeCss = HudWebRenderer.ThemeCss(CurrentPalette());
@@ -368,6 +375,7 @@ internal sealed class HudHost : IDisposable
         ResolveLayout(force: false);
         bool show = !_app.Demo && (_editing || _preview || Settings.Enabled && !_hidden && ShowWhen(frame));
         int fastest = 0;
+        bool anyShown = false;
         long now = Stopwatch.GetTimestamp();
         foreach (var s in _slots.Values)
         {
@@ -398,7 +406,9 @@ internal sealed class HudHost : IDisposable
                 }
             }
             if (s.Dirty || due && s.LastSeq != frame.Sequence) Draw(s, frame);
+            anyShown = true;
         }
+        SyncSimBar(anyShown && frame.Simulated);
         if (_web?.Clients is { Count: > 0 } clients)
         {
             try { fastest = Math.Max(fastest, _webRenderer.Render(clients, frame, Race, Settings, Settings.Layout(_layoutName), Palette, _webDirty)); }
@@ -414,6 +424,13 @@ internal sealed class HudHost : IDisposable
         int interval = fastest > 0 ? Math.Clamp(1000 / fastest, 16, 250) : 250;
         if (_timer.Interval != interval) _timer.Interval = interval;
         if (!_timer.Enabled) _timer.Start();
+    }
+
+    private void SyncSimBar(bool on)
+    {
+        if (!on) { _simBar?.Hide(); return; }
+        _simBar ??= new HudSimBar();
+        _simBar.Show(this, Palette, _toolbar is null ? 24 : 70);
     }
 
     private bool ShowWhen(TelemetryFrame f) => Settings.ShowWhen switch
@@ -780,6 +797,8 @@ internal sealed class HudHost : IDisposable
         foreach (var s in _slots.Values) Close(s);
         _vr.HideAll();
         _toolbar?.Close();
+        _simBar?.Close();
+        _simBar = null;
     }
 
     private static void Close(Slot s)
@@ -1218,7 +1237,6 @@ internal sealed class HudHost : IDisposable
         int w = Math.Max(1, (int)Math.Round(layout.Width * scale)), h = Math.Max(1, (int)Math.Round(layout.Height * scale));
         var g = _previewSurface.Ensure(new Size(w, h));
         painter.Simulated = race.Frame.Simulated;
-        painter.MarkSimulated = false;
         painter.IsPreview = true;
         painter.Begin(g, scale, layout, Palette, Settings.Appearance);
         painter.Background = config.Background;

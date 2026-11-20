@@ -10,6 +10,7 @@ internal sealed class TimingWidget : HudWidget
 {
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
+        HudOption.Choice("look", "Look", "full", new HudChoice("full", "Full", "Delta, times and sectors"), new HudChoice("compact", "Compact", "The delta, a bar and what it's measured to")),
         HudOption.Choice("reference", "Delta to", "optimal", new HudChoice("best", "My best lap"), new HudChoice("session", "Session best"), new HudChoice("optimal", "My optimal lap", "Best sectors combined"),
             new HudChoice("lastlap", "My last lap"), new HudChoice("sessionOptimal", "Session optimal lap", "The best sectors of the session combined")),
         HudOption.Bool("bar", "Delta bar", true),
@@ -44,6 +45,11 @@ internal sealed class TimingWidget : HudWidget
         double? d = ok ? delta : null;
         var color = d is null ? p.P.Muted : d < 0 ? p.P.GoodText : p.P.DangerText;
         string refLabel = reference switch { "session" => "Δ SESSION BEST", "optimal" => "Δ OPTIMAL", "lastlap" => "Δ LAST LAP", "sessionOptimal" => "Δ SESSION OPTIMAL", _ => "Δ MY BEST" };
+        if (v.Options.Choice("look") == "compact")
+        {
+            Compact(p, v, d, color, refLabel[2..]);
+            return;
+        }
         var fields = v.Options.Columns("fields");
         bool bar = v.Options.Bool("bar");
         bool sectors = v.Options.Bool("sectors") && v.Race.Laps.SectorCount > 1;
@@ -113,6 +119,36 @@ internal sealed class TimingWidget : HudWidget
             p.Region("sectors", rest);
             Sectors(p, v, rest);
         }
+    }
+
+    private static void Compact(HudPainter p, HudView v, double? d, Color color, string label)
+    {
+        float k = p.Density;
+        var area = p.Bounds.Inflated(-10 * k, -6 * k);
+        p.Region("delta", area);
+        float labelH = p.LineHeight(p.SmallBold), barH = 6 * k, gap = 5 * k;
+        float contentW = Math.Max(Math.Max(p.Measure("+00.000", p.Huge), 120 * k), p.Measure("SESSION OPTIMAL", p.SmallBold)) + 8 * k;
+        p.Need(contentW + 20 * k, p.LineHeight(p.Huge) + gap + barH + gap + labelH + 12 * k);
+        float numberH = Math.Max(0, area.Height - labelH - barH - gap * 2);
+        var font = p.Fitting("+00.00", area.Width, numberH, p.Font(Math.Max(14, numberH * 0.95f), true), p.Huge, p.Big, p.Bold);
+        float block = p.LineHeight(font) + gap + barH + gap + labelH;
+        float y = area.Y + Math.Max(0, (area.Height - block) / 2);
+        p.Text(d is null ? RaceFormat.Missing : RaceFormat.Delta(d), font, color, new RectangleF(area.X, y, area.Width, p.LineHeight(font)), HAlign.Center, VAlign.Center, false);
+        y += p.LineHeight(font) + gap;
+        float trackW = Math.Min(area.Width, 120 * k);
+        var track = new RectangleF(area.X + (area.Width - trackW) / 2, y, trackW, barH);
+        p.Region("bar", track);
+        p.Fill(track, p.Solid(p.Raised(0.10), 130), 3);
+        float mid = track.X + track.Width / 2;
+        if (d is { } dv)
+        {
+            float len = (float)(Math.Clamp(dv / v.Options.Number("range"), -1, 1) * track.Width / 2);
+            var fill = len < 0 ? new RectangleF(mid + len, track.Y, -len, track.Height) : new RectangleF(mid, track.Y, len, track.Height);
+            p.Fill(fill, d < 0 ? p.P.Good : p.P.Danger, 3);
+        }
+        p.Line(mid, track.Y - 2, mid, track.Bottom + 2, p.P.Heading, 1.5f);
+        y += barH + gap;
+        p.Text(label, p.SmallBold, p.P.Heading, new RectangleF(area.X, y, area.Width, labelH), HAlign.Center, VAlign.Center);
     }
 
     private static Color LastColor(HudPainter p, HudView v)

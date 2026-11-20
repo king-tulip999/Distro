@@ -101,6 +101,7 @@ public partial class App : Application
 
         string? screenshotDir = ArgValue(e.Args, "--screenshots");
         bool fromStartup = e.Args.Contains("--minimized", StringComparer.OrdinalIgnoreCase);
+        bool afterUpdate = e.Args.Any(a => a.Equals("--updated", StringComparison.OrdinalIgnoreCase) || a.Equals("--update-failed", StringComparison.OrdinalIgnoreCase));
         string? perfFile = ArgValue(e.Args, "--perf");
         string? monkeyDir = ArgValue(e.Args, "--monkey");
         string? controlsDir = ArgValue(e.Args, "--controls");
@@ -169,7 +170,7 @@ public partial class App : Application
             config.Ui.Animations = false;
         }
         PerfProbe.Mark("config");
-        if (!(config.Ui.StartMinimized && withTray)) TopographyBackdrop.Preload(config.Ui.Window);
+        if (!(config.Ui.StartMinimized && withTray && !afterUpdate)) TopographyBackdrop.Preload(config.Ui.Window);
         Grr.GrrResources.Install();
         Theme.Themes.Register(Grr.GrrTheme.Spec);
         if (AppIdentity.IsTecnica || !Theme.Themes.Exists(config.Ui.Theme))
@@ -220,7 +221,7 @@ public partial class App : Application
             return;
         }
 
-        if (config.Ui.StartMinimized && _services.Tray is { } trayIcon)
+        if (config.Ui.StartMinimized && !afterUpdate && _services.Tray is { } trayIcon)
         {
             window.ScheduleTrim();
             if (!fromStartup || !config.Ui.TrayTipShown)

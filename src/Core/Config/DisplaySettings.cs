@@ -28,6 +28,10 @@ public sealed class DisplayProfile
 
     public int? Volume { get; set; }
 
+    public List<string> Apps { get; set; } = new();
+
+    public bool CloseAppsOnLeave { get; set; }
+
     public static void Migrate(AppConfig config)
     {
         var profiles = config.Displays.Profiles;

@@ -200,6 +200,8 @@ public sealed class UiSettings
 
     public bool OldAppNoticeOff { get; set; }
 
+    public bool HomeOfferOff { get; set; }
+
     public AppTheme Theme { get; set; } = AppTheme.Glow;
 
     public CustomThemeSettings OledCustom { get; set; } = new();

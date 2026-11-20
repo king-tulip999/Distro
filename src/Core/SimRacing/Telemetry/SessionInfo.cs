@@ -94,6 +94,7 @@ internal sealed class SessionInfo
 
     public double? PlayerEstLapTime { get; init; }
 
+    public int? ForwardGears { get; init; }
     public double? ShiftLightFirstRpm { get; init; }
     public double? ShiftRpm { get; init; }
     public double? BlinkRpm { get; init; }
@@ -258,6 +259,7 @@ internal sealed class SessionInfo
             FuelMaxLiters = SessionYaml.Num(driverInfo, "DriverCarFuelMaxLtr") is > 0 and var fuel ? fuel : null,
             MaxFuelPct = SessionYaml.Num(driverInfo, "DriverCarMaxFuelPct") is > 0 and var maxPct ? maxPct : null,
             PlayerEstLapTime = SessionYaml.Num(driverInfo, "DriverCarEstLapTime") is > 0 and var lap ? lap : null,
+            ForwardGears = SessionYaml.Int(driverInfo, "DriverCarGearNumForward") is > 0 and var gears ? gears : null,
             ShiftLightFirstRpm = SessionYaml.Num(driverInfo, "DriverCarSLFirstRPM") is > 0 and var slFirst ? slFirst : null,
             ShiftRpm = SessionYaml.Num(driverInfo, "DriverCarSLShiftRPM") is > 0 and var slShift ? slShift : null,
             BlinkRpm = SessionYaml.Num(driverInfo, "DriverCarSLBlinkRPM") is > 0 and var slBlink ? slBlink : null,

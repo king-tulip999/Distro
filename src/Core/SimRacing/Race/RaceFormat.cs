@@ -132,13 +132,15 @@ internal static class RaceFormat
 
     [ThreadStatic] private static long _clockMinute;
     [ThreadStatic] private static string? _clockText;
+    [ThreadStatic] private static bool _clock24h;
 
-    public static string TimeOfDay(DateTime t)
+    public static string TimeOfDay(DateTime t, bool clock24h = false)
     {
         long minute = t.Ticks / TimeSpan.TicksPerMinute;
-        if (_clockText is not null && minute == _clockMinute) return _clockText;
+        if (_clockText is not null && minute == _clockMinute && clock24h == _clock24h) return _clockText;
         _clockMinute = minute;
-        return _clockText = t.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture);
+        _clock24h = clock24h;
+        return _clockText = t.ToString(clock24h ? "HH:mm" : "h:mm tt", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     public static string Clock(double? seconds)

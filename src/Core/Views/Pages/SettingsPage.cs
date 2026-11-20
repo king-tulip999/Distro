@@ -1009,7 +1009,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         try
         {
             var steps = await Task.Run(Uninstaller.Prepare);
-            App.RunAfterExit(Uninstaller.Action, steps, Environment.ProcessPath!);
+            App.RunAfterExit(Uninstaller.Action, steps, Environment.ProcessPath!, Environment.IsPrivilegedProcess ? null : Path.GetTempPath());
         }
         catch (Exception ex)
         {

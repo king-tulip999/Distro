@@ -31,7 +31,7 @@ internal static class StartupManager
         return new StartupState(true, command, command is not null && OthersCanChange(command));
     }
 
-    public static string InstallFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), AppIdentity.Name);
+    public static string InstallFolder => Core.Services.AppHome.Folder;
 
     public static string MoveToProgramFiles()
     {
@@ -66,7 +66,21 @@ internal static class StartupManager
         {
             var file = new FileInfo(exe);
             if (!file.Exists || Open(file.GetAccessControl(), ChangeFile)) return file.Exists;
-            if (file.Directory is not { } folder) return false;
+            return file.Directory is { } folder && OthersCanChangeFolder(folder.FullName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    internal static bool OthersCanChangeFolder(string path)
+    {
+        try
+        {
+            var folder = new DirectoryInfo(path);
+            while (folder is { Exists: false }) folder = folder.Parent;
+            if (folder is null) return false;
             if (Open(folder.GetAccessControl(), ChangeFolder)) return true;
             for (var up = folder.Parent; up is not null; up = up.Parent)
                 if (Open(up.GetAccessControl(), ChangeAncestor)) return true;

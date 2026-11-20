@@ -75,7 +75,10 @@ internal sealed class WindowProfileEditor
             stack.Children.Add(Ui.FieldRow("Group", Ui.Combo(groups, _groupId, c => _groupId = c.Id, 211), LabelWidth));
         }
 
-        stack.Children.Add(Ui.EditorSection("Size and position"));
+        var right = new StackPanel();
+        var placeHead = Ui.EditorSection("Size and position");
+        placeHead.Margin = new Thickness(0, 0, 0, placeHead.Margin.Bottom);
+        right.Children.Add(placeHead);
         var presets = PresetBox();
         var current = Ui.LabeledButton("I.Target", "Where it is now", ReadCurrent, "GhostButton");
         current.ToolTip = "Copy the size and spot of the program's window as it is right now";
@@ -85,7 +88,7 @@ internal sealed class WindowProfileEditor
         presetRow.Children.Add(current);
         presets.MinWidth = 0;
         presetRow.Children.Add(presets);
-        stack.Children.Add(Ui.FieldRow("Copy values from", presetRow, LabelWidth));
+        right.Children.Add(Ui.FieldRow("Copy values from", presetRow, LabelWidth));
 
         var screen = Span();
         _width = new NumberBox(profile.Width ?? screen.Width, "px", 68) { Minimum = 100, Maximum = 32000 };
@@ -97,14 +100,14 @@ internal sealed class WindowProfileEditor
         _keepSize.ToolTip = "Only move the window; leave its size as the program sets it";
         _keepSize.Click += (_, _) => SizeChanged();
         foreach (var box in new[] { _width, _height, _x, _y }) box.ValueChanged += _ => SizeChanged();
-        stack.Children.Add(Ui.FieldRow("Size", Pair("W", _width, "H", _height), LabelWidth));
-        stack.Children.Add(Ui.FieldRow("", _keepSize, LabelWidth));
-        stack.Children.Add(Ui.FieldRow("Position", Pair("X", _x, "Y", _y), LabelWidth,
+        right.Children.Add(Ui.FieldRow("Size", Pair("W", _width, "H", _height), LabelWidth));
+        right.Children.Add(Ui.FieldRow("", _keepSize, LabelWidth));
+        right.Children.Add(Ui.FieldRow("Position", Pair("X", _x, "Y", _y), LabelWidth,
             "Desktop pixels: 0, 0 is the main display's top left, so screens to its left are negative."));
-        stack.Children.Add(new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(6), Margin = new Thickness(LabelWidth, 6, 0, 4), MinWidth = Ui.FieldWidth, HorizontalAlignment = HorizontalAlignment.Stretch, Child = _preview });
+        right.Children.Add(new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(6), Margin = new Thickness(LabelWidth, 6, 0, 4), MinWidth = Ui.FieldWidth, HorizontalAlignment = HorizontalAlignment.Stretch, Child = _preview });
         _offScreen.Foreground = Ui.Res<System.Windows.Media.Brush>("WarnDeep");
         _offScreen.Margin = new Thickness(LabelWidth, 2, 0, 6);
-        stack.Children.Add(_offScreen);
+        right.Children.Add(_offScreen);
 
         stack.Children.Add(Ui.EditorSection("Window"));
         _borders = new CheckBox { Content = "Remove borders", IsChecked = profile.RemoveBorders, ToolTip = "Strips the frame and title bar. Only for games without a borderless option of their own." };
@@ -147,7 +150,14 @@ internal sealed class WindowProfileEditor
         test.Margin = new Thickness(0, 0, Ui.GroupGap, 0);
         buttons.Children.Insert(0, test);
         var delete = onDelete is null ? null : Ui.LabeledButton("I.Trash", "Delete profile", onDelete, "DangerButton");
-        Card = Ui.Dialog(window, isNew ? "New window profile" : $"Edit “{profile.Name}”", "", stack, buttons, _error, 640, delete);
+        var columns = new Grid();
+        columns.ColumnDefinitions.Add(new ColumnDefinition());
+        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Ui.PanelSpacing * 2) });
+        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.25, GridUnitType.Star) });
+        Grid.SetColumn(right, 2);
+        columns.Children.Add(stack);
+        columns.Children.Add(right);
+        Card = Ui.Dialog(window, isNew ? "New window profile" : $"Edit “{profile.Name}”", "", columns, buttons, _error, 1080, delete);
     }
 
     private static List<MonitorInfo> Monitors(AppServices app)

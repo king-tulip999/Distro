@@ -320,6 +320,11 @@ internal static class Ui
 
     public static TextBlock EditorSection(string title)
     {
+        return new TextBlock { Text = title, Style = Res<Style>("H2"), Margin = new Thickness(0, 22, 0, 8) };
+    }
+
+    public static TextBlock PanelSection(string title)
+    {
         return new TextBlock { Text = title, Style = Res<Style>("Eyebrow"), Margin = new Thickness(0, 19, 0, 6) };
     }
 
@@ -327,6 +332,8 @@ internal static class Ui
     private const double FieldLine = 28;
 
     public const double DialogShare = 0.85, DialogGrowth = 1.15, DialogEdge = 19;
+
+    public static double DialogMaxHeight(double room) => Math.Max(480, room);
 
     public static double DialogWidth(double baseWidth, double room)
     {
@@ -437,7 +444,7 @@ internal static class Ui
         {
             Style = Res<Style>("LiftedCard"),
             Width = width,
-            MaxHeight = Math.Max(480, window.ModalRoom),
+            MaxHeight = DialogMaxHeight(window.ModalRoom),
             Padding = new Thickness(DialogPadding.Left, DialogPadding.Top, DialogPadding.Right - DialogScrollGutter, DialogPadding.Bottom),
             Child = outer,
         };

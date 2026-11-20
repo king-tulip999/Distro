@@ -60,11 +60,11 @@ internal sealed class SessionWidget : HudWidget
                 case "track": cells.Add(("TRACK", f.Session.TrackConfig.Length > 0 ? f.Session.TrackConfig : f.Session.TrackDisplayName)); break;
                 case "temps": cells.Add(("AIR / TRACK", PooledText.Concat(RaceFormat.Temp(f.AirTemp, v.Units), " / ", RaceFormat.Temp(f.TrackTemp, v.Units)))); break;
                 case "inc": cells.Add(("INCIDENTS", f.Incidents is { } i ? (f.Session.IncidentLimit is { } lim ? PooledText.Number("", i, "x / ", lim, "x") : PooledText.Number("", i, "x")) : RaceFormat.Missing)); break;
-                case "clock": cells.Add(("TIME", RaceFormat.TimeOfDay(DateTime.Now))); break;
+                case "clock": cells.Add(("TIME", RaceFormat.TimeOfDay(DateTime.Now, v.Settings.Clock24h))); break;
                 case "finish":
                     double? togo = v.Race.Fuel?.LapsToGo ?? (f.SessionKind == SessionKind.Race ? v.Race.LapsToGo(f) : null);
                     double? left = session?.Laps is > 0 ? (togo is { } lt && LapMath.Stats(v.Race.Laps.Laps, 5)?.Average is { } avg ? lt * avg : null) : f.SessionTimeRemain;
-                    cells.Add(("FINISH ~", left is { } s ? RaceFormat.TimeOfDay(DateTime.Now.AddSeconds(s)) : RaceFormat.Missing));
+                    cells.Add(("FINISH ~", left is { } s ? RaceFormat.TimeOfDay(DateTime.Now.AddSeconds(s), v.Settings.Clock24h) : RaceFormat.Missing));
                     break;
                 case "irchange":
                     cells.Add(("IR ± EST.", v.Race.IRatingChangeOf(me) is { } ir ? RaceFormat.Signed(Math.Round(ir), "0") : RaceFormat.Missing));
@@ -295,10 +295,16 @@ internal sealed class TyresWidget : HudWidget
     private static Color WearColor(HudPainter p, double left) => left < 0.5 ? p.P.DangerText : left < 0.75 ? p.P.WarnText : p.P.GoodText;
 }
 
-internal sealed class WeatherWidget : HudWidget
+internal sealed partial class WeatherWidget : HudWidget
 {
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
+        TitleRow,
+        HudOption.Choice("look", "Look", PanelLook, new HudChoice(PanelLook, "Panel", "A compass with the wind, a row per value and the track's wetness"), new HudChoice(StripLook, "Strip", "The sky over one low row of temperatures, humidity and wind")),
+        HudOption.Columns("rows", "Rows", "track,air,wind,humidity,rain,rubber",
+            new HudChoice("track", "Track temperature"), new HudChoice("air", "Air temperature"), new HudChoice("wind", "Wind"), new HudChoice("humidity", "Humidity"),
+            new HudChoice("rain", "Rain"), new HudChoice("fog", "Fog"), new HudChoice("rubber", "Rubber", "From the session information"), new HudChoice("trend", "Track temperature change (10 min)")),
+        HudOption.Bool("wetBar", "Track wetness bar", true),
         HudOption.Choice("temp", "Temperatures in", "units", new HudChoice("units", "Overlay units"), new HudChoice("c", "°C"), new HudChoice("f", "°F"), new HudChoice("both", "°C and °F")),
         HudOption.Bool("wind", "Wind", true, "A pointer in a dotted dial showing where the wind blows, the speed under it: red for a headwind, amber across, green behind"),
         HudOption.Bool("turn", "Pointer turns with the car", true, "On: up = straight ahead. Off: up = north."),
@@ -317,6 +323,11 @@ internal sealed class WeatherWidget : HudWidget
         string Temp(double? c) => temp == "both" && c is { } x && double.IsFinite(x)
             ? $"{x:0}° / {x * 9 / 5 + 32:0}°"
             : RaceFormat.Temp(c, fahrenheit ? HudUnits.Imperial : HudUnits.Metric);
+        if (v.Options.Choice("look") != StripLook)
+        {
+            DrawPanel(p, v, Temp);
+            return;
+        }
         var bounds = p.Bounds;
         float pill = p.PillHeight + 4 * d;
         var body = bounds;
@@ -761,6 +772,86 @@ internal sealed class BlockWidget : HudWidget
                 }
                 p.G.DrawLines(p.Pen(p.P.Accent, 1.5f), _points);
             }
+        }
+    }
+}
+
+internal sealed class IncidentsWidget : HudWidget
+{
+    public static IReadOnlyList<HudOption> Options { get; } = new[]
+    {
+        TitleRow,
+        HudOption.Int("count", "Incidents listed", 7, 3, 30),
+        HudOption.Columns("columns", "Columns", "time,lap,sector,incident,points",
+            new HudChoice("time", "Session time"), new HudChoice("lap", "Lap"), new HudChoice("sector", "Sector"),
+            new HudChoice("incident", "Incident", "Named from iRacing's points: 1x off track, 2x loss of control or wall, 4x car contact"), new HudChoice("points", "Points")),
+    };
+
+    private static readonly string[] Names = { "", "Off track", "Loss of control", "", "Car contact" };
+
+    internal static string Name(int points) => points switch
+    {
+        1 or 2 or 4 => Names[points],
+        _ => RaceFormat.Count(points, "incident point"),
+    };
+
+    public override void Draw(HudPainter p, HudView v)
+    {
+        if (DrawWaiting(p, v, "Incident log")) return;
+        var f = v.Frame;
+        var list = v.Race.Incidents;
+        string total = f.Incidents is { } inc ? (f.Session.IncidentLimit is > 0 and var lim ? PooledText.Number("", inc, "/", lim, "x") : PooledText.Number("", inc, "x")) : RaceFormat.Missing;
+        var totalColor = f.Incidents is { } i2 && f.Session.IncidentLimit is > 0 and var l2 && i2 >= l2 * 0.75 ? p.P.WarnText : p.P.GoodText;
+        var area = p.Header("Incident log", total, totalColor);
+        float k = p.Density;
+        float rowH = p.LineHeight(p.SmallBold) + 10 * k, headH = p.LineHeight(p.Label) + 8 * k;
+        int count = v.Options.Int("count");
+        p.NeedBelow(area, headH + rowH * count);
+        var cols = v.Options.Columns("columns");
+        float timeW = p.Measure("00:00:00", p.SmallBold) + 12 * k, lapW = p.Measure("L000", p.SmallBold) + 12 * k,
+            secW = p.Measure("S00", p.SmallBold) + 12 * k, ptsW = p.Measure("VALUE", p.Label) + 8 * k;
+        float fixedW = 0;
+        foreach (var c in cols) fixedW += c switch { "time" => timeW, "lap" => lapW, "sector" => secW, "points" => ptsW, _ => 0 };
+        float stripe = 3 * k, left = area.X + stripe + 6 * k;
+        float nameW = Math.Max(0, area.Right - left - fixedW);
+        float WidthOf(string c) => c switch { "time" => timeW, "lap" => lapW, "sector" => secW, "points" => ptsW, _ => nameW };
+        float x = left;
+        foreach (var c in cols)
+        {
+            float w = WidthOf(c);
+            string head = c switch { "time" => "TIME", "lap" => "LAP", "sector" => "SEC", "points" => "VALUE", _ => "INCIDENT" };
+            p.Text(head, p.Label, p.LabelColor, new RectangleF(x, area.Y, w, headH), c == "points" ? HAlign.Right : HAlign.Left, VAlign.Center, false);
+            x += w;
+        }
+        p.Line(area.X, area.Y + headH - 0.5f, area.Right, area.Y + headH - 0.5f, HudPalette.Alpha(p.P.LineStrong, 110), 1);
+        var rows = new RectangleF(area.X, area.Y + headH, area.Width, area.Height - headH);
+        if (list.Count == 0) { p.Text("No incidents", p.Small, p.P.Faint, rows, HAlign.Center, VAlign.Center); return; }
+        float y = rows.Y;
+        for (int n = 0, idx = list.Count - 1; idx >= 0 && n < count; idx--, n++)
+        {
+            if (y + rowH > rows.Bottom + 1) break;
+            var e = list[idx];
+            var color = e.Points >= 4 ? p.P.DangerText : e.Points >= 2 ? p.P.WarnText : e.Points == 1 ? p.P.GoodText : p.P.Muted;
+            var stripeColor = e.Points >= 4 ? p.P.Danger : e.Points >= 2 ? p.P.Warn : p.P.Good;
+            if (n > 0) p.Line(area.X, MathF.Round(y) + 0.5f, area.Right, MathF.Round(y) + 0.5f, HudPalette.Alpha(p.P.LineStrong, 60), 1);
+            p.Fill(new RectangleF(area.X, y + 2 * k, stripe, rowH - 4 * k), stripeColor);
+            var text = n == 0 ? p.P.Heading : p.P.Text;
+            x = left;
+            foreach (var c in cols)
+            {
+                float w = WidthOf(c);
+                var cell = new RectangleF(x, y, w, rowH);
+                switch (c)
+                {
+                    case "time": p.Text(RaceFormat.Clock(e.SessionTime), p.SmallBold, text, cell, HAlign.Left, VAlign.Center, false); break;
+                    case "lap": p.Text(e.Lap is { } lap ? PooledText.Number("L", lap) : RaceFormat.Missing, p.SmallBold, text, cell, HAlign.Left, VAlign.Center, false); break;
+                    case "sector": p.Text(PooledText.Number("S", e.Sector + 1), p.SmallBold, text, cell, HAlign.Left, VAlign.Center, false); break;
+                    case "points": p.Text(PooledText.Number("", e.Points, "x"), p.SmallBold, color, cell, HAlign.Right, VAlign.Center, false); break;
+                    default: p.Text(Name(e.Points), p.SmallBold, text, new RectangleF(x, y, w - 6 * k, rowH), HAlign.Left, VAlign.Center); break;
+                }
+                x += w;
+            }
+            y += rowH;
         }
     }
 }

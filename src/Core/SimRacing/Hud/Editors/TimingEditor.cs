@@ -9,8 +9,8 @@ internal static class TimingEditor
         ContentTitle = "Times",
         Groups = new HudGroup[]
         {
-            new("delta", "Delta", HudTab.Layout, true, O("reference"), O("bar"), O("range") with { ShowIf = o => o.Bool("bar") }),
-            new("sectors", "Sectors", HudTab.Layout, true, O("sectors"), O("split")),
+            new("delta", "Delta", HudTab.Layout, true, O("look"), O("reference"), O("bar") with { ShowIf = o => o.Choice("look") != "compact" }, O("range")),
+            new("sectors", "Sectors", HudTab.Layout, true, O("sectors") with { ShowIf = o => o.Choice("look") != "compact" }, O("split")),
             new("times", "Times", HudTab.Content, true, new PickerSetting("fields", new HudCategory[]
             {
                 new("Your laps", "current", "last", "best", "predicted", "theoretical", "consistency"),

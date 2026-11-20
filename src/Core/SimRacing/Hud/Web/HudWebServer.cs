@@ -83,6 +83,8 @@ internal sealed class HudWebServer : IDisposable
 
     public bool Running => _listener is not null;
 
+    public bool Remote { get; private set; }
+
     public event Action? ClientsChanged;
 
     public IReadOnlyList<HudWebClient> Clients => Volatile.Read(ref _snapshot);
@@ -99,11 +101,11 @@ internal sealed class HudWebServer : IDisposable
         }
     }
 
-    public string? Start(int port)
+    public string? Start(int port, bool remote = false)
     {
-        if (Running && Port == port) return null;
+        if (Running && Port == port && Remote == remote) return null;
         Stop();
-        var listener = new TcpListener(IPAddress.Loopback, port);
+        var listener = new TcpListener(remote ? IPAddress.Any : IPAddress.Loopback, port);
         try
         {
             listener.ExclusiveAddressUse = true;
@@ -116,6 +118,7 @@ internal sealed class HudWebServer : IDisposable
         }
         _listener = listener;
         Port = port;
+        Remote = remote;
         _stop = new CancellationTokenSource();
         _ = AcceptLoop(listener, _stop.Token);
         return null;
@@ -168,8 +171,8 @@ internal sealed class HudWebServer : IDisposable
                 }
                 if (request is null) return;
                 var (method, path, query, headers) = request.Value;
-                bool remote = tcp.Client.RemoteEndPoint is not IPEndPoint { Address: var from } || !IPAddress.IsLoopback(from);
-                if (remote || method != "GET" || !headers.TryGetValue("host", out var host) || !LocalHost(host, Port))
+                bool allowed = tcp.Client.RemoteEndPoint is IPEndPoint { Address: var from } && (IPAddress.IsLoopback(from) || Remote && PrivateNetwork(from));
+                if (!allowed || method != "GET" || !headers.TryGetValue("host", out var host) || !(LocalHost(host, Port) || Remote && NetworkHost(host, Port)))
                 {
                     await Respond(stream, "403 Forbidden", "text/plain", "Forbidden"u8.ToArray(), token).ConfigureAwait(false);
                     return;
@@ -177,7 +180,7 @@ internal sealed class HudWebServer : IDisposable
                 if (path.StartsWith("/ws/", StringComparison.Ordinal) && headers.TryGetValue("upgrade", out var up) && up.Equals("websocket", StringComparison.OrdinalIgnoreCase)
                     && headers.TryGetValue("sec-websocket-key", out var key) && _kinds.Contains(path[4..]))
                 {
-                    if (!LocalOrigin(headers.GetValueOrDefault("origin"), Port))
+                    if (!LocalOrigin(headers.GetValueOrDefault("origin"), Port) && !(Remote && SameOrigin(headers.GetValueOrDefault("origin"), host)))
                     {
                         await Respond(stream, "403 Forbidden", "text/plain", "Forbidden"u8.ToArray(), token).ConfigureAwait(false);
                         return;
@@ -199,6 +202,30 @@ internal sealed class HudWebServer : IDisposable
 
     internal static bool LocalHost(string host, int port) =>
         host.Equals($"127.0.0.1:{port}", StringComparison.OrdinalIgnoreCase) || host.Equals($"localhost:{port}", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool PrivateNetwork(IPAddress address)
+    {
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        if (address.AddressFamily != AddressFamily.InterNetwork) return false;
+        var b = address.GetAddressBytes();
+        return b[0] == 10 || b[0] == 172 && b[1] is >= 16 and <= 31 || b[0] == 192 && b[1] == 168 || b[0] == 169 && b[1] == 254 || b[0] == 100 && b[1] is >= 64 and <= 127;
+    }
+
+    internal static bool NetworkHost(string host, int port)
+    {
+        int colon = host.LastIndexOf(':');
+        return colon > 0 && host[(colon + 1)..] == port.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            && IPAddress.TryParse(host[..colon], out var address) && PrivateNetwork(address);
+    }
+
+    internal static bool SameOrigin(string? origin, string host) =>
+        origin is not null && origin.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && origin[7..].Equals(host, StringComparison.OrdinalIgnoreCase);
+
+    public static IReadOnlyList<string> NetworkUrls(int port) =>
+        System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+            .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+            .SelectMany(n => n.GetIPProperties().UnicastAddresses).Select(a => a.Address)
+            .Where(PrivateNetwork).Select(a => $"http://{a}:{port}/").Distinct().ToList();
 
     internal static bool LocalOrigin(string? origin, int port) =>
         string.IsNullOrEmpty(origin) || origin.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && LocalHost(origin[7..], port);

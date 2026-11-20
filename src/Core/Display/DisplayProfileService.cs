@@ -133,6 +133,16 @@ internal sealed class DisplayProfileService
             if (!_app.Demo)
                 await AudioManager.ApplyAsync(profile.Audio, profile.Volume, displayChanged, problems);
 
+            var toClose = ProfileApps.ToClose(profile, Profiles);
+            if (toClose.Count > 0 && !_app.Demo && Services.External.Allowed("close " + string.Join(", ", toClose)))
+                problems.AddRange(await Task.Run(() => ProfileApps.CloseAsync(toClose)));
+
+            if (profile.Apps.Count > 0 && !_app.Demo)
+            {
+                var apps = profile.Apps.ToList();
+                problems.AddRange(await Task.Run(() => ProfileApps.Launch(apps).ToList()));
+            }
+
             LastApplied = profile.Name;
         }
         finally
@@ -163,6 +173,10 @@ internal sealed class DisplayProfileService
             changes.Add(new ProfileChange("Display", profile.Taskbar == TaskbarMode.AllDisplays ? "Show the taskbar on every display" : "Taskbar on the main display only"));
         if (profile.Wallpapers.Count > 0)
             changes.Add(new ProfileChange("Display", profile.Wallpapers.Count == 1 ? "Set the wallpaper" : $"Set {profile.Wallpapers.Count} wallpapers"));
+        if (ProfileApps.ToClose(profile, Profiles) is { Count: > 0 } closing)
+            changes.Add(new ProfileChange("Apps", "Close " + string.Join(", ", closing)));
+        if (profile.Apps.Count > 0)
+            changes.Add(new ProfileChange("Apps", "Open " + string.Join(", ", profile.Apps.Select(ProfileApps.DisplayName))));
         if (!withAudio)
             return changes;
         if (_app.Demo)

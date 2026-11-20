@@ -68,7 +68,9 @@ internal static class Dividers
         var fade = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
         if (fromStart)
         {
-            fade.GradientStops.Add(new GradientStop(Colors.Black, 0));
+            fade.GradientStops.Add(new GradientStop(Colors.Transparent, 0));
+            fade.GradientStops.Add(new GradientStop(Color.FromArgb(90, 0, 0, 0), 0.035));
+            fade.GradientStops.Add(new GradientStop(Colors.Black, 0.1));
             fade.GradientStops.Add(new GradientStop(Colors.Black, 0.25));
             fade.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
         }

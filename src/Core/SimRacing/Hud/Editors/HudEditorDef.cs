@@ -11,6 +11,7 @@ internal abstract record HudSetting(string Id)
     public string? Label { get; init; }
     public string? Help { get; init; }
     public bool InlineHelp { get; init; }
+    public bool Dropdown { get; init; }
     public Func<HudOptions, bool>? ShowIf { get; init; }
     public bool Visible(HudOptions o) => ShowIf?.Invoke(o) ?? true;
 }

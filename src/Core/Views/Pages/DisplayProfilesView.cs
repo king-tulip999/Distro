@@ -132,6 +132,8 @@ internal sealed class DisplayProfilesView : Tile
         if (profile.Wallpapers.Count > 0) chips.Children.Add(Ui.Chip(SimRacing.Race.RaceFormat.Count(profile.Wallpapers.Count, "wallpaper")));
         if (profile.Audio?.PlaybackName is { } speakers) chips.Children.Add(Ui.Chip("Audio: " + speakers));
         if (profile.Volume is { } vol) chips.Children.Add(Ui.Chip($"Volume {vol}%"));
+        if (profile.Apps.Count > 0) chips.Children.Add(Ui.Chip(SimRacing.Race.RaceFormat.Count(profile.Apps.Count, "app")));
+        if (profile.CloseAppsOnLeave && profile.Apps.Count > 0) chips.Children.Add(Ui.Chip("Closes its apps when left"));
         if (chips.Children.Count > 0)
             stack.Children.Add(chips);
 
@@ -269,6 +271,7 @@ internal sealed class DisplayProfileEditor
     private TaskbarMode _taskbar;
     private int? _volume;
     private readonly ComboBox _playback = new(), _recording = new();
+    private readonly CheckBox _closeOthers = new() { Content = "Close these apps when switching to another profile" };
     private readonly CheckBox _comms = new() { Content = "Also use them for calls (Discord, Teams…)" };
 
     public Border Card { get; }
@@ -311,8 +314,11 @@ internal sealed class DisplayProfileEditor
         stack.Children.Add(Ui.FieldRow("", _comms, LabelWidth));
         stack.Children.Add(Ui.FieldRow("Volume", AudioPicker.Volume(_volume, v => _volume = v), LabelWidth));
 
-        stack.Children.Add(Ui.EditorSection("Wallpapers"));
-        stack.Children.Add(Ui.FieldHint("One per monitor; empty keeps whatever it has. Saving the current setup fills these in.", 0));
+        var right = new StackPanel();
+        var wallpapersHead = Ui.EditorSection("Wallpapers");
+        wallpapersHead.Margin = new Thickness(0, 0, 0, wallpapersHead.Margin.Bottom);
+        right.Children.Add(wallpapersHead);
+        right.Children.Add(Ui.FieldHint("One per monitor; empty keeps whatever it has. Saving the current setup fills these in.", 0));
         foreach (var (key, name) in WallpaperMonitors())
         {
             var box = new TextBox { Tag = "Keep its wallpaper", Text = profile.Wallpapers.FirstOrDefault(w => string.Equals(w.Key, key, StringComparison.OrdinalIgnoreCase)).Value ?? "" };
@@ -331,13 +337,99 @@ internal sealed class DisplayProfileEditor
             row.Children.Add(clear);
             row.Children.Add(browse);
             row.Children.Add(box);
-            stack.Children.Add(Ui.FieldRow(name, row, LabelWidth));
+            right.Children.Add(Ui.FieldRow(name, row, LabelWidth));
         }
+
+        right.Children.Add(Ui.EditorSection("Apps"));
+        right.Children.Add(Ui.FieldHint("Opened after the profile is applied, unless already running.", 0));
+        right.Children.Add(_appRows);
+        foreach (var path in profile.Apps) AddAppRow(path);
+        var addApp = Ui.LabeledButton("I.Plus", "Add app", () => { }, "SoftButton");
+        addApp.Click += (_, _) => ShowAppChoices(addApp, startMenu: false);
+        addApp.HorizontalAlignment = HorizontalAlignment.Left;
+        right.Children.Add(Ui.FieldRow("", addApp, LabelWidth));
+        _closeOthers.IsChecked = profile.CloseAppsOnLeave;
+        right.Children.Add(Ui.FieldRow("", _closeOthers, LabelWidth, "Asked to close, then ended if they stay open. Apps the next profile also lists keep running."));
+
+        var columns = new Grid();
+        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.25, GridUnitType.Star) });
+        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Ui.PanelSpacing * 2) });
+        columns.ColumnDefinitions.Add(new ColumnDefinition());
+        Grid.SetColumn(right, 2);
+        columns.Children.Add(stack);
+        columns.Children.Add(right);
 
         var buttons = Ui.DialogButtons(window, isNew ? "Save profile" : "Save changes", Validate);
         var delete = onDelete is null ? null : Ui.LabeledButton("I.Trash", "Delete profile", onDelete, "DangerButton");
-        Card = Ui.Dialog(window, isNew ? "New display profile" : $"Edit “{profile.Name}”", "", stack, buttons, _error, 640, delete);
+        Card = Ui.Dialog(window, isNew ? "New display profile" : $"Edit “{profile.Name}”", "", columns, buttons, _error, 1080, delete);
     }
+
+    private readonly StackPanel _appRows = new();
+    private readonly List<TextBox> _apps = new();
+
+    private void AddAppRow(string path)
+    {
+        var box = new TextBox { Tag = "Program, shortcut or script", Text = path };
+        _apps.Add(box);
+        var row = new DockPanel();
+        FrameworkElement? field = null;
+        var remove = Ui.IconButton("I.X", "Remove", () => { _apps.Remove(box); _appRows.Children.Remove(field); });
+        var browse = Ui.IconButton("I.Folder", "Choose a program", () =>
+        {
+            if (ProgramPicker.BrowseExe() is { } picked) box.Text = picked;
+        });
+        remove.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
+        browse.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
+        DockPanel.SetDock(remove, Dock.Right);
+        DockPanel.SetDock(browse, Dock.Right);
+        row.Children.Add(remove);
+        row.Children.Add(browse);
+        row.Children.Add(box);
+        field = Ui.FieldRow(Display.ProfileApps.DisplayName(path) is { Length: > 0 } n ? n : "App", row, LabelWidth);
+        _appRows.Children.Add(field);
+    }
+
+    private void ShowAppChoices(FrameworkElement anchor, bool startMenu)
+    {
+        var menu = new ContextMenu { PlacementTarget = anchor, MaxHeight = 360 };
+        Ui.DropBelow(menu);
+        var listed = _apps.Select(b => Display.ProfileApps.Clean(b.Text)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var choices = (startMenu ? StartMenuChoices() : RunningChoices()).Where(c => !listed.Contains(c.Path)).ToList();
+        foreach (var (path, label) in choices)
+        {
+            var item = new MenuItem { Header = label };
+            Core.Theme.TextCase.Verbatim(item);
+            item.Click += (_, _) => AddAppRow(path);
+            menu.Items.Add(item);
+        }
+        if (choices.Count == 0)
+            menu.Items.Add(new MenuItem { Header = startMenu ? "No more Start menu apps" : "No other apps running with a window", IsEnabled = false });
+        menu.Items.Add(new Separator());
+        if (!startMenu)
+        {
+            var more = new MenuItem { Header = "Start menu apps" };
+            more.Click += (_, _) => anchor.Dispatcher.BeginInvoke(() => ShowAppChoices(anchor, startMenu: true));
+            menu.Items.Add(more);
+        }
+        var browse = new MenuItem { Header = "Browse for a file" };
+        browse.Click += (_, _) => anchor.Dispatcher.BeginInvoke(() =>
+        {
+            if (ProgramPicker.BrowseExe() is { } path) AddAppRow(path);
+        });
+        menu.Items.Add(browse);
+        menu.IsOpen = true;
+    }
+
+    private IEnumerable<(string Path, string Label)> RunningChoices()
+    {
+        if (_app.Demo)
+            return new[] { (@"C:\Program Files\Dash\Dash.exe", "Dash  ·  Wheel dashboard"), (@"C:\Program Files\Spotter\Spotter.exe", "Spotter  ·  Race spotter") };
+        return WindowProfiles.WindowProfileService.AppsWithWindows().Select(w => (w.Path, $"{Display.ProfileApps.DisplayName(w.Path)}  ·  {w.Title}"));
+    }
+
+    private IEnumerable<(string Path, string Label)> StartMenuChoices() =>
+        _app.Demo ? new[] { (@"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Music.lnk", "Music"), (@"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Voice chat.lnk", "Voice chat") }
+            : Display.ProfileApps.StartMenuShortcuts().Select(p => (p, Display.ProfileApps.DisplayName(p)));
 
     private IEnumerable<(string Key, string Name)> WallpaperMonitors()
     {
@@ -356,7 +448,8 @@ internal sealed class DisplayProfileEditor
     private bool Validate()
     {
         var problem = _app.DisplayProfiles.Validate(_name.Text.Trim(), _hotkey.Hotkey, _profile)
-                      ?? _wallpapers.Values.Select(b => WallpaperPath(b.Text)).Where(p => p.Length > 0 && !File.Exists(p)).Select(p => $"Can't find {Path.GetFileName(p)}.").FirstOrDefault();
+                      ?? _wallpapers.Values.Select(b => WallpaperPath(b.Text)).Where(p => p.Length > 0 && !File.Exists(p)).Select(p => $"Can't find {Path.GetFileName(p)}.").FirstOrDefault()
+                      ?? _apps.Select(b => Display.ProfileApps.Clean(Environment.ExpandEnvironmentVariables(b.Text))).Where(p => p.Length > 0 && !p.Contains("://", StringComparison.Ordinal) && !File.Exists(p)).Select(p => $"Can't find {Path.GetFileName(p)}.").FirstOrDefault();
         _error.Text = problem ?? "";
         _error.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
         return problem is null;
@@ -384,5 +477,7 @@ internal sealed class DisplayProfileEditor
             SetCommunications = _comms.IsChecked == true,
         };
         profile.Volume = _volume;
+        profile.CloseAppsOnLeave = _closeOthers.IsChecked == true;
+        profile.Apps = _apps.Select(b => Display.ProfileApps.Clean(b.Text)).Where(p => p.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 }

@@ -464,7 +464,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
 
         if (report.Unusual.Count > 0)
         {
-            _tab.Children.Add(Ui.EditorSection("Changed from iRacing's default"));
+            _tab.Children.Add(Ui.PanelSection("Changed from iRacing's default"));
             _tab.Children.Add(new TextBlock { Text = "Usually on purpose. Reset one if you didn't mean to change it, or keep it to stop it being listed.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 5) });
             var card = new StackPanel();
             foreach (var s in report.Unusual.Take(30))
@@ -476,7 +476,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
 
         if (report.Passed.Count > 0)
         {
-            _tab.Children.Add(Ui.EditorSection("Passed"));
+            _tab.Children.Add(Ui.PanelSection("Passed"));
             var wrap = new WrapPanel();
             foreach (var p in report.Passed)
                 wrap.Children.Add(PassedChip(p));
@@ -1343,7 +1343,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         if (_ws.Demo) now.ToolTip = "Not with demo data";
         now.HorizontalAlignment = HorizontalAlignment.Left;
         now.Margin = new Thickness(0, 0, 0, 12);
-        var title = Ui.EditorSection("Backups");
+        var title = Ui.PanelSection("Backups");
         _tab.Children.Add(title);
         _tab.Children.Add(new TextBlock
         {

@@ -56,6 +56,8 @@ internal static class HudChannels
         new("best", "Best lap", ChannelKind.Live, ChannelUnit.LapTime, v => v.Frame.LapBest),
         new("deltaBest", "Delta to best lap", ChannelKind.Live, ChannelUnit.Seconds, v => v.Frame.DeltaBestOk ? v.Frame.DeltaBest : null, 2),
         new("deltaSession", "Delta to session best", ChannelKind.Live, ChannelUnit.Seconds, v => v.Frame.DeltaSessionBestOk ? v.Frame.DeltaSessionBest : null, 2),
+        new("lapNumber", "Lap number", ChannelKind.Live, ChannelUnit.Count, v => v.Frame.Lap is > 0 and var l ? l : null, 0),
+        new("wetness", "Track wetness", ChannelKind.Live, ChannelUnit.None, v => v.Frame.TrackWetness, 0) { Text = x => RaceFormat.Wetness((int)x) },
         new("incidents", "My incidents", ChannelKind.Live, ChannelUnit.Count, v => v.Frame.Incidents, 0),
         new("position", "Position (overall)", ChannelKind.Live, ChannelUnit.Count, v => Pos(v, v.Frame.CarPosition), 0),
         new("classPosition", "Position in class", ChannelKind.Live, ChannelUnit.Count, v => v.Race.StandingOf(v.Frame.PlayerCarIdx)?.ClassPosition is > 0 and var c ? c : null, 0),
@@ -131,7 +133,23 @@ internal static class HudChannels
         new("tireTread" + corner, "Tire tread left " + corner, ChannelKind.Pits, ChannelUnit.Percent,
             v => v.Frame.TyreWearInner[i] is { } a && v.Frame.TyreWearMiddle[i] is { } b && v.Frame.TyreWearOuter[i] is { } c ? Math.Min(a, Math.Min(b, c)) : null, 0);
 
-    public static HudChannel? Find(string id) => All.FirstOrDefault(c => c.Id == id);
+    private static readonly Dictionary<string, HudChannel> ById = All.ToDictionary(c => c.Id);
+
+    public static HudChannel? Find(string id) => ById.GetValueOrDefault(id);
+
+    public static string Format(HudChannel channel, HudView v, int? decimals = null, bool withUnit = false)
+    {
+        double? raw = v.Frame.Status == SimStatus.Connected ? channel.Read(v) : null;
+        if (raw is not { } r) return RaceFormat.Missing;
+        double x = Convert(r, channel.Unit, v.Units);
+        if (channel.Text is { } named) return named(x);
+        if (channel.Unit == ChannelUnit.LapTime) return channel.Id is "timeLeft" or "stint" ? RaceFormat.Clock(x) : RaceFormat.LapTime(x);
+        string unit = withUnit ? UnitText(channel.Unit, v.Units) : "";
+        string suffix = unit.Length == 0 ? "" : unit is "%" or "°" or "°C" or "°F" ? unit : " " + unit;
+        return PooledText.Number("", x, DecimalFormats[Math.Clamp(decimals ?? channel.Decimals, 0, 4)], System.Globalization.CultureInfo.InvariantCulture, suffix);
+    }
+
+    private static readonly string[] DecimalFormats = { "F0", "F1", "F2", "F3", "F4" };
 
     private static double? Pos(HudView v, int[] positions) =>
         (uint)v.Frame.PlayerCarIdx < TelemetryFrame.MaxCars && positions[v.Frame.PlayerCarIdx] > 0 ? positions[v.Frame.PlayerCarIdx] : null;

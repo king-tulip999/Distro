@@ -82,6 +82,7 @@ internal static class HudSheet
             new("timing", "Delta to my optimal lap", O()),
             new("timing", "Delta to the session best", O(("reference", "session"))),
             new("timing", "Delta to my best lap", O(("reference", "best"))),
+            new("timing", "Compact", O(("look", "compact"), ("reference", "session")), H: 110),
             new("fuel", "Default", O(), At: 600),
             new("fuel", "Pit exit", O(("parts", "header,figures"), ("head", "togo,pitexit,stops,add"), ("top", "pitexit,level,laps")), At: 600, H: 122),
             new("fuel", "Fuel saving", O(("parts", "header,save")), At: 600, H: 122),
@@ -93,6 +94,8 @@ internal static class HudSheet
             new("map", "Turns with the car", O(("rotate", "true"), ("zoom", "3"))),
             new("tyres", "Default", O()),
             new("tyres", "Without wear", O(("wear", "false"))),
+            new("weather", "Panel", O()),
+            new("weather", "Strip", O(("look", "strip"))),
             new("weather", "°C", O(("temp", "c"))),
             new("weather", "°F", O(("temp", "f"))),
             new("weather", "°C and °F", O(("temp", "both"))),
@@ -102,6 +105,7 @@ internal static class HudSheet
             new("wind", "Accent color", O(("colors", "accent")), WindFrom: Cross + 0.6),
             new("laps", "Last 10 laps", O()),
             new("laps", "Last 3 laps, no statistics", O(("count", "3"), ("stats", "false")), Fit: true),
+            new("incidents", "Default", O()),
             new("events", "Default", O()),
             new("events", "Longer timeline", O(("count", "14")), H: 330),
             new("goals", "Lap list", O()),
@@ -114,16 +118,18 @@ internal static class HudSheet
             new("result", "Banner", O(("look", "banner")), Fit: true),
             new("result", "Stamp", O(("look", "stamp")), Fit: true),
             new("result", "Lap story", O(("look", "story")), Fit: true),
-            new("inputs", "Trace", O()),
-            new("inputs", "Shift-light bar", O(("style", "lights"))),
+            new("inputs", "Gear dial", O()),
+            new("inputs", "Gear dial with extra fields", O(("extras", "position,lapNumber,fuelPct,last,best,air")), Fit: true),
+            new("inputs", "Trace only", O(("style", "bare"))),
             new("inputs", "Pedals and speed", O(("show", "throttle,brake,speed"))),
-            new("inputs", "Shift lights, pedals and RPM", O(("style", "lights"), ("show", "throttle,brake,rpm"))),
+            new("inputs", "Pedals and RPM", O(("show", "throttle,brake,rpm"))),
             new("block", "Speed", O(("source", "speed"))),
             new("block", "RPM with a bar", O(("source", "rpm"), ("visual", "bar"))),
             new("block", "Fuel", O(("source", "fuel"))),
             new("block", "Throttle with a bar", O(("source", "throttle"), ("visual", "bar"))),
             new("block", "Gear", O(("source", "gear"))),
             new("ledboard", "Gear", O(("show", "gear"))),
+            new("ledboard", "Waving green flag", O(("show", "flag")), RaceFlags.Green, At: 0.3),
             new("ledboard", "Position, white frame", O(("show", "pos"), ("frame", "white"))),
             new("ledboard", "Laps left, no frame", O(("show", "left"), ("frame", "off"))),
             new("ledboard", "Green flag", O(("show", "flag")), RaceFlags.Green | RaceFlags.StartGo, At: 0.4),
@@ -134,6 +140,12 @@ internal static class HudSheet
             new("ledboard", "Black flag", O(("show", "flag")), RaceFlags.Black),
             new("ledboard", "Red flag", O(("show", "flag")), RaceFlags.Red),
             new("ledboard", "Safety car", O(("show", "flag")), RaceFlags.Caution),
+            new("ledboard", "Safety car, SC and chase", O(("show", "flag"), ("flagSafetyCar", "chase")), RaceFlags.Caution, At: 0.2),
+            new("ledboard", "Repair flag", O(("show", "flag")), RaceFlags.Repair),
+            new("ledboard", "Yellow, hazard stripes", O(("show", "flag"), ("flagYellow", "stripes")), RaceFlags.Yellow),
+            new("ledboard", "Checkered, fireworks", O(("show", "flag"), ("flagCheckered", "fireworks")), RaceFlags.Checkered, At: 0.3),
+            new("ledboard", "Gear, rev lights", O(("show", "gear"))),
+            new("ledboard", "Gear, no frame", O(("show", "gear"), ("frame", "off"))),
         };
         foreach (var (kind, options, count, name) in new[]
         {
@@ -179,7 +191,6 @@ internal static class HudSheet
             {
                 var g = surface.Ensure(new Size((int)Math.Ceiling(size.Width * SiteScale), (int)Math.Ceiling(size.Height * SiteScale)));
                 painter.Simulated = true;
-                painter.MarkSimulated = false;
                 painter.IsPreview = true;
                 painter.Begin(g, SiteScale, size, HudPalette.Of(site.Settings.Appearance), site.Settings.Appearance);
                 def.Create().Draw(painter, new HudView { Frame = frame, Race = site.Race, Settings = site.Settings, Config = config, Options = view, Def = def });
@@ -306,6 +317,9 @@ internal static class HudSheet
         demo.Fill(frame, 0.25);
         frame.Sequence = ++seq;
         race.Update(frame);
+        if (race.Incidents.Count < 4)
+            foreach (var (at, lap, sector, points) in new[] { (380.2, 3, 1, 1), (742.6, 6, 2, 2), (1105.9, 9, 0, 4), (1310.4, 11, 2, 1) })
+                race.AddIncident(new IncidentRecord(at, lap, sector, points, 0));
         using var painter = new HudPainter();
         foreach (var name in new[] { "Default" })
         {
@@ -329,7 +343,7 @@ internal static class HudSheet
             race.Frame.Flags = flags;
 
             var inputs = HudCatalog.Find("inputs")!;
-            foreach (var (file, style, show) in new[] { ("inputs-lights", "lights", ""), ("inputs-trimmed", "trace", "throttle,brake,speed"), ("inputs-lights-trimmed", "lights", "throttle,brake,rpm"), ("inputs-bare", "bare", ""), ("inputs-no-gear", "trace", "throttle,brake,clutch,steering,speed,rpm,trace,abs"), ("inputs-lights-no-gear", "lights", "throttle,brake,clutch,speed,rpm,abs") })
+            foreach (var (file, style, show) in new[] { ("inputs-dial", "dial", ""), ("inputs-trimmed", "dial", "throttle,brake,speed"), ("inputs-rpm-trimmed", "dial", "throttle,brake,rpm"), ("inputs-bare", "bare", ""), ("inputs-no-gear", "dial", "throttle,brake,clutch,steering,speed,rpm,trace,abs") })
             {
                 var config = new HudWidgetConfig { Options = { ["style"] = style } };
                 if (show.Length > 0) config.Options["show"] = show;
@@ -354,6 +368,20 @@ internal static class HudSheet
                 Save(def, size.Width, size.Height, Path.Combine(dir, file + ".png"), 1, options);
             }
 
+            var dialExtras = new HudWidgetConfig { Options = { ["extras"] = "position,lapNumber,fuelPct,last,best,air,bias,tc" } };
+            var dialSize = inputs.Natural!(new HudOptions(inputs, dialExtras));
+            Save(inputs, dialSize.Width, dialSize.Height, Path.Combine(dir, "inputs-extras.png"), 1, ("extras", "position,lapNumber,fuelPct,last,best,air,bias,tc"));
+            var timing = HudCatalog.Find("timing")!;
+            Save(timing, 200, 110, Path.Combine(dir, "timing-compact.png"), 1, ("look", "compact"), ("reference", "session"));
+            var weather = HudCatalog.Find("weather")!;
+            Save(weather, 340, 124, Path.Combine(dir, "weather-strip.png"), 1, ("look", "strip"));
+            var ledboard = HudCatalog.Find("ledboard")!;
+            foreach (var (file, flag) in new[] { ("ledboard-green", RaceFlags.Green | RaceFlags.StartGo), ("ledboard-sc", RaceFlags.Caution), ("ledboard-checkered", RaceFlags.Checkered) })
+            {
+                race.Frame.Flags = flag;
+                Save(ledboard, 150, 150, Path.Combine(dir, file + ".png"), 1, ("show", "flag"));
+            }
+            race.Frame.Flags = flags;
             var fuel = HudCatalog.Find("fuel")!;
             Save(fuel, fuel.W, 150, Path.Combine(dir, "fuel-pitexit.png"), 1, ("parts", "header,figures"), ("head", "togo,pitexit,stops,add"), ("top", "pitexit,level,laps"));
             Save(fuel, fuel.W, 150, Path.Combine(dir, "fuel-save.png"), 1, ("parts", "header,save"));
@@ -411,7 +439,6 @@ internal static class HudSheet
                 var g = surface.Ensure(new Size((int)Math.Round(w * scale), (int)Math.Round(h * scale)));
                 {
                     painter.Simulated = true;
-                    painter.MarkSimulated = false;
                     painter.IsPreview = true;
                     painter.Begin(g, scale, new SizeF((float)w, (float)h), palette, settings.Appearance);
                     var view = new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = new HudOptions(def, config), Def = def };
@@ -460,7 +487,6 @@ internal static class HudSheet
                 double updated = clock.Elapsed.TotalMilliseconds;
                 var g = surface.Ensure(size);
                 painter.Simulated = true;
-                painter.MarkSimulated = false;
                 painter.Begin(g, 1, new SizeF((float)def.W, (float)def.H), palette, settings.Appearance);
                 widget.Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
                 painter.FinishPanels();
@@ -530,7 +556,6 @@ internal static class HudSheet
                 for (int s = substeps; s >= 1; s--) Step(start + (i - (s - 1) / (double)substeps) * speed / FrameRate);
                 var g = surface.Ensure(size);
                 painter.Simulated = true;
-                painter.MarkSimulated = false;
                 painter.Begin(g, (float)FrameScale, new SizeF((float)def.W, (float)def.H), palette, settings.Appearance);
                 widget.Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
                 painter.FinishPanels();
@@ -577,7 +602,6 @@ internal static class HudSheet
             for (; simTime <= at; simTime += 0.25) Step(simTime);
             var g = surface.Ensure(size);
             painter.Simulated = true;
-            painter.MarkSimulated = false;
             painter.Begin(g, 1, new SizeF((float)def.W, (float)def.H), palette, settings.Appearance);
             widget.Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
             painter.FinishPanels();

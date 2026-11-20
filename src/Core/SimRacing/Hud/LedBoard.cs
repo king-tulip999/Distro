@@ -10,7 +10,7 @@ internal enum LedDot : byte
     Green,
     Blue,
     Red,
-    Dim,
+    Orange,
     Frame,
 }
 
@@ -24,6 +24,7 @@ internal enum LedFlag
     White,
     Checkered,
     Black,
+    Repair,
     Red,
 }
 
@@ -53,68 +54,54 @@ internal static class LedBoard
         FlagKind.Blue => LedFlag.Blue,
         FlagKind.White => LedFlag.White,
         FlagKind.Checkered => LedFlag.Checkered,
-        FlagKind.Black or FlagKind.Meatball or FlagKind.Disqualified => LedFlag.Black,
+        FlagKind.Meatball => LedFlag.Repair,
+        FlagKind.Black or FlagKind.Disqualified => LedFlag.Black,
         FlagKind.Red => LedFlag.Red,
         FlagKind.Green => LedFlag.Green,
         _ => LedFlag.None,
     };
 
-    public static void Build(LedDot[] dots, string text, LedFlag flag, bool frame, bool blinkOn)
+    public static void Build(LedDot[] dots, string text, bool frame)
     {
         Array.Clear(dots);
-        if (flag == LedFlag.Checkered)
+        if (!frame)
         {
-            for (int y = 0; y < Size; y++)
-                for (int x = 0; x < Size; x++)
-                    dots[y * Size + x] = (x / 5 + y / 5) % 2 == 0 ? LedDot.White : LedDot.Off;
-            return;
-        }
-        if (flag == LedFlag.None && !frame)
-        {
-            var full = new Area(dots, Size, 0, Size);
-            Text(full, text, false);
+            Text(new Area(dots, Size, 0, Size), text, false);
             return;
         }
         var g = new LedDot[Inner * Inner];
-        var inner = new Area(g, Inner, 2, Inner - 2);
-        switch (flag)
-        {
-            case LedFlag.None:
-                Ring(g, LedDot.Frame);
-                Text(inner, text, true);
-                break;
-            case LedFlag.SafetyCar:
-                if (blinkOn) Ring(g, LedDot.Yellow);
-                Text(inner, "SC", true);
-                break;
-            case LedFlag.Blue:
-                for (int y = 0; y < Inner; y++)
-                    for (int x = 0; x < Inner; x++)
-                        g[y * Inner + x] = Math.Abs(x - (Inner - 1 - y)) <= 2 ? LedDot.Yellow : LedDot.Blue;
-                break;
-            case LedFlag.Black:
-                Ring(g, LedDot.White);
-                if (blinkOn) Fill(g, 2, Inner - 2, LedDot.Dim);
-                break;
-            default:
-                bool steady = flag is LedFlag.Yellow or LedFlag.Red;
-                if (steady || blinkOn) Fill(g, 0, Inner, Solid(flag));
-                break;
-        }
+        Ring(g, LedDot.Frame);
+        Text(new Area(g, Inner, 2, Inner - 2), text, true);
         for (int y = 0; y < Size; y++)
             for (int x = 0; x < Size; x++)
                 dots[y * Size + x] = g[Clamp(y) * Inner + Clamp(x)];
     }
 
-    private static int Clamp(int v) => Math.Clamp(v - 2, 0, Inner - 1);
-
-    private static LedDot Solid(LedFlag flag) => flag switch
+    public static void Digits(LedDot[] dots, string text, bool framed)
     {
-        LedFlag.Green => LedDot.Green,
-        LedFlag.Yellow => LedDot.Yellow,
-        LedFlag.White => LedDot.White,
-        _ => LedDot.Red,
-    };
+        Build(dots, text, framed);
+        for (int i = 0; i < dots.Length; i++)
+            if (dots[i] == LedDot.Frame) dots[i] = LedDot.Off;
+    }
+
+    public const int FrameWidth = 3;
+
+    public static bool IsFrame(int x, int y) => x < FrameWidth || y < FrameWidth || x >= Size - FrameWidth || y >= Size - FrameWidth;
+
+    public static double BothSides(int x, int y)
+    {
+        double c = (Size - 1) / 2.0;
+        double a = Math.Atan2(y - c, x - c) - Math.PI / 2;
+        double turn = (a % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / (2 * Math.PI);
+        return turn <= 0.5 ? turn * 2 : (1 - turn) * 2;
+    }
+
+    public static double RevFill(double? rpm, double first, double shift) =>
+        rpm is { } r && shift > first ? Math.Clamp((r - first) / (shift - first), 0, 1) : 0;
+
+    public static bool OnLimiter(double? rpm, double limit) => limit > 0 && rpm is { } r && r >= limit;
+
+    private static int Clamp(int v) => Math.Clamp(v - 2, 0, Inner - 1);
 
     private static void Ring(LedDot[] g, LedDot c)
     {
@@ -123,13 +110,6 @@ internal static class LedBoard
             g[i] = g[(Inner - 1) * Inner + i] = c;
             g[i * Inner] = g[i * Inner + Inner - 1] = c;
         }
-    }
-
-    private static void Fill(LedDot[] g, int from, int to, LedDot c)
-    {
-        for (int y = from; y < to; y++)
-            for (int x = from; x < to; x++)
-                g[y * Inner + x] = c;
     }
 
     private readonly record struct Area(LedDot[] Dots, int Stride, int Lo, int Hi)

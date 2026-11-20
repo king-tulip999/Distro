@@ -77,7 +77,6 @@ internal sealed class HudPainter : IDisposable
     private readonly Dictionary<(Font, string[]), float> _widest = new(FontSamples.Instance);
     private readonly StringFormat[] _formats = new StringFormat[18];
     private readonly Dictionary<(int, float), Pen> _flatPens = new();
-    private Pen? _dashed;
     private readonly Bitmap _measureBitmap = new(1, 1);
     private readonly Graphics _measure;
     private float _textScale = 1;
@@ -425,7 +424,7 @@ internal sealed class HudPainter : IDisposable
         float radius = Look.Corner;
         r = Snap(r);
         if (r.Width <= 1 || r.Height <= 1) return;
-        if (radius <= 0.5f && !(Simulated && MarkSimulated))
+        if (radius <= 0.5f)
         {
             if (alpha > 0) FillFresh(Brush(HudPalette.Alpha(PanelColor, alpha)), r);
             if (Look.Outline) _panels.Add((new RectangleF(r.X + _inset.X, r.Y + _inset.Y, r.Width, r.Height), HudPalette.Alpha(P.LineStrong, Math.Max(60, alpha * 2 / 3))));
@@ -439,15 +438,7 @@ internal sealed class HudPainter : IDisposable
         {
             G.DrawPath(Pen(HudPalette.Alpha(P.LineStrong, Math.Max(60, alpha * 2 / 3)), 1), path);
         }
-        bool sim = Simulated && MarkSimulated;
-        if (sim) G.DrawPath(DashedPen(), path);
         G.TranslateTransform(-ox, -oy);
-        if (sim)
-        {
-            var tag = new RectangleF(r.Right - 30, r.Y + 1.5f, 26, 9);
-            Fill(tag, HudPalette.Alpha(P.Warn, 200), 2);
-            Text("SIM", Font(7.5f, true), HudPalette.On(P.Warn), tag, HAlign.Center, VAlign.Center, false);
-        }
     }
 
     private const int MaxLoose = 16;
@@ -483,8 +474,6 @@ internal sealed class HudPainter : IDisposable
         _g.CompositingMode = CompositingMode.SourceOver;
     }
 
-    public bool MarkSimulated { get; set; } = true;
-
     public void FinishPanels()
     {
         float px = 1 / _scale;
@@ -505,14 +494,6 @@ internal sealed class HudPainter : IDisposable
             if (bottom) Fill(new RectangleF(r.Left + px, r.Bottom - px, r.Width - px * 2, px), c);
         }
         _panels.Clear();
-    }
-
-    private Pen DashedPen()
-    {
-        var c = HudPalette.Alpha(P.Warn, 170);
-        if (_dashed is { } d && d.Color == c) return d;
-        _dashed?.Dispose();
-        return _dashed = new Pen(c, 1) { DashStyle = DashStyle.Dash };
     }
 
     public void Fill(RectangleF r, Color c, float radius = 0)
@@ -956,7 +937,6 @@ internal sealed class HudPainter : IDisposable
         foreach (var p in _pens.Values) p.Dispose();
         foreach (var p in _flatPens.Values) p.Dispose();
         foreach (var f in _formats) f?.Dispose();
-        _dashed?.Dispose();
         foreach (var s in _shapes.Values) s.Dispose();
         foreach (var g in _gradients.Values) g.Dispose();
         _measure.Dispose();

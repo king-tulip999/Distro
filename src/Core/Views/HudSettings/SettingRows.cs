@@ -121,10 +121,10 @@ internal static class SettingRows
                 return Row(label, o.Help, true, box);
             case HudOptionKind.Choice:
                 int index = Math.Max(0, o.Choices.ToList().FindIndex(ch => ch.Id == current));
-                if (o.Choices.Count <= 3 && o.Choices.All(ch => ch.Label.Length < 22)
+                if (!s.Dropdown && o.Choices.Count <= 3 && o.Choices.All(ch => ch.Label.Length < 22)
                     && c.Pictures?.Invoke(s.Id, o.Choices.Select(ch => (IReadOnlyDictionary<string, string>)new Dictionary<string, string> { [s.Key] = ch.Id }).ToList()) is { Count: > 0 } pictures && pictures.Count == o.Choices.Count)
                     return PictureRow(label, o.Help, PictureChoice(o.Choices.Select(ch => ch.Label).ToList(), o.Choices.Select(ch => ch.Help).ToList(), pictures, index, i => c.SetOne(s.Key, o.Choices[i].Id), "pic" + c.W.Id + s.Key));
-                if (o.Choices.Count <= 3 && o.Choices.All(ch => ch.Label.Length < 22))
+                if (!s.Dropdown && o.Choices.Count <= 3 && o.Choices.All(ch => ch.Label.Length < 22))
                     return Row(label, o.Help, true, Ui.Segmented(o.Choices.Select(ch => ch.Label).ToList(), index, i => c.SetOne(s.Key, o.Choices[i].Id), "opt" + c.W.Id + s.Key, o.Choices.Select(ch => ch.Help).ToList()));
                 string? help = string.Join("\n", new[] { o.Help }.Concat(o.Choices.Where(ch => ch.Help is not null).Select(ch => $"{ch.Label}: {ch.Help}")).OfType<string>());
                 var combo = Ui.Combo(o.Choices.Select(ch => new Choice(ch.Id, ch.Label)), current, ch => c.SetOne(s.Key, ch.Id), ComboWidth);

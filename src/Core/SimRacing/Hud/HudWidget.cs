@@ -182,6 +182,8 @@ internal sealed class HudView
     public required HudOptions Options { get; init; }
     public required HudWidgetDef Def { get; init; }
     public HudUnits Units => Settings.Units;
+
+    public HudUnits SpeedUnits => Settings.SpeedUnits;
     public double Now => Race.Now;
 
     public bool ClassShown(int car)

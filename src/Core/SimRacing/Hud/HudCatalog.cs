@@ -30,7 +30,7 @@ internal static class HudCatalog
         new("tyres", "Tires", "Pressures, temperatures (inner / middle / outer) and wear for each corner.", 280, 180, () => new TyresWidget())
             { FixedSize = true, MinW = 180, MinH = 124, DefaultHz = 2, Options = TyresWidget.Options, Editor = Editors.TyresEditor.Def,
               Limits = "iRacing updates tire data in the pit box, not while driving." },
-        new("weather", "Weather and track", "The sky, track wetness and rain, air and track temperature, humidity, and the wind as a pointer turning with your car.", 340, 124, () => new WeatherWidget())
+        new("weather", "Weather and track", "The sky, a compass with the wind turning with your car, air and track temperature, humidity, rain, rubber and the track's wetness.", WeatherWidget.PanelW, WeatherWidget.PanelH, () => new WeatherWidget())
             { FixedSize = true, MinW = 140, MinH = 80, DefaultHz = 5, Options = WeatherWidget.Options, Editor = Editors.WeatherEditor.Def,
               Limits = "No forecast: iRacing doesn't publish one." },
         new("wind", "Wind", "A pointer in a dotted dial showing where the wind blows, with its speed under it, turning with your car: red for a headwind, amber across, green behind.", 150, 150, () => new WindWidget())
@@ -49,14 +49,17 @@ internal static class HudCatalog
               Limits = "Notes are written in Session Stats, on the Performance card for each car and track." },
         new("events", "Race events", "A timeline of flags, pit stops, places gained or lost, incidents and best laps.", 320, 200, () => new EventsWidget())
             { MinW = 300, MinH = 130, DefaultHz = 2, Options = EventsWidget.Options, Editor = Editors.EventsEditor.Def },
+        new("incidents", "Incident log", "Each of your incidents with the session time, lap, sector, what it was and its points, and your total against the limit.", 400, 280, () => new IncidentsWidget())
+            { MinW = 240, MinH = 110, DefaultHz = 2, Options = IncidentsWidget.Options, Editor = Editors.IncidentsEditor.Def,
+              Limits = "Light contact gives no points, so iRacing doesn't report it. Incidents are named from their points; the log starts when the overlay first sees the session." },
         new("result", "Race result", "Your finish once you take the checkered flag, as a card, a banner, a stamp or a lap chart: position and places gained, the car, iRating, incidents, awards, best and average lap, consistency and every lap's time.", 300, 448, () => new ResultWidget())
             { MinW = 160, MinH = 120, DefaultHz = 2, Options = ResultWidget.Options, Editor = Editors.ResultEditor.Def, HideWhenEmpty = true, Natural = ResultWidget.Natural,
               Limits = "The iRating change is an estimate from the field's ratings and your finish. Awards compare this race with the ones Session Stats has recorded, so they need Session Stats on." },
-        new("inputs", "Inputs", "Throttle, brake, clutch and steering with gear, speed and shift lights: as a trace or a low shift-light bar.", 420, 110, () => new InputsWidget())
+        new("inputs", "Inputs", "Throttle, brake, clutch and steering with gear, speed and RPM: a gear dial with pedal bars, a trace and an RPM bar, or the gear dial and trace alone, with extra fields to pick.", 436, 96, () => new InputsWidget())
             { MinW = 225, MinH = 50, DefaultHz = 30, Options = InputsWidget.Options, Editor = Editors.InputsEditor.Def, Natural = InputsWidget.Natural,
               Limits = "The shift point, limiter flash and RPM scale come from iRacing's figures for your car." },
         new("ledboard", "LED board", "A square of lit dots like a trackside board: your gear, lap, position or laps left in big digits, and the flag that's out filling the board.", 150, 150, () => new LedBoardWidget())
-            { FixedSize = true, MinW = 60, MinH = 60, DefaultHz = 10, Background = 0, Options = LedBoardWidget.Options, Editor = Editors.LedBoardEditor.Def,
+            { FixedSize = true, MinW = 60, MinH = 60, DefaultHz = 30, Background = 0, Options = LedBoardWidget.Options, Editor = Editors.LedBoardEditor.Def,
               Limits = "Shows up to three digits." },
         new("block", "Data block", "Any single value (live, session or calculated) as a number, bar or graph.", 170, 80, () => new BlockWidget())
             { FixedSize = true, MinW = 150, MinH = 72, DefaultHz = 10, Options = BlockWidget.Options, Editor = Editors.BlockEditor.Def },

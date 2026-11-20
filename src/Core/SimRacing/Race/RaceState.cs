@@ -8,6 +8,8 @@ namespace Core.SimRacing.Race;
 
 internal readonly record struct RaceEvent(double SessionTime, string Text, AlertLevel Level);
 
+internal readonly record struct IncidentRecord(double SessionTime, int? Lap, int Sector, int Points, int Total);
+
 internal readonly record struct PitStop(int Lap, double LaneTime, double? StallTime, double? Span = null);
 
 internal sealed class RaceState
@@ -21,6 +23,7 @@ internal sealed class RaceState
     private SessionInfo? _keysFrom;
     private int? _keysNum;
     private readonly List<RaceEvent> _events = new();
+    private readonly List<IncidentRecord> _incidents = new();
     private readonly Dictionary<int, int> _startPositions = new();
     private List<StandingRow> _standings = new();
     private long _standingsSeq = -1;
@@ -130,6 +133,14 @@ internal sealed class RaceState
     public int SelectedCar { get; set; } = -1;
 
     public IReadOnlyList<RaceEvent> Events => _events;
+
+    public IReadOnlyList<IncidentRecord> Incidents => _incidents;
+
+    public void AddIncident(IncidentRecord record)
+    {
+        _incidents.Add(record);
+        if (_incidents.Count > MaxEvents) _incidents.RemoveAt(0);
+    }
 
     public IReadOnlyList<PitStop> PitStops => _pitStops;
     private readonly List<PitStop> _pitStops = new();
@@ -419,6 +430,7 @@ internal sealed class RaceState
         _spotter.Reset();
         _startPositions.Clear();
         _pitStops.Clear();
+        _incidents.Clear();
         Array.Clear(_carStops);
         Array.Clear(_carPitAt);
         Array.Clear(_carPitTime);
@@ -596,7 +608,7 @@ internal sealed class RaceState
         {
             double kph = speed * 3.6, tolerance = Alerts.Threshold("pit.speed");
             bool speeding = f.OnPitRoad && f.Driving && kph > limit + tolerance;
-            Alerts.Set("pit.speed", speeding, now, detail: speeding ? $"{RaceFormat.Speed(speed, s.Units)} · limit {RaceFormat.SpeedKph(limit, s.Units)}" : null);
+            Alerts.Set("pit.speed", speeding, now, detail: speeding ? $"{RaceFormat.Speed(speed, s.SpeedUnits)} · limit {RaceFormat.SpeedKph(limit, s.SpeedUnits)}" : null);
         }
         Alerts.Set("pit.limiter", f.OnPitRoad && f.Driving && !f.InPitStall && f.Speed > 3 && !f.Warnings.HasFlag(EngineWarnings.PitLimiter)
             && f.Vars.ContainsKey("EngineWarnings"), now);
@@ -626,6 +638,7 @@ internal sealed class RaceState
             {
                 Alerts.Fire("incident.new", now, $"+{inc - _lastIncidents}x incident", $"{inc}x total" + (f.Session.IncidentLimit is { } l ? $" / {l}" : ""));
                 AddEvent(f, $"+{inc - _lastIncidents}x incident ({inc}x)", AlertLevel.Warning);
+                AddIncident(new IncidentRecord(f.SessionTime ?? 0, f.Lap, Laps.CurrentSector, inc - _lastIncidents, inc));
             }
             _lastIncidents = inc;
             if (f.Session.IncidentLimit is { } lim && lim > 0)

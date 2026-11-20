@@ -130,8 +130,14 @@ public partial class MainWindow : Window, IModalHost
             else if (_app.Updates.JustUpdated)
                 Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => ChangelogDialog.Show(this, _app.Updates, _app.Updates.UpdatedFrom, justUpdated: true));
             else
-                Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => OldAppDialog.CheckLater(this, _app));
+                Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => _ = StartChecks());
         };
+    }
+
+    private async Task StartChecks()
+    {
+        if (await AppHomeDialog.Offer(this, _app)) return;
+        OldAppDialog.CheckLater(this, _app);
     }
 
     private static (string Page, string? Anchor)? Moved(string? key) => key switch
@@ -1140,8 +1146,11 @@ public partial class MainWindow : Window, IModalHost
         double right = Math.Max(0, ContentArea.ActualWidth - at.X - PageArea.ActualWidth);
         double bottom = Math.Max(0, ContentArea.ActualHeight - at.Y - PageArea.ActualHeight);
         ModalContent.Margin = new Thickness(Math.Max(0, at.X), Math.Max(0, at.Y), right, bottom);
-        if (ModalContent.Content is FrameworkElement card && (double)card.GetValue(Ui.DialogBaseWidthProperty) is var baseWidth && !double.IsNaN(baseWidth))
+        if (ModalContent.Content is not FrameworkElement card) return;
+        if ((double)card.GetValue(Ui.DialogBaseWidthProperty) is var baseWidth && !double.IsNaN(baseWidth))
             card.Width = Ui.DialogWidth(baseWidth, PageArea.ActualWidth);
+        if (!double.IsInfinity(card.MaxHeight))
+            card.MaxHeight = Ui.DialogMaxHeight(ModalRoom);
     }
 
     internal void CloseModal(bool result)
@@ -1248,6 +1257,7 @@ public partial class MainWindow : Window, IModalHost
         {
             _app.Config.Ui.SetupPending = false;
             _app.Save();
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => _ = AppHomeDialog.Offer(this, _app));
         }
         Motion.FadeTo(SetupLayer, 0, 180, () =>
         {

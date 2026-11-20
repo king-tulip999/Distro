@@ -239,7 +239,7 @@ internal sealed class LapReplayView : Grid
         }
         foreach (var part in Parts().Append(top)) part.SizeChanged += (_, _) => QueueAvoid();
         stageHost.SizeChanged += (_, _) => QueueAvoid();
-        _stageTile = Hairline.Frame(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Height = 454, Child = stageHost });
+        _stageTile = Hairline.Frame(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Height = 454, ClipChild = true, Child = stageHost });
         _stageTile.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
 
         _stageTile.Margin = new Thickness(0, 0, 0, 10);

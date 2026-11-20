@@ -754,6 +754,11 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             _profiles.OpenEditor(0);
             return Task.CompletedTask;
         });
+        yield return ("profile-editor-bottom", () =>
+        {
+            if (_window.FindModalScroll() is { } sv) sv.ScrollToEnd();
+            return Task.CompletedTask;
+        });
         yield return ("profile-editor-closed", () =>
         {
             _window.CloseModal(false);

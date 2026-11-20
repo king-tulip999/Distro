@@ -18,7 +18,7 @@ public enum HudVrPlacement { Off, Cockpit, Head }
 
 public sealed class RaceHudSettings
 {
-    public const int CurrentVersion = 6;
+    public const int CurrentVersion = 7;
 
     public int Version { get; set; }
 
@@ -39,6 +39,17 @@ public sealed class RaceHudSettings
     public HudAppearance Appearance { get; set; } = new();
 
     public HudUnits Units { get; set; } = HudUnits.Metric;
+
+    public bool SpeedInMph { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public HudUnits SpeedUnits => SpeedInMph ? HudUnits.Imperial : Units;
+
+    public bool Clock24h { get; set; }
+
+    public bool HideAppOnConnect { get; set; }
+
+    public bool WebRemote { get; set; }
 
     public const int DefaultWebPort = 8642, MinWebPort = 1024, MaxWebPort = 65535;
 
@@ -212,7 +223,7 @@ public sealed class RaceHudSettings
             Layouts.AddRange(defaults());
             Rules.AddRange(defaultRules());
         }
-        bool before2 = Version < 2, before3 = Version < 3, before4 = Version < 4, before5 = Version < 5, before6 = Version < 6;
+        bool before2 = Version < 2, before3 = Version < 3, before4 = Version < 4, before5 = Version < 5, before6 = Version < 6, before7 = Version < 7;
         Version = CurrentVersion;
         Appearance ??= new();
         if (before4) { Appearance.Colors = HudAppearance.DefaultColors; Appearance.Custom = new(); }
@@ -235,7 +246,9 @@ public sealed class RaceHudSettings
                 if (string.IsNullOrWhiteSpace(w.Id) || !ids.Add(w.Id)) { w.Id = HudWidgetConfig.NewId(w.Kind); ids.Add(w.Id); }
                 SideBannerToTop(w);
                 OldInputStyles(w);
+                OldWeatherStrip(w);
                 if (before6) InputsShowGear(w);
+                if (before7) SwitchToNewLooks(w);
                 if (before2) ShowClassesInsteadOfHiding(w);
                 if (before3) ScaleFromNaturalSize(w);
                 w.Clamp();
@@ -289,6 +302,40 @@ public sealed class RaceHudSettings
         if (!show.Split(',').Contains("gear")) w.Options["show"] = show.Length == 0 ? "gear" : show + ",gear";
     }
 
+    internal static void OldWeatherStrip(HudWidgetConfig w)
+    {
+        if (!string.Equals(w.Kind, "weather", StringComparison.OrdinalIgnoreCase) || w.H >= w.W) return;
+        if (w.Options is not null && w.Options.ContainsKey("look")) return;
+        double factor = w.H / 124;
+        w.W = Math.Max(1, Math.Round(SimRacing.Hud.Widgets.WeatherWidget.PanelW * factor));
+        w.H = Math.Max(1, Math.Round(SimRacing.Hud.Widgets.WeatherWidget.PanelH * factor));
+    }
+
+    internal static void SwitchToNewLooks(HudWidgetConfig w)
+    {
+        if (w.Options is null) return;
+        if (string.Equals(w.Kind, "weather", StringComparison.OrdinalIgnoreCase) && w.Options.TryGetValue("look", out var look) && look != SimRacing.Hud.Widgets.WeatherWidget.PanelLook)
+        {
+            w.Options.Remove("look");
+            double factor = w.H / 124;
+            w.W = Math.Max(1, Math.Round(SimRacing.Hud.Widgets.WeatherWidget.PanelW * factor));
+            w.H = Math.Max(1, Math.Round(SimRacing.Hud.Widgets.WeatherWidget.PanelH * factor));
+        }
+        else if (string.Equals(w.Kind, "weather", StringComparison.OrdinalIgnoreCase) && w.W > 0 && Math.Abs(w.H / w.W - 400.0 / 230) < 0.02)
+            w.H = Math.Max(1, Math.Round(w.W * SimRacing.Hud.Widgets.WeatherWidget.PanelH / SimRacing.Hud.Widgets.WeatherWidget.PanelW));
+        if (string.Equals(w.Kind, "inputs", StringComparison.OrdinalIgnoreCase) && w.Options.TryGetValue("style", out var style) && style != SimRacing.Hud.Widgets.InputsWidget.Dial
+            && SimRacing.Hud.HudCatalog.Find(w.Kind) is { } def)
+        {
+            var before = SimRacing.Hud.Widgets.InputsWidget.Natural(new SimRacing.Hud.HudOptions(def, w));
+            w.Options.Remove("style");
+            var after = SimRacing.Hud.Widgets.InputsWidget.Natural(new SimRacing.Hud.HudOptions(def, w));
+            if (before.Height <= 0 || after.Height <= 0 || !double.IsFinite(w.H)) return;
+            double factor = w.H / before.Height;
+            w.W = Math.Max(1, Math.Round(after.Width * factor));
+            w.H = Math.Max(1, Math.Round(after.Height * factor));
+        }
+    }
+
     internal static void OldInputStyles(HudWidgetConfig w)
     {
         if (!string.Equals(w.Kind, "inputs", StringComparison.OrdinalIgnoreCase) || w.Options is null || !w.Options.TryGetValue("style", out var style)) return;
@@ -299,12 +346,15 @@ public sealed class RaceHudSettings
             w.W = Math.Max(1, Math.Round(420 * factor));
             w.H = Math.Max(1, Math.Round(110 * factor));
         }
-        else if (style == "strip")
+        else if (style is "strip" or "lights" or "trace" && SimRacing.Hud.HudCatalog.Find(w.Kind) is { } def)
         {
-            w.Options["style"] = "lights";
-            double factor = w.H / 50;
-            w.W = Math.Max(1, Math.Round(470 * factor));
-            w.H = Math.Max(1, Math.Round(66 * factor));
+            double oldH = style switch { "strip" => 50, "lights" => 66, _ => SimRacing.Hud.Widgets.InputsWidget.Parse(new SimRacing.Hud.HudOptions(def, w)).Rpm ? 110 : 100 };
+            w.Options.Remove("style");
+            var after = SimRacing.Hud.Widgets.InputsWidget.Natural(new SimRacing.Hud.HudOptions(def, w));
+            if (!double.IsFinite(w.H) || w.H <= 0) return;
+            double factor = w.H / oldH;
+            w.W = Math.Max(1, Math.Round(after.Width * factor));
+            w.H = Math.Max(1, Math.Round(after.Height * factor));
         }
     }
 

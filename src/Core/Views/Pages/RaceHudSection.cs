@@ -749,11 +749,22 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             Refresh();
         }
         var toggle = Ui.Switch(S.WebOverlays, on => { S.WebOverlays = on; Apply(); });
-        port.ValueChanged += v => { S.WebPort = (int)v; Apply(); };
+        var addresses = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4) };
+        port.ValueChanged += v => { S.WebPort = (int)v; Apply(); Addresses(); };
+        void Addresses()
+        {
+            var urls = S.WebRemote ? SimRacing.Hud.Web.HudWebServer.NetworkUrls(S.WebPort) : Array.Empty<string>();
+            addresses.Text = urls.Count > 0 ? "On other devices: " + string.Join("  ·  ", urls) : S.WebRemote ? "No home network found." : "";
+            addresses.Visibility = S.WebRemote ? Visibility.Visible : Visibility.Collapsed;
+        }
+        var remote = Ui.Switch(S.WebRemote, on => { S.WebRemote = on; Apply(); Addresses(); });
+        Addresses();
         Refresh();
         return Group("Browser sources", null,
-            Ui.SettingRow("Browser sources", "Every widget as a page on this PC only, for a wheel screen or streaming software. Each widget's URL is on its page.", toggle),
+            Ui.SettingRow("Browser sources", "Every widget as a page, for a wheel screen or streaming software. Each widget's URL is on its page.", toggle),
             problem,
+            Ui.SettingRow("Other devices", "Lets a second PC, phone or tablet on your home network open the pages. Windows may ask to allow it through the firewall.", remote),
+            addresses,
             Ui.SettingRow("Port", null, port),
             Ui.SettingRow("Overlay list", null, open));
     }
@@ -777,7 +788,10 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             Ui.SettingRow("Click-through", "Clicks go to the game. Off: click a driver in the Relative or Standings to highlight them in both (the window never takes the keyboard).",
                 Ui.Switch(!S.Interactive, on => { S.Interactive = !on; changed(); })),
             Ui.SettingRow("Units", null, Ui.Segmented(new[] { "Metric", "Imperial" }, (int)S.Units, i => { S.Units = (HudUnits)i; changed(); }, "hudunits"),
-                D(() => S.Units == HudUnits.Metric, () => S.Units = HudUnits.Metric, "Metric"))));
+                D(() => S.Units == HudUnits.Metric, () => S.Units = HudUnits.Metric, "Metric")),
+            Ui.SettingRow("Speed in mph", "Other values keep the units above.", Ui.Switch(S.SpeedInMph, on => { S.SpeedInMph = on; changed(); })),
+            Ui.SettingRow("Clock", null, Ui.Segmented(new[] { "12h", "24h" }, S.Clock24h ? 1 : 0, i => { S.Clock24h = i == 1; changed(); }, "hudclock")),
+            Ui.SettingRow("Hide app when iRacing connects", "Velocita goes to the tray; the overlay keeps running.", Ui.Switch(S.HideAppOnConnect, on => { S.HideAppOnConnect = on; changed(); }))));
         var keys = new KeybindTree(app, e => e.Id.StartsWith("hud.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true) { Style = null, Padding = new Thickness(0), Margin = new Thickness(-5, 5, 0, 0) };
         root.Children.Add(new Tile
         {
@@ -874,7 +888,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         System.Windows.Automation.AutomationProperties.SetName(swatch, "Pick a color");
         Motion.Pressable(swatch);
         var box = new TextBox { Width = 96, Text = get(), MaxLength = 7, VerticalContentAlignment = VerticalAlignment.Center };
-        void Show() => swatch.Background = CustomPalette.Parse(get()) is { } c ? new SolidColorBrush(c) : null;
+        void Show() => swatch.Background = CustomPalette.Parse(get()) is { } c ? new SolidColorBrush(c) : Brushes.Transparent;
         void Commit()
         {
             if (CustomPalette.Parse(box.Text) is { } c)
@@ -1328,6 +1342,22 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         yield return ("hud-relative-all-classes", () => { _widgets?.SetOption("relative", "classes", null); return Task.CompletedTask; });
         yield return ("hud-timing", () => { _widgets?.ShowAll("timing"); return Task.CompletedTask; });
         yield return ("hud-fuel-sections", () => { _widgets?.ShowAll("fuel"); return Task.CompletedTask; });
+        yield return ("hud-ledboard-flags", () =>
+        {
+            _widgets?.SweepSelect("ledboard");
+            _widgets?.SetOption("ledboard", "show", "flag");
+            _widgets?.SetOption("ledboard", "previewFlag", "flagSafetyCar");
+            _widgets?.ShowAll("ledboard");
+            return Task.CompletedTask;
+        });
+        yield return ("hud-ledboard-numbers", () =>
+        {
+            _widgets?.SweepSelect("ledboard");
+            _widgets?.SetOption("ledboard", "show", null);
+            _widgets?.SetOption("ledboard", "previewFlag", null);
+            _widgets?.ShowAll("ledboard");
+            return Task.CompletedTask;
+        });
         foreach (var def in HudCatalog.All)
         {
             string kind = def.Kind;

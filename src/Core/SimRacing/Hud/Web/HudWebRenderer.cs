@@ -274,7 +274,6 @@ internal sealed class HudWebRenderer : IDisposable
         var g = t.Surface.Ensure(size);
         var p = t.Painter;
         p.Simulated = frame.Simulated;
-        p.MarkSimulated = false;
         p.Begin(g, scale, new SizeF((float)config.W, (float)config.H), palette, settings.Appearance);
         p.Background = config.Background;
         t.Widget!.Paint(p, view);

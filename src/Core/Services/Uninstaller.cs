@@ -17,7 +17,7 @@ internal static class Uninstaller
         else OpenXrLayer.Remove();
         try { StartupManager.SetEnabled(false); }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException) { }
-        return Steps(exe, Folders(), Files(exe), StartupManager.InstallFolder);
+        return Steps(exe, Folders(), Files(exe), Path.GetDirectoryName(exe) is { } home && AppHome.IsOwnFolder(home) ? home : StartupManager.InstallFolder);
     }
 
     internal static List<string> Folders()

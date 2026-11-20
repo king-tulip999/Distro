@@ -1312,7 +1312,7 @@ internal static class Strips
                     break;
                 case "humidity": items.Add(("HUMIDITY", f.Humidity is { } h ? PooledText.Number("", h * 100, "0", CultureInfo.CurrentCulture, "%") : missing, null)); break;
                 case "wetness": items.Add(("SURFACE", f.TrackWetness is { } w and > 0 ? RaceFormat.Wetness(w) : missing, f.TrackWetness is > 1 ? p.P.WarnText : null)); break;
-                case "clock": items.Add(("", RaceFormat.TimeOfDay(DateTime.Now), null)); break;
+                case "clock": items.Add(("", RaceFormat.TimeOfDay(DateTime.Now, v.Settings.Clock24h), null)); break;
                 case "bias": items.Add(("BB", f.BrakeBias is { } bb ? PooledText.Number("", bb, "0.0", CultureInfo.InvariantCulture, "%") : missing, null)); break;
                 case "trackname": items.Add(("", f.Session.TrackDisplayName is { Length: > 0 } tn ? tn : f.Session.TrackName is { Length: > 0 } tn2 ? tn2 : missing, null)); break;
                 case "fuellevel": items.Add(("FUEL", f.Fuel is { } inTank ? RaceFormat.Fuel(inTank, u) : missing, null)); break;

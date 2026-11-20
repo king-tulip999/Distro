@@ -593,7 +593,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
                     <c:Tile x:Name="Bd" Background="{DynamicResource SurfaceAlt}" BorderBrush="{DynamicResource Line}" BorderThickness="{DynamicResource HairlineEdge}"
-                            Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            Padding="{TemplateBinding Padding}" CornerRadius="{DynamicResource R.Control}" SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                     </c:Tile>
                     <ControlTemplate.Triggers>

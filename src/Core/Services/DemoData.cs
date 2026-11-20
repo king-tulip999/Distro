@@ -89,12 +89,12 @@ internal static class DemoData
             {
                 Profiles =
                 {
-                    new DisplayProfile { Name = "Triples", Hotkey = "Ctrl+Alt+F3", Taskbar = TaskbarMode.MainOnly, Hdr = HdrMode.Off, Volume = 70,
+                    new DisplayProfile { Name = "Triples", Hotkey = "Ctrl+Alt+F3", Taskbar = TaskbarMode.MainOnly, Hdr = HdrMode.Off, Volume = 70, CloseAppsOnLeave = true, Apps = { @"C:\Program Files (x86)\iRacing\ui\iRacingUI.exe", @"C:\Program Files\SimHub\SimHubWPF.exe" },
                         Audio = new AudioSnapshot { PlaybackId = "demo-speakers", PlaybackName = "Speakers (Realtek Audio)", RecordingId = "demo-mic2", RecordingName = "Microphone (Shure MV7)" },
                         Layout = Snapshot(Triple, ("LG 27GP850", "demo-center"), ("Dell S2721DGF", "demo-left"), ("Dell S2721DGF", "demo-right")) },
                     new DisplayProfile { Name = "Desk", Hotkey = "Ctrl+Alt+F1", Layout = Snapshot(Single, ("LG 27GP850", "demo-center")),
                         Audio = new AudioSnapshot { PlaybackId = "demo-headset", PlaybackName = "Headset (Arctis Nova Pro)", RecordingId = "demo-mic", RecordingName = "Microphone (Arctis Nova Pro)" },
-                        Wallpapers = { ["demo-center"] = @"C:\Users\Public\Pictures\desk.jpg" } },
+                        Wallpapers = { ["demo-center"] = @"C:\Users\Public\Pictures\desk.jpg" }, Apps = { @"C:\Program Files (x86)\Steam\steam.exe", @"C:\Users\Public\Discord\Update.exe" } },
                     new DisplayProfile { Name = "Desk + TV", Hdr = HdrMode.On, Layout = Snapshot(Stream, ("LG 27GP850", "demo-center"), ("LG TV SSCR2", "demo-tv")) },
                 },
             },
