@@ -11,6 +11,7 @@ namespace Core;
 public partial class App : Application
 {
     private AppServices? _services;
+    private SimRacing.Race.FieldLog? _fieldLog;
 
     internal static bool ExitRequested { get; private set; }
 
@@ -102,6 +103,7 @@ public partial class App : Application
         string? screenshotDir = ArgValue(e.Args, "--screenshots");
         bool fromStartup = e.Args.Contains("--minimized", StringComparer.OrdinalIgnoreCase);
         bool afterUpdate = e.Args.Any(a => a.Equals("--updated", StringComparison.OrdinalIgnoreCase) || a.Equals("--update-failed", StringComparison.OrdinalIgnoreCase));
+        bool stayInTray = e.Args.Contains(UpdateService.StayInTrayArg, StringComparer.OrdinalIgnoreCase);
         string? perfFile = ArgValue(e.Args, "--perf");
         string? monkeyDir = ArgValue(e.Args, "--monkey");
         string? controlsDir = ArgValue(e.Args, "--controls");
@@ -120,9 +122,17 @@ public partial class App : Application
 
         if (!demo && !SingleInstance.TryAcquire())
         {
-            SingleInstance.SignalExisting();
-            Shutdown();
-            return;
+            if (Handover.OlderCopy() is not { } older || !Handover.Close(older) || !SingleInstance.TryAcquire())
+            {
+                SingleInstance.SignalExisting();
+                Shutdown();
+                return;
+            }
+            if (Environment.ProcessPath is { } self && UpdateService.CanSelfInstall && Handover.ShouldReplace(older.Path, self))
+            {
+                RelaunchAfterExit("", UpdateService.SwapSteps(older.Path, self), older.Path);
+                return;
+            }
         }
         if (!demo) NotificationIdentity.Register();
         bool tookOverFans = !demo && FanService.StopRunning(TimeSpan.FromSeconds(12));
@@ -184,6 +194,8 @@ public partial class App : Application
         _services = new AppServices(demo, config);
         PerfProbe.Mark("services");
         _services.Start(withTray);
+        if (!demo && !AppIdentity.IsTecnica && e.Args.Contains(SimRacing.Race.FieldLog.Arg, StringComparer.OrdinalIgnoreCase))
+            _fieldLog = new SimRacing.Race.FieldLog(_services.Telemetry, Path.Combine(Config.ConfigStore.Folder, "field-log"));
         PerfProbe.Mark("started");
 
         var window = new MainWindow(_services);
@@ -221,7 +233,11 @@ public partial class App : Application
             return;
         }
 
-        if (config.Ui.StartMinimized && !afterUpdate && _services.Tray is { } trayIcon)
+        if (stayInTray && _services.Tray is not null)
+        {
+            window.ScheduleTrim();
+        }
+        else if (config.Ui.StartMinimized && !afterUpdate && _services.Tray is { } trayIcon)
         {
             window.ScheduleTrim();
             if (!fromStartup || !config.Ui.TrayTipShown)
@@ -247,6 +263,7 @@ public partial class App : Application
         if (!demo)
         {
             SingleInstance.Listen(() => Dispatcher.BeginInvoke(new Action(() => window.ShowFromTray(null))));
+            SingleInstance.ListenForQuit(() => Dispatcher.BeginInvoke(new Action(Quit)));
             Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => Task.Run(Program.TidyRuntimeFolders)));
         }
 
@@ -356,6 +373,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _fieldLog?.Dispose();
         _services?.Dispose();
         SingleInstance.Release();
         base.OnExit(e);

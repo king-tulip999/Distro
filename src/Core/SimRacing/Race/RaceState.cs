@@ -19,7 +19,7 @@ internal sealed class RaceState
     private readonly Func<RaceHudSettings> _settings;
     private readonly Spotter _spotter = new();
 
-    public EstProfile Profile { get; } = new();
+    public EstProfile Profile { get; }
     private SessionInfo? _keysFrom;
     private int? _keysNum;
     private readonly List<RaceEvent> _events = new();
@@ -41,9 +41,10 @@ internal sealed class RaceState
     private double? _bestLap;
     private bool _windowWasOpen;
 
-    public RaceState(Func<RaceHudSettings> settings, PitLossStore? pitLoss = null)
+    public RaceState(Func<RaceHudSettings> settings, PitLossStore? pitLoss = null, LapProfileStore? lapProfiles = null)
     {
         _settings = settings;
+        Profile = new EstProfile(lapProfiles);
         _pitExit = new PitExitFeed(pitLoss ?? new PitLossStore(null));
         Alerts = new AlertEngine(def => ChoiceFor(settings(), def));
         Laps.LapCompleted += OnLap;
@@ -271,6 +272,17 @@ internal sealed class RaceState
         now == TrackSurface.NotInWorld && was is TrackSurface.OnTrack or TrackSurface.OffTrack or TrackSurface.ApproachingPits
         && !wasOnPitRoad && phase is not (SessionPhase.Checkered or SessionPhase.CoolDown);
 
+    public const int RecentLapCount = 3;
+    private readonly double[,] _carRecent = new double[TelemetryFrame.MaxCars, RecentLapCount];
+    private readonly int[] _carRecentCount = new int[TelemetryFrame.MaxCars];
+
+    public double? RecentLap(int car, int lapsBack)
+    {
+        if ((uint)car >= TelemetryFrame.MaxCars || (uint)lapsBack >= RecentLapCount || lapsBack >= _carRecentCount[car]) return null;
+        double t = _carRecent[car, (_carRecentCount[car] - 1 - lapsBack) % RecentLapCount];
+        return t > 0 ? t : null;
+    }
+
     public double? PaceOf(int car, int n = 5)
     {
         if ((uint)car >= TelemetryFrame.MaxCars || _carLapCount[car] == 0) return null;
@@ -308,6 +320,8 @@ internal sealed class RaceState
                     _carLaps[i, _carLapCount[i] % CarLapHistory] = last;
                     _carLapCount[i]++;
                 }
+                _carRecent[i, _carRecentCount[i] % RecentLapCount] = last;
+                _carRecentCount[i]++;
                 _carLastSeen[i] = last;
                 _carLapDirty[i] = pit || caution;
             }
@@ -402,6 +416,7 @@ internal sealed class RaceState
         if (!f.IsReplayPlaying) Radar.Learn(f, f.Session.Player?.CarPath ?? "");
         var call = _spotter.Next(f.Sides);
         if (call != SpotterCall.None) Alerts.Fire("side.car", Now, Spotter.Text(call));
+        TrackIncidents(f);
         if (Now - _lastChecks >= 0.25)
         {
             _lastChecks = Now;
@@ -438,6 +453,7 @@ internal sealed class RaceState
         Array.Clear(_carPitExitLap);
         Array.Clear(_carLeftPits);
         Array.Clear(_carLapCount);
+        Array.Clear(_carRecentCount);
         Array.Clear(_carLastSeen);
         Array.Clear(_carLapDirty);
         Array.Copy(f.CarOnPitRoad, _carWasPit, TelemetryFrame.MaxCars);
@@ -489,6 +505,18 @@ internal sealed class RaceState
         }
         _wasOnPitRoad = f.OnPitRoad;
         _wasStall = f.InPitStall;
+    }
+
+    private void TrackIncidents(TelemetryFrame f)
+    {
+        if (f.Incidents is not { } inc) return;
+        if (_lastIncidents >= 0 && inc > _lastIncidents)
+        {
+            Alerts.Fire("incident.new", Now, $"+{inc - _lastIncidents}x incident", $"{inc}x total" + (f.Session.IncidentLimit is { } l ? $" / {l}" : ""));
+            AddEvent(f, $"+{inc - _lastIncidents}x incident ({inc}x)", AlertLevel.Warning);
+            AddIncident(new IncidentRecord(f.SessionTime ?? 0, f.Lap, Laps.CurrentSector, inc - _lastIncidents, inc));
+        }
+        _lastIncidents = inc;
     }
 
     private void TrackFlags(TelemetryFrame f)
@@ -632,18 +660,8 @@ internal sealed class RaceState
         }
         var penalty = RaceControl.Active(f.Flags).FirstOrDefault(k => k is FlagKind.Black or FlagKind.Meatball or FlagKind.Disqualified);
         Alerts.Set("flag.penalty", penalty != FlagKind.None, now, RaceControl.Label(penalty), RaceControl.Meaning(penalty));
-        if (f.Incidents is { } inc)
-        {
-            if (_lastIncidents >= 0 && inc > _lastIncidents)
-            {
-                Alerts.Fire("incident.new", now, $"+{inc - _lastIncidents}x incident", $"{inc}x total" + (f.Session.IncidentLimit is { } l ? $" / {l}" : ""));
-                AddEvent(f, $"+{inc - _lastIncidents}x incident ({inc}x)", AlertLevel.Warning);
-                AddIncident(new IncidentRecord(f.SessionTime ?? 0, f.Lap, Laps.CurrentSector, inc - _lastIncidents, inc));
-            }
-            _lastIncidents = inc;
-            if (f.Session.IncidentLimit is { } lim && lim > 0)
-                Alerts.Set("incidents.limit", inc >= lim - Alerts.Threshold("incidents.limit"), now, detail: $"{inc}x of {lim}x");
-        }
+        if (f.Incidents is { } inc && f.Session.IncidentLimit is { } lim && lim > 0)
+            Alerts.Set("incidents.limit", inc >= lim - Alerts.Threshold("incidents.limit"), now, detail: $"{inc}x of {lim}x");
         var bad = f.Warnings & (EngineWarnings.WaterTemp | EngineWarnings.OilTemp | EngineWarnings.OilPressure | EngineWarnings.FuelPressure);
         Alerts.Set("engine.warning", bad != EngineWarnings.None && f.Driving, now, detail: RaceFormat.Warnings(bad));
         if (s.Fuel.MaxStintMinutes > 0 && StintStart is { } st && f.SessionTime is { } t)

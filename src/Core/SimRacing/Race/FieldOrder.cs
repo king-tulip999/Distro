@@ -25,19 +25,7 @@ internal static class FieldOrder
 
     public static int ClassOf(TelemetryFrame f, int car) => f.Session.ByCar.TryGetValue(car, out var d) ? d.ClassId : 0;
 
-    private const double BoxStretch = 1.01;
-
-    public static double PaceScale(TelemetryFrame f, int player)
-    {
-        if (f.LapBest is not { } best || best <= 0) return 1;
-        if (!f.Session.ByCar.TryGetValue(player, out var d) || d.ClassEstLapTime is not { } est || est <= 0) return 1;
-        return Math.Clamp(best / est * BoxStretch, 0.85, 1.2);
-    }
-
-    public static double? GapSeconds(TelemetryFrame f, int player, int car, EstProfile? profile = null) =>
-        EstGapSeconds(f, player, car, profile) * PaceScale(f, player);
-
-    private static double? EstGapSeconds(TelemetryFrame f, int player, int car, EstProfile? profile)
+    public static double? GapSeconds(TelemetryFrame f, int player, int car, EstProfile? profile = null)
     {
         double pp = f.CarLapDistPct[player], cp = f.CarLapDistPct[car];
         if (pp < 0 || cp < 0) return null;
@@ -45,7 +33,7 @@ internal static class FieldOrder
         var lapTime = LapTimeOf(f, player);
         if (f.HasCarEstTime && lapTime is { } lap && f.CarEstTime[player] > 0)
         {
-            double? est = ClassOf(f, player) == ClassOf(f, car) && f.CarEstTime[car] > 0 ? f.CarEstTime[car] : profile?.At(cp, lap);
+            double? est = profile?.At(cp, lap) ?? InPlayersTime(f, player, car, lap);
             if (est is { } e)
             {
                 double gap = e - f.CarEstTime[player];
@@ -55,6 +43,14 @@ internal static class FieldOrder
             }
         }
         return lapTime is { } l ? dist * l : null;
+    }
+
+    private static double? InPlayersTime(TelemetryFrame f, int player, int car, double lap)
+    {
+        double est = f.CarEstTime[car];
+        if (est <= 0) return null;
+        if (f.Session.ByCar.TryGetValue(car, out var d) && d.ClassEstLapTime is { } own && own > 0) return est * lap / own;
+        return ClassOf(f, player) == ClassOf(f, car) ? est : null;
     }
 
     public static double? Distance(TelemetryFrame f, int car)
@@ -209,48 +205,103 @@ internal static class FieldOrder
 
 internal sealed class EstProfile
 {
-    private const int Slices = 200;
+    private const int Slices = 1000;
+    private const int Reach = 20;
     private readonly double[] _time = new double[Slices];
     private readonly double[] _pct = new double[Slices];
     private readonly bool[] _known = new bool[Slices];
-    private int _class = int.MinValue;
+    private const long KeepEveryMs = 10_000;
+    private readonly LapProfileStore? _store;
+    private string? _key;
+    private bool _learned;
+    private long _keptAt;
+    private int _car = -1;
+    private double _lap;
     private int? _track;
+    private string? _carPath;
+
+    public EstProfile(LapProfileStore? store = null) => _store = store;
 
     public void Update(TelemetryFrame f)
     {
         int player = f.PlayerCarIdx;
         if (!f.HasCarEstTime || (uint)player >= TelemetryFrame.MaxCars) return;
-        int cls = FieldOrder.ClassOf(f, player);
+        double lap = f.Session.ByCar.TryGetValue(player, out var d) && d.ClassEstLapTime is { } own ? own : 0;
         int? track = f.Session.TrackId;
-        if (cls != _class || track != _track) Clear(cls, track);
-        for (int i = 0; i < TelemetryFrame.MaxCars; i++)
+        string? carPath = d?.CarPath;
+        if (player != _car || lap != _lap || track != _track || carPath != _carPath)
         {
-            double pct = f.CarLapDistPct[i], est = f.CarEstTime[i];
-            if (pct < 0 || pct >= 1 || est <= 0 || !f.CarActive(i) || FieldOrder.ClassOf(f, i) != cls) continue;
+            Keep();
+            _car = player;
+            _lap = lap;
+            _track = track;
+            _carPath = carPath;
+            Array.Clear(_known);
+            _key = _store is not null && !f.Simulated && lap > 0 && track is { } t && carPath is { Length: > 0 } ? LapProfileStore.Key(t, carPath) : null;
+            if (_key is not null && _store!.Get(_key, lap) is { } saved) Restore(saved);
+            _keptAt = Environment.TickCount64;
+        }
+        Learn(f, player);
+        if (_learned && Environment.TickCount64 - _keptAt >= KeepEveryMs) Keep();
+        if (lap > 0 && d is { CarPath.Length: > 0 })
+            for (int i = 0; i < TelemetryFrame.MaxCars; i++)
+                if (i != player && f.CarLapDistPct[i] >= 0 && f.Session.ByCar.TryGetValue(i, out var other)
+                    && other.ClassEstLapTime == lap && other.CarPath == d.CarPath && f.CarActive(i))
+                    Learn(f, i);
+    }
+
+    private void Learn(TelemetryFrame f, int car)
+    {
+        double pct = f.CarLapDistPct[car], est = f.CarEstTime[car];
+        if (pct < 0 || pct >= 1 || est <= 0) return;
+        int s = (int)(pct * Slices);
+        _time[s] = est;
+        _pct[s] = pct;
+        _known[s] = true;
+        _learned = true;
+    }
+
+    public void Keep()
+    {
+        _keptAt = Environment.TickCount64;
+        if (!_learned || _key is null || _store is null) return;
+        _learned = false;
+        int n = 0;
+        foreach (bool k in _known) if (k) n++;
+        var data = new LapProfileData { Lap = _lap, Pct = new double[n], Time = new double[n] };
+        for (int s = 0, i = 0; s < Slices; s++)
+            if (_known[s])
+            {
+                data.Pct[i] = _pct[s];
+                data.Time[i++] = _time[s];
+            }
+        _store.Put(_key, data);
+    }
+
+    private void Restore(LapProfileData saved)
+    {
+        for (int i = 0; i < saved.Pct.Length; i++)
+        {
+            double pct = saved.Pct[i];
+            if (!(pct >= 0 && pct < 1) || !(saved.Time[i] > 0)) continue;
             int s = (int)(pct * Slices);
-            _time[s] = est;
+            _time[s] = saved.Time[i];
             _pct[s] = pct;
             _known[s] = true;
         }
-    }
-
-    private void Clear(int cls, int? track)
-    {
-        _class = cls;
-        _track = track;
-        Array.Clear(_known);
     }
 
     public double? At(double pct, double lap)
     {
         if (pct < 0 || pct >= 1 || lap <= 0) return null;
         int s = (int)(pct * Slices);
-        if (_known[s]) return _time[s] + (pct - _pct[s]) * lap;
         double loPct = 0, loTime = 0, hiPct = 1, hiTime = lap;
-        bool any = false;
-        for (int k = s - 1; k >= 0; k--) if (_known[k]) { loPct = _pct[k]; loTime = _time[k]; any = true; break; }
-        for (int k = s + 1; k < Slices; k++) if (_known[k]) { hiPct = _pct[k]; hiTime = _time[k]; any = true; break; }
-        if (!any) return null;
+        bool lo = s <= Reach, hi = s >= Slices - 1 - Reach;
+        for (int k = s; k >= Math.Max(0, s - Reach); k--)
+            if (_known[k] && _pct[k] <= pct) { loPct = _pct[k]; loTime = _time[k]; lo = true; break; }
+        for (int k = s; k <= Math.Min(Slices - 1, s + Reach); k++)
+            if (_known[k] && _pct[k] > pct) { hiPct = _pct[k]; hiTime = _time[k]; hi = true; break; }
+        if (!lo || !hi) return null;
         return loTime + (hiTime - loTime) * (pct - loPct) / Math.Max(1e-9, hiPct - loPct);
     }
 }

@@ -392,6 +392,28 @@ internal static class HudSheet
             };
             var everySize = Fitted(fuel, everyFuel);
             Save(fuel, everySize.Width, everySize.Height, Path.Combine(dir, "fuel-every.png"), 1, everyFuel);
+            var threeLaps = new[] { ("lastLaps", "3") };
+            var standings = HudCatalog.Find("standings")!;
+            Save(standings, 400, standings.H, Path.Combine(dir, "standings-narrow.png"));
+            var standingsThree = Asked(standings, threeLaps);
+            Save(standings, standingsThree.Width, standingsThree.Height, Path.Combine(dir, "standings-last3.png"), 1, threeLaps);
+            var threeLapsSize = Asked(relative, threeLaps);
+            Save(relative, threeLapsSize.Width, threeLapsSize.Height, Path.Combine(dir, "relative-last3.png"), 1, threeLaps);
+
+            SizeF Asked(HudWidgetDef def, (string Key, string Value)[] options)
+            {
+                var config = new HudWidgetConfig { Id = "asked-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
+                foreach (var (key, value) in options) config.Options[key] = value;
+                using var fit = new HudPainter { Overflow = new() };
+                using var surface = new Core.Overlay.DibSurface();
+                var g = surface.Ensure(new Size((int)def.W, 2400));
+                fit.Simulated = true;
+                fit.IsPreview = true;
+                fit.Begin(g, 1, new SizeF((float)def.W, 2400), palette, settings.Appearance);
+                def.Create().Draw(fit, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = new HudOptions(def, config), Def = def });
+                fit.FinishPanels();
+                return fit.Needed is { } need ? new SizeF(Math.Max(need.Width, fit.MinWidth), need.Height) : new SizeF((float)def.W, (float)def.H);
+            }
 
             SizeF Fitted(HudWidgetDef def, (string Key, string Value)[] options)
             {

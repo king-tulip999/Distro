@@ -85,7 +85,14 @@ public enum UpdateCheck { OnStart, Daily, Weekly, Manual }
 
 public sealed class UpdateSettings
 {
-    public UpdateCheck Check { get; set; } = UpdateCheck.OnStart;
+    public bool AutoInstall { get; set; } = true;
+
+    [System.Text.Json.Serialization.JsonPropertyName("check")]
+    public UpdateCheck? OldCheck
+    {
+        get => null;
+        set { if (value == UpdateCheck.Manual) AutoInstall = false; }
+    }
     public DateTime? LastCheckUtc { get; set; }
 
     public string? NotifiedVersion { get; set; }

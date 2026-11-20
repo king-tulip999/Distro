@@ -18,6 +18,10 @@ internal sealed record Column(string Id, string Header, string Template, HAlign 
     public Action<HudPainter, int, RectangleF, bool>? Draw { get; init; }
 
     public Func<int, bool?>? ProTag { get; init; }
+
+    public Func<int, bool>? Robot { get; init; }
+
+    public Func<int, string?>? Shorter { get; init; }
 }
 
 internal readonly record struct RowStyle(bool PositionBlock = true)
@@ -46,6 +50,11 @@ internal static class HudTable
 
     private static bool IsPosition(Column c) => c.Id is "pos" or "cpos";
 
+    private const float AfterNumber = 6;
+
+    private static float Lead(Column? previous, Column col) =>
+        previous is { Align: HAlign.Right } prev && !IsPosition(prev) && col.Align != HAlign.Right ? AfterNumber : 0;
+
     public static List<(Column Col, float Width)> Fit(HudPainter p, IReadOnlyList<Column> columns, float width, Font font, string key = "columns")
     {
         var bold = Bold(p, font);
@@ -60,6 +69,7 @@ internal static class HudTable
             natural[i] = c.Flex
                 ? (c.Template.Length > 0 ? p.Measure(c.Template, font) : 0) + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0)
                 : Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)) + 2 + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0);
+            natural[i] += Lead(i > 0 ? columns[i - 1] : null, c);
             flex[i] = c.Flex;
             position[i] = IsPosition(c);
             keep[i] = c.Id == "gap";
@@ -83,7 +93,7 @@ internal static class HudTable
             sum += c.Flex
                 ? Math.Max(60, (c.Template.Length > 0 ? p.Measure(c.Template, font) : 0) + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0))
                 : Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)) + 2 + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0);
-            if (i > 0) sum += Gap;
+            if (i > 0) sum += Gap + Lead(columns[i - 1], c);
         }
         return MathF.Ceiling(sum);
     }
@@ -144,8 +154,9 @@ internal static class HudTable
         for (int i = start; i < cols.Count; i++)
         {
             var (col, w) = cols[i];
+            float lead = Lead(i > 0 ? cols[i - 1].Col : null, col);
             float headW = !col.Flex && col.ProTag is not null ? Math.Max(0, w - ProTagWidth(p) - 6) : w;
-            p.Text(col.Header, p.Tiny, p.P.Faint, new RectangleF(x, row.Y, headW, row.Height), col.Align, VAlign.Center);
+            p.Text(col.Header, p.Tiny, p.P.Faint, new RectangleF(x + lead, row.Y, Math.Max(0, headW - lead), row.Height), col.Align, VAlign.Center);
             x += w + Gap;
         }
     }
@@ -187,7 +198,8 @@ internal static class HudTable
         for (int i = start; i < cols.Count; i++)
         {
             var (col, w) = cols[i];
-            var box = new RectangleF(x, row.Y, w, row.Height);
+            float lead = Lead(i > 0 ? cols[i - 1].Col : null, col);
+            var box = new RectangleF(x + lead, row.Y, Math.Max(0, w - lead), row.Height);
             if (col.Draw is { } draw) { draw(p, car, box, dim); x += w + Gap; continue; }
             var cell = col.Value(car);
             if (!col.Flex) box = ProTag(p, col, car, box, dim);
@@ -201,8 +213,8 @@ internal static class HudTable
             }
             if (cell.Bold && cell.Color == pal.Fastest && cell.Text.Length > 0)
             {
-                float tw = Math.Min(w + 4, p.Measure(cell.Text, bold) + 8);
-                float tx = col.Align == HAlign.Right ? box.Right - tw + 3 : col.Align == HAlign.Center ? box.X + (w - tw) / 2 : box.X - 3;
+                float tw = Math.Min(box.Width + 4, p.Measure(cell.Text, bold) + 8);
+                float tx = col.Align == HAlign.Right ? box.Right - tw + 3 : col.Align == HAlign.Center ? box.X + (box.Width - tw) / 2 : box.X - 3;
                 p.Fill(new RectangleF(tx, row.Y + 2, tw, row.Height - 4), HudPalette.Alpha(pal.Fastest, 70), 2);
             }
             if (col.Marks is { } marks)
@@ -227,7 +239,22 @@ internal static class HudTable
                 }
             }
             if (col.Flex && box.Width > ProTagWidth(p) + 40) box = ProTag(p, col, car, box, dim);
-            p.Text(cell.Text, cell.Bold ? bold : font, Shade(cell.Color), box, col.Align, VAlign.Center);
+            if (col.Robot is { } robot && robot(car))
+            {
+                float side = MathF.Round(Math.Min(row.Height - 6, p.LineHeight(font) * 0.82f));
+                if (box.Width > side + 40)
+                {
+                    float rx = col.Align == HAlign.Right ? box.Right - side : box.X;
+                    Robot(p, new RectangleF(MathF.Round(rx), MathF.Round(row.Y + (row.Height - side) / 2), side, side), Shade(pal.Muted));
+                    box = col.Align == HAlign.Right
+                        ? new RectangleF(box.X, box.Y, box.Width - side - 5, box.Height)
+                        : new RectangleF(box.X + side + 5, box.Y, box.Width - side - 5, box.Height);
+                }
+            }
+            var cellFont = cell.Bold ? bold : font;
+            string shown = cell.Text;
+            if (col.Shorter is { } shorter && p.Measure(shown, cellFont) > box.Width && shorter(car) is { Length: > 0 } brief) shown = brief;
+            p.Text(shown, cellFont, Shade(cell.Color), box, col.Align, VAlign.Center);
             x += w + Gap;
         }
     }
@@ -258,6 +285,21 @@ internal static class HudTable
         p.G.DrawLine(pen, cx - s * 0.16f, cy - r - s * 0.2f, cx + s * 0.16f, cy - r - s * 0.2f);
         p.G.DrawLine(pen, cx + r * 0.72f, cy - r * 0.72f, cx + r * 0.95f, cy - r * 0.95f);
         p.G.DrawLine(pen, cx, cy, cx + r * 0.42f, cy - r * 0.42f);
+    }
+
+    private static void Robot(HudPainter p, RectangleF icon, Color c)
+    {
+        float s = icon.Width, stroke = Math.Max(1.2f, s * 0.11f), half = stroke / 2;
+        float dot = Math.Max(2f, s * 0.2f);
+        float headW = s - stroke, headH = s * 0.62f;
+        var head = new RectangleF(icon.X + half, icon.Bottom - half - headH, headW, headH);
+        p.Outline(head, c, stroke, s * 0.18f);
+        float cx = icon.X + s / 2, eye = Math.Max(1.5f, s * 0.16f), eyeY = head.Y + (headH - eye) / 2;
+        p.Fill(new RectangleF(cx - headW * 0.22f - eye / 2, eyeY, eye, eye), c, eye / 2);
+        p.Fill(new RectangleF(cx + headW * 0.22f - eye / 2, eyeY, eye, eye), c, eye / 2);
+        float dotY = icon.Y + dot / 2;
+        p.G.DrawLine(p.Pen(c, stroke), cx, head.Y - half, cx, dotY);
+        p.Fill(new RectangleF(cx - dot / 2, icon.Y, dot, dot), c, dot / 2);
     }
 
     private static readonly string[] LicenseSamples = BadgeSamples("RDCBAP", " 0.00", " 4.44", " 8.88");
@@ -358,7 +400,9 @@ internal static class FieldColumns
     public static readonly HudOption PitShow = HudOption.Choice("pitShow", "Pit column shows", "lap",
         new HudChoice("lap", "Lap of the last stop (L12)"), new HudChoice("since", "Laps since the last stop"), new HudChoice("stops", "Stops made (2×)"));
     public static readonly HudOption PitTime = HudOption.Bool("pitTime", "Time in the pit lane", true, "Seconds in the pit lane beside PIT, counting while a car is in it");
-    public static readonly HudOption AvgLaps = HudOption.Int("avgLaps", "Laps in the average", 5, 3, 10);
+    public static readonly HudOption LastLaps = HudOption.Int("lastLaps", "Last laps shown", 1, 1, RaceState.RecentLapCount,
+        help: "With the Last lap column: 2 or 3 also show the laps before it, newest first");
+    public static readonly HudOption AvgLaps =HudOption.Int("avgLaps", "Laps in the average", 5, 3, 10);
     public static readonly HudOption PositionBlock = HudOption.Bool("posBlock", "Your position on a colored block", true);
     public static readonly HudOption FlagEdgeOption = HudOption.Bool("flagEdge", "Flag color around the widget", false, "A border in the color of a yellow, red, blue, white or checkered flag while it's out");
     public static readonly HudOption FlagWidth = HudOption.Int("flagWidth", "Flag border width", 4, 1, 10, "px");
@@ -482,6 +526,9 @@ internal static class FieldColumns
                 {
                     Marks = v.Def.Option("marks") is not null && v.Options.Bool("marks") ? (car, list) => Marks(pal, f, car, list) : null,
                     ProTag = proAm && !tagBesideClassPos ? proTag : null,
+                    Robot = car => D(car) is { IsAi: true },
+                    Shorter = nameFormat != "full" ? null
+                        : car => D(car) is { Name.Length: > 0 } d ? RaceFormat.Name(d.Name, "first", noDigits) : null,
                 };
             case "team": return new Column(id, "TEAM", "Team Name Here", HAlign.Left, car => D(car) is { TeamName.Length: > 0 } d ? new Cell(d.TeamName, pal.Muted) : None);
             case "badge":
@@ -501,6 +548,9 @@ internal static class FieldColumns
             case "last":
                 return new Column(id, "LAST", Time(538.888), HAlign.Right, car =>
                     new Cell(Time(f.CarLastLap[car] > 0 ? f.CarLastLap[car] : null), Text(car)));
+            case "last2" or "last3":
+                int lapsBack = id == "last2" ? 1 : 2;
+                return new Column(id, PooledText.Number("LAP −", lapsBack + 1), Time(538.888), HAlign.Right, car => new Cell(Time(r.RecentLap(car, lapsBack)), pal.Muted));
             case "best":
                 return new Column(id, "BEST", Time(538.888), HAlign.Right, car =>
                 {
@@ -566,6 +616,22 @@ internal static class FieldColumns
         return null;
     }
 
+    public static float AddOlderLaps(List<Column> cols, HudPainter p, HudView v, Font font, float width)
+    {
+        int lastAt = cols.FindIndex(c => c.Id == "last");
+        int older = lastAt < 0 || v.Def.Option(LastLaps.Key) is null ? 0 : v.Options.Int(LastLaps.Key) - 1;
+        for (int back = older + 1; back >= 2; back--)
+            cols.Insert(lastAt++, Make(back == 2 ? "last2" : "last3", p, v, _ => Cell.Empty(p.P), "")!);
+        float natural = HudTable.Natural(p, cols, font);
+        while (older > 0 && HudTable.Natural(p, cols, font) > width)
+        {
+            cols.RemoveAt(lastAt - older);
+            lastAt--;
+            older--;
+        }
+        return natural;
+    }
+
     private static string Signed(double c)
     {
         double whole = Math.Abs(Math.Round(c));
@@ -590,6 +656,7 @@ internal sealed class RelativeWidget : HudWidget
         Editors.HudClassFilter.List,
         HudOption.Choice("hidePits", "Cars in the pits", "false", new HudChoice("false", "Show them"),
             new HudChoice("stall", "Hide cars parked in their pit stall", "Cars driving down the pit lane still show"), new HudChoice("true", "Hide every car in the pit lane")),
+        FieldColumns.LastLaps,
         HudOption.Number("close", "Close gap", 1.2, 0, 5, 0.1, Units.S, "Same-class cars within this gap are highlighted (battles)."),
         HudOption.Bool("lapColors", "Lap colors", true, "Red: lapping you. Blue: a lap or more behind you"),
         FieldColumns.MarksOption,
@@ -599,7 +666,12 @@ internal sealed class RelativeWidget : HudWidget
         HudOption.Bool("highlightMe", "Highlight my row", true, "Your row tinted in the accent color, your position in a block"),
         HudOption.Bool("stripes", "Row shading", true),
         HudFlags.BannerOption,
-    }.Concat(FieldColumns.Shared).Select(o => o.Key == "posBlock" ? o with { Default = "false" } : o).ToArray();
+    }.Concat(FieldColumns.Shared).Select(o => o.Key switch
+    {
+        "posBlock" => o with { Default = "false" },
+        "decimals" => o with { Default = "3" },
+        _ => o,
+    }).ToArray();
 
     private PointF _inset;
 
@@ -672,9 +744,10 @@ internal sealed class RelativeWidget : HudWidget
         var cols = new List<Column>();
         foreach (var id in o.Columns("columns"))
             if (FieldColumns.Make(id, p, v, car => GapCell(p, v, rows, car, close), "GAP") is { } c) cols.Add(c);
+        float natural = FieldColumns.AddOlderLaps(cols, p, v, font, area.Width);
         var fitted = HudTable.Fit(p, cols, area.Width, font);
         float chrome = (header.Count > 0 ? pill + sep : 0) + (footer.Count > 0 ? pill + sep : 0);
-        p.Need(HudTable.Natural(p, cols, font) + pad * 2, chrome + pad * 2 + headH + (o.Int("ahead") + o.Int("behind") + 1) * rowH);
+        p.Need(natural + pad * 2, chrome + pad * 2 + headH + (o.Int("ahead") + o.Int("behind") + 1) * rowH);
         var style = RowStyle.Of(v);
         float y = area.Y;
         p.Region("rows", area);
@@ -801,6 +874,7 @@ internal sealed class StandingsWidget : HudWidget
             FieldColumns.Badge, FieldColumns.IRatingChange, new HudChoice("gap", "Gap"), new HudChoice("int", "Interval (car ahead)"),
             new HudChoice("gapme", "Gap to you"), FieldColumns.LapsDone, FieldColumns.Last, FieldColumns.Best, FieldColumns.AvgLap, FieldColumns.PaceDelta,
             FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Tire, FieldColumns.Incidents),
+        FieldColumns.LastLaps,
         HudOption.Bool("group", "Group by class", true, "Multiclass: one block per class, positions within the class."),
         HudOption.Choice("classOrder", "Class order", "fastest", new HudChoice("position", "By their leader's position"), new HudChoice("fastest", "Fastest class first")),
         HudOption.Set("classInfo", "Class headings", "cars,sof,laps", null,
@@ -823,7 +897,9 @@ internal sealed class StandingsWidget : HudWidget
         HudOption.Columns("footer", "Footer", "remain,classFastest,best,last", Strips.Footer),
         HudOption.Bool("highlightMe", "Highlight my row", true, "Your row tinted in the accent color, your position in a block"),
         HudOption.Bool("stripes", "Row shading", true),
-    }.Concat(FieldColumns.Shared).ToArray();
+    }.Concat(FieldColumns.Shared).Select(o => o.Key == "decimals" ? o with { Default = "2" } : o).ToArray();
+
+    private static readonly string[] PlusTemplates = { "+00", "+00.0", "+00.00", "+00.000" };
 
     public override void Draw(HudPainter p, HudView v)
     {
@@ -923,7 +999,7 @@ internal sealed class StandingsWidget : HudWidget
         {
             Column? c = id switch
             {
-                "int" => new Column(id, "INT", "+00.0", HAlign.Right, car => v.Race.StandingOf(car) is { } s && (group ? s.ClassInterval : s.Interval) is { } i
+                "int" => new Column(id, "INT", PlusTemplates[Math.Clamp(o.Int("decimals"), 0, PlusTemplates.Length - 1)], HAlign.Right, car => v.Race.StandingOf(car) is { } s && (group ? s.ClassInterval : s.Interval) is { } i
                     ? new Cell(RaceFormat.Plus(i, o.Int("decimals")), p.P.Muted) : None),
                 "gapme" => new Column(id, "YOU", "+00.0", HAlign.Right, car => car == me || (uint)me >= TelemetryFrame.MaxCars ? None
                     : FieldOrder.GapSeconds(f, me, car, v.Race.Profile) is { } g2 ? new Cell(RaceFormat.Gap(-g2), p.P.Muted) : new Cell(RaceFormat.Missing, p.P.Faint)),
@@ -932,6 +1008,7 @@ internal sealed class StandingsWidget : HudWidget
             if (c is not null) cols.Add(c);
         }
         var font = p.Body;
+        float natural = FieldColumns.AddOlderLaps(cols, p, v, font, area.Width);
         var fitted = HudTable.Fit(p, cols, area.Width, font);
         var style = RowStyle.Of(v);
         float rowH = p.LineHeight(font) * 1.38f * p.Density;
@@ -1045,7 +1122,7 @@ internal sealed class StandingsWidget : HudWidget
             if (group) y += blockPad + blockGap;
         }
         float footH = footShown ? pill + sep : 0;
-        p.Need(HudTable.Natural(p, cols, font) + pad * 2, y + (group ? 0 : pad) + footH);
+        p.Need(natural + pad * 2, y + (group ? 0 : pad) + footH);
         if (group && y < box.Bottom - 1) p.Panel(RectangleF.FromLTRB(box.X, y, box.Right, box.Bottom));
         HudTable.Track(p, fitted, RectangleF.FromLTRB(area.X, area.Y, area.Right, Math.Max(y, area.Y + rowH)));
         if (o.Bool("flagEdge")) HudTable.FlagEdge(p, f, o.Int("flagWidth"));

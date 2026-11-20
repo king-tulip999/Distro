@@ -11,7 +11,7 @@ internal static class Program
     internal const string ExtractVariable = "DOTNET_BUNDLE_EXTRACT_BASE_DIR";
     internal static string RuntimePrefix => AppIdentity.Name + "-runtime";
 
-    private static readonly string[] BackgroundArgs = { "--minimized", "--updated", "--update-failed", "--fan-service" };
+    private static readonly string[] BackgroundArgs = { "--minimized", "--updated", "--update-failed", "--fan-service", "--stay-in-tray" };
 
     private static string ProtectedRoot => Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
 

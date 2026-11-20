@@ -66,6 +66,7 @@ internal sealed class DemoTelemetry
                 IRating = i == 0 ? null : 1400 + i * 137 % 2600,
                 License = i == 0 ? "" : (i % 4) switch { 0 => "A 3.12", 1 => "B 2.87", 2 => "A 4.01", _ => "C 3.55" },
                 IsPaceCar = i == 0,
+                IsAi = i != 0 && i % 2 == 1,
                 Incidents = i % 5,
             });
         }
@@ -341,7 +342,7 @@ internal sealed class DemoTelemetry
         f.Sides = left && right ? CarSides.LeftRight : left ? CarSides.Left : right ? CarSides.Right : CarSides.Clear;
     }
 
-    private static readonly int[] DemoIncidentTotals = { 0, 1, 3, 3, 7, 8, 10 };
+    private static readonly int[] DemoIncidentTotals = { 0, 0, 1, 3, 3, 4, 8, 9, 9, 11, 11, 12, 14, 14, 15 };
 
-    private static int DemoIncidents(double raceT) => DemoIncidentTotals[Math.Clamp((int)(raceT / 230), 0, DemoIncidentTotals.Length - 1)];
+    private static int DemoIncidents(double raceT) => DemoIncidentTotals[Math.Clamp((int)(raceT / 115), 0, DemoIncidentTotals.Length - 1)];
 }

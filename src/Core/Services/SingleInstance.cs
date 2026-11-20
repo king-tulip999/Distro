@@ -4,9 +4,11 @@ internal static class SingleInstance
 {
     private static string MutexName => $@"Local\{AppIdentity.Name}.SingleInstance";
     private static string ShowEventName => $@"Local\{AppIdentity.Name}.ShowWindow";
+    private static string QuitEventName => $@"Local\{AppIdentity.Name}.Quit";
 
     private static Mutex? _mutex;
     private static EventWaitHandle? _showEvent;
+    private static EventWaitHandle? _quitEvent;
 
     public static bool TryAcquire()
     {
@@ -18,6 +20,7 @@ internal static class SingleInstance
             return false;
         }
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
+        _quitEvent = new EventWaitHandle(false, EventResetMode.AutoReset, QuitEventName);
         return true;
     }
 
@@ -31,6 +34,31 @@ internal static class SingleInstance
         catch
         {
         }
+    }
+
+    public static bool AskToQuit()
+    {
+        try
+        {
+            using var ev = EventWaitHandle.OpenExisting(QuitEventName);
+            return ev.Set();
+        }
+        catch (Exception ex) when (ex is WaitHandleCannotBeOpenedException or UnauthorizedAccessException or System.IO.IOException)
+        {
+            return false;
+        }
+    }
+
+    public static void ListenForQuit(Action quit)
+    {
+        var quitEvent = _quitEvent ??= new EventWaitHandle(false, EventResetMode.AutoReset, QuitEventName);
+        var thread = new Thread(() =>
+        {
+            if (quitEvent.WaitOne())
+                quit();
+        })
+        { IsBackground = true, Name = $"{AppIdentity.Name} handover" };
+        thread.Start();
     }
 
     public static void Listen(Action show)

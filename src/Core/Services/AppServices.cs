@@ -39,6 +39,8 @@ internal sealed class AppServices : IDisposable
 
     public SimRacing.Race.PitLossStore PitLoss { get; }
 
+    public SimRacing.Race.LapProfileStore LapProfiles { get; }
+
     public HotkeyService Hotkeys { get; }
 
     private SimRacing.IracingKeybinds? _iracingKeys;
@@ -84,6 +86,7 @@ internal sealed class AppServices : IDisposable
         Watcher = new AppWatcher();
         Telemetry = new SimRacing.Telemetry.TelemetryService(Watcher);
         PitLoss = new SimRacing.Race.PitLossStore(demo ? null : System.IO.Path.Combine(Core.Config.ConfigStore.Folder, "pitloss.json"));
+        LapProfiles = new SimRacing.Race.LapProfileStore(demo ? null : System.IO.Path.Combine(Core.Config.ConfigStore.Folder, "lapprofiles.json"));
         WindowProfiles = new WindowProfileService(this);
         Hotkeys = new HotkeyService(this);
         Plugins = new PluginManager(this);
@@ -368,6 +371,7 @@ internal sealed class AppServices : IDisposable
         Safely(Displays.Dispose);
         Safely(Telemetry.Dispose);
         Safely(PitLoss.Flush);
+        Safely(LapProfiles.Flush);
         Safely(Watcher.Dispose);
         Safely(Network.Dispose);
         Safely(Overlay.Dispose);

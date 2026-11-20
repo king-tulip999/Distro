@@ -160,6 +160,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         BuildPerformance();
         if (AppIdentity.IsTecnica) BuildHardware();
         BuildData();
+        BuildDiagnostics();
     }
 
     private StartupState? _startupState;
@@ -188,7 +189,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private static StackPanel Group(StackPanel section, string title, string anchor)
     {
-        var group = new StackPanel { Margin = new Thickness(0, section.Children.Count > 1 ? 8 : 3, 0, 0) };
+        var group = new SettingsFlow { FillRows = true, MaxColumns = 1, Margin = new Thickness(0, section.Children.Count > 1 ? 8 : 3, 0, 0) };
         group.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 3, 0, 0) });
         Ui.Anchor(group, anchor);
         section.Children.Add(group);
@@ -451,16 +452,13 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private TextBlock _diagStatus = new();
 
-    private void BuildDiagnostics(StackPanel parent)
+    private void BuildDiagnostics()
     {
-        var section = new StackPanel();
-        Ui.Anchor(section, "settings.diagnostics");
-        parent.Children.Add(section);
-        section.Children.Add(new TextBlock { Text = "Diagnostics", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 6, 0, 3) });
+        var section = Section("Diagnostics", "settings.diagnostics");
         section.Children.Add(new TextBlock
         {
-            Text = "Tools for troubleshooting hardware and app problems. Reports leave out personal details (user and PC names, folders, IP addresses).",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 8),
+            Text = "Reports leave out personal details (user and PC names, folders, IP addresses).",
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 8),
         });
         var buttons = new WrapPanel();
         if (AppIdentity.IsTecnica)
@@ -591,16 +589,18 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         var import = Ui.LabeledButton("I.Download", "Import…", () => _ = ImportSettingsAsync());
         import.ToolTip = $"Loads settings from an exported file (shows what's in it first; {AppIdentity.Name} then restarts)";
         transfer.Children.Add(import);
-        var transferRow = Ui.ControlBelow(Ui.SettingRow("Export / import settings",
-            $"Importing replaces your settings (a copy is kept) and restarts {AppIdentity.Name}.",
-            transfer));
+        var transferRow = Ui.SettingRow("Export / import settings",
+            $"Import keeps a copy of yours and restarts {AppIdentity.Name}.",
+            transfer);
+        Grid.SetIsSharedSizeScope(transferRow, true);
         Ui.Anchor(transferRow, "settings.export");
         section.Children.Add(transferRow);
         section.Children.Add(Ui.Divider());
 
         var folder = Ui.LabeledButton("I.Folder", "Open folder", () => OpenFolder(ConfigStore.Folder));
         folder.ToolTip = TextCase.PathTip(ConfigStore.Folder);
-        var fileRow = Ui.ControlBelow(Ui.SettingRow("Settings file", "Your settings, the error log, backups made by Reset and Import, and iRacing backups, all in one folder.", folder));
+        var fileRow = Ui.SettingRow("Settings file", "Your settings, the error log, backups made by Reset and Import, and iRacing backups, all in one folder.", folder);
+        Grid.SetIsSharedSizeScope(fileRow, true);
         Ui.Anchor(fileRow, "settings.folder");
         section.Children.Add(fileRow);
         section.Children.Add(Ui.Divider());
@@ -612,8 +612,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         section.Children.Add(ResetRow());
         section.Children.Add(Ui.Divider());
         section.Children.Add(UninstallRow());
-        section.Children.Add(Ui.Divider());
-        BuildDiagnostics(section);
     }
 
     private Action? _openStorage;
@@ -798,7 +796,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         about.Children.Add(links);
         section.Children.Add(about);
         section.Children.Add(Ui.Divider());
-        _updates = new StackPanel();
+        _updates = Flow();
         section.Children.Add(_updates);
         FillUpdates();
     }
@@ -850,13 +848,14 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         check.IsEnabled = u.State is not (UpdateState.Checking or UpdateState.Downloading or UpdateState.NotConfigured);
         _updates.Children.Add(Ui.SettingRow("Check for updates", status, check));
         _updates.Children.Add(Ui.Divider());
-        var when = Ui.Segmented(new[] { "On start", "Daily", "Weekly", "Manually" }, (int)_app.Config.Updates.Check, i =>
+        var auto = Ui.Switch(_app.Config.Updates.AutoInstall, v =>
         {
-            _app.Config.Updates.Check = (UpdateCheck)i;
+            _app.Config.Updates.AutoInstall = v;
             _app.Save();
-            u.ApplySchedule();
-        }, "UpdateCheck", new[] { $"Every time {AppIdentity.Name} starts", "Once a day", "Once a week", "Only when you click Check now" });
-        _updates.Children.Add(Ui.SettingRow("When to check", "Nothing is downloaded until you click Install.", when));
+            u.AutoInstallChanged();
+        });
+        _updates.Children.Add(Ui.SettingRow("Install updates automatically", null, auto,
+            more: $"Checks every hour. Installs only while {AppIdentity.Name}'s window isn't in front and not while {u.WaitingFor}."));
     }
 
     public IEnumerable<(string Name, Func<Task> Enter)> ScreenshotStates()
@@ -943,9 +942,10 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
     {
         var button = Ui.LabeledButton("I.Undo", $"Reset {AppIdentity.Name}", () => _ = ResetAsync(), "DangerButton");
         button.ToolTip = "Asks first. Your current settings are kept as a copy in the settings folder.";
-        var row = Ui.ControlBelow(Ui.SettingRow("Back to defaults",
+        var row = Ui.SettingRow("Back to defaults",
             $"Every setting, profile, layout and fan curve. {AppIdentity.Name} restarts; a copy of your settings is kept.",
-            button));
+            button);
+        Grid.SetIsSharedSizeScope(row, true);
         Ui.Anchor(row, "settings.reset");
         return row;
     }
@@ -980,9 +980,10 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
     {
         var button = Ui.LabeledButton("I.Trash", $"Uninstall {AppIdentity.Name}", () => _ = UninstallAsync(), "DangerButton");
         button.ToolTip = "Asks first. Nothing is kept.";
-        var row = Ui.ControlBelow(Ui.SettingRow("Uninstall",
+        var row = Ui.SettingRow("Uninstall",
             $"Deletes {AppIdentity.ExeName}, your settings and everything {AppIdentity.Name} saved on this PC.",
-            button));
+            button);
+        Grid.SetIsSharedSizeScope(row, true);
         Ui.Anchor(row, "settings.uninstall");
         return row;
     }
@@ -1031,7 +1032,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private StackPanel Section(string title, string? anchor = null, bool wide = false)
     {
-        var stack = new StackPanel();
+        var stack = Flow();
         var outer = new StackPanel { Children = { Ui.SectionHeader(title, null), stack } };
         if (!wide)
         {
@@ -1044,6 +1045,8 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         _body.Children.Insert(_body.Children.IndexOf(_sectionsCard), card);
         return stack;
     }
+
+    private static SettingsFlow Flow() => new() { FillRows = true, MaxColumns = 1 };
 
     private static Grid StatusRow(string title, bool ok, string text)
     {

@@ -297,7 +297,7 @@ internal sealed class WindowProfileService : IDisposable
         var list = new List<(string Path, string Title)>();
         foreach (var (pid, title) in Win32.TitledWindows())
         {
-            if (!paths.TryGetValue(pid, out var path)) paths[pid] = path = Win32.ImagePath(pid) ?? "";
+            if (!paths.TryGetValue(pid, out var path)) paths[pid] = path = ProcessImage.PathOf(pid) ?? "";
             if (path.Length == 0 || path.Equals(self, StringComparison.OrdinalIgnoreCase) || hidden.Contains(System.IO.Path.GetFileName(path))) continue;
             if (path.Contains(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase) || path.StartsWith(System.IO.Path.Combine(system, "SystemApps"), StringComparison.OrdinalIgnoreCase)) continue;
             list.Add((path, title));
@@ -361,9 +361,6 @@ internal sealed class WindowProfileService : IDisposable
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT { public int Left, Top, Right, Bottom; }
 
-        [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
-        [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr handle);
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, EntryPoint = "QueryFullProcessImageNameW")] private static extern bool QueryFullProcessImageName(IntPtr process, uint flags, StringBuilder text, ref int size);
         [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc proc, IntPtr lParam);
         [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr parent, EnumProc proc, IntPtr lParam);
         [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
@@ -462,20 +459,6 @@ internal sealed class WindowProfileService : IDisposable
                 return true;
             }, IntPtr.Zero);
             return list;
-        }
-
-        public static string? ImagePath(int pid)
-        {
-            const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
-            var handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, (uint)pid);
-            if (handle == IntPtr.Zero) return null;
-            try
-            {
-                var text = new StringBuilder(1024);
-                int size = text.Capacity;
-                return QueryFullProcessImageName(handle, 0, text, ref size) ? text.ToString(0, size) : null;
-            }
-            finally { CloseHandle(handle); }
         }
 
         public static List<(int Pid, string Title)> TitledWindows()

@@ -25,13 +25,17 @@ internal sealed class UpdateService
     private static HttpClient Http => _http ??= CreateClient();
 
     private readonly DispatcherTimer _retry = new();
+    private readonly DispatcherTimer _autoWait = new() { Interval = TimeSpan.FromMinutes(5) };
     private int _retries;
+    private string? _autoFailedTag;
+    private bool _autoInstalling;
 
     public UpdateService(AppServices app)
     {
         _app = app;
-        _timer.Tick += (_, _) => { if (Due) _ = CheckAsync(manual: false); };
+        _timer.Tick += (_, _) => _ = CheckAsync(manual: false);
         _retry.Tick += (_, _) => { _retry.Stop(); _ = CheckAsync(manual: false); };
+        _autoWait.Tick += (_, _) => TryAutoInstall();
     }
 
     internal static readonly TimeSpan[] RetryDelays = { TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(60) };
@@ -65,12 +69,6 @@ internal sealed class UpdateService
 
     private UpdateSettings S => _app.Config.Updates;
 
-    private bool Due => S.Check switch
-    {
-        UpdateCheck.Daily => S.LastCheckUtc is not { } d1 || DateTime.UtcNow - d1 >= TimeSpan.FromDays(1),
-        UpdateCheck.Weekly => S.LastCheckUtc is not { } d7 || DateTime.UtcNow - d7 >= TimeSpan.FromDays(7),
-        _ => false,
-    };
 
     public void Start()
     {
@@ -83,14 +81,13 @@ internal sealed class UpdateService
                     NoticeKind.Warning, important: true)));
         }
         if (!_app.Demo) NoteSeenVersion(Environment.GetCommandLineArgs().Contains("--updated", StringComparer.OrdinalIgnoreCase));
+        if (JustUpdated && Environment.GetCommandLineArgs().Contains(StayInTrayArg, StringComparer.OrdinalIgnoreCase))
+            _app.Notify($"{AppIdentity.Name} updated to {Show(Installed)}", "Open it to see what's new.", NoticeKind.Success);
         if (_app.Demo || Repository.Length == 0) return;
-        ApplySchedule();
-        if (S.Check == UpdateCheck.OnStart || Due)
-        {
-            var delay = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
-            delay.Tick += (_, _) => { delay.Stop(); _ = CheckAsync(manual: false); };
-            delay.Start();
-        }
+        _timer.Start();
+        var delay = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
+        delay.Tick += (_, _) => { delay.Stop(); _ = CheckAsync(manual: false); };
+        delay.Start();
     }
 
     public bool JustUpdated { get; private set; }
@@ -112,11 +109,42 @@ internal sealed class UpdateService
         return installed > seen ? (true, seen) : (false, null);
     }
 
-    public void ApplySchedule()
+    public const string StayInTrayArg = "--stay-in-tray";
+
+    public bool CanInstallItself(ReleaseInfo release) =>
+        !_app.Demo && CanSelfInstall && release.ExeUrl is not null && release.ChecksumUrl is not null && release.SignatureUrl is not null;
+
+    public void AutoInstallChanged()
     {
-        if (S.Check is UpdateCheck.Daily or UpdateCheck.Weekly && Repository.Length > 0 && !_app.Demo) _timer.Start();
-        else _timer.Stop();
+        if (S.AutoInstall) TryAutoInstall();
+        else _autoWait.Stop();
     }
+
+    public string WaitingFor => AppIdentity.IsTecnica ? "a program with an automatic window profile is open" : "iRacing is open";
+
+    private void TryAutoInstall()
+    {
+        _autoWait.Stop();
+        if (!S.AutoInstall || _autoInstalling || State != UpdateState.Available || Latest is not { } release || release.Version <= Installed
+            || !CanInstallItself(release) || release.Tag == _autoFailedTag) return;
+        if (!SafeToInstall())
+        {
+            _autoWait.Start();
+            return;
+        }
+        _autoInstalling = true;
+        _ = InstallAsync(auto: true).ContinueWith(_ => _autoInstalling = false, TaskScheduler.FromCurrentSynchronizationContext());
+    }
+
+    private bool SafeToInstall()
+    {
+        if (System.Windows.Application.Current?.MainWindow is { IsVisible: true, IsActive: true }) return false;
+        return !BusyPrograms().Any(_app.Watcher.IsRunning);
+    }
+
+    private IEnumerable<string> BusyPrograms() => AppIdentity.IsTecnica
+        ? _app.Config.WindowProfiles.Profiles.Where(p => p.Auto && p.ProcessName.Length > 0).Select(p => p.ProcessName).Distinct(StringComparer.OrdinalIgnoreCase)
+        : new[] { SimRacing.IracingFiles.IracingPaths.SimProcess };
 
     public async Task CheckAsync(bool manual)
     {
@@ -136,11 +164,14 @@ internal sealed class UpdateService
             if (Latest is not null && Latest.Version > Installed)
             {
                 Set(UpdateState.Available);
-                if (manual || S.NotifiedVersion != Latest.Tag)
+                bool auto = S.AutoInstall && CanInstallItself(Latest) && Latest.Tag != _autoFailedTag;
+                if (manual || !auto && S.NotifiedVersion != Latest.Tag)
                 {
                     S.NotifiedVersion = Latest.Tag;
-                    _app.Notify("Update available", "Install it from the title bar or Settings → About and updates.", NoticeKind.Info, important: true);
+                    _app.Notify("Update available", auto ? $"It installs by itself when {AppIdentity.Name} isn't in use, or install it now from the title bar."
+                        : "Install it from the title bar or Settings → About and updates.", NoticeKind.Info, important: !auto);
                 }
+                if (auto) TryAutoInstall();
             }
             else
             {
@@ -162,7 +193,7 @@ internal sealed class UpdateService
         }
     }
 
-    public async Task InstallAsync()
+    public async Task InstallAsync(bool auto = false)
     {
         if (Latest is not { } release || State is UpdateState.Downloading or UpdateState.Checking) return;
         if (_app.Demo || release.ExeUrl is null || release.ChecksumUrl is null || release.SignatureUrl is null || !CanSelfInstall)
@@ -212,7 +243,8 @@ internal sealed class UpdateService
 
             S.InstalledTag = release.Tag;
             _app.SaveNow();
-            App.RelaunchAfterExit("--updated", SwapSteps(current, download), current, scratch);
+            bool hidden = System.Windows.Application.Current?.MainWindow is not { IsVisible: true };
+            App.RelaunchAfterExit(auto && hidden ? "--updated " + StayInTrayArg : "--updated", SwapSteps(current, download), current, scratch);
         }
         catch (Exception ex)
         {
@@ -224,12 +256,13 @@ internal sealed class UpdateService
                 _app.SaveNow();
             }
             Error = ex.Message;
+            if (auto) _autoFailedTag = release.Tag;
             Set(UpdateState.Available);
             _app.Notify("Update didn't install", ex.Message + " You can download it from the release page instead.", NoticeKind.Warning, important: true);
         }
     }
 
-    internal const string ReleaseKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPT4v6bfJ4T5XRxyD+Miltt1uUpl+D6HQVrQmDFziDu1fjDLUIWgSUCFDsM/JXl+mR1jd8OI5iqsZDlN/XQ2+bw==";
+    internal const string ReleaseKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEkPe9uVC+Yxp3Ybb9OI3KTwO31FqWYIYNlcelxIxeQR14LsmoHUPRFBjKYwhhESQso/8IA2RaIcLqhEedLBW4dw==";
 
     internal static bool SignedByRelease(byte[] hash, string signature, string publicKey = ReleaseKey)
     {

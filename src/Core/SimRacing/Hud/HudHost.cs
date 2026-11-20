@@ -76,7 +76,7 @@ internal sealed class HudHost : IDisposable
     public HudHost(AppServices app)
     {
         _app = app;
-        Race = new RaceState(() => Settings, app.PitLoss) { MapLoader = TrackMaps.TrackMapLibrary.ForRace };
+        Race = new RaceState(() => Settings, app.PitLoss, app.LapProfiles) { MapLoader = TrackMaps.TrackMapLibrary.ForRace };
         _vr = new HudVr(app);
         _vr.Changed += OnVrChanged;
         _timer.Tick += (_, _) => SafeTick();
@@ -1378,5 +1378,6 @@ internal sealed class HudHost : IDisposable
         _previewWidgets.Clear();
         _toolbar = null;
         if (_holding) { _holding = false; _app.Telemetry.Release(Consumer); }
+        Race.Profile.Keep();
     }
 }

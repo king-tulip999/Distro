@@ -36,12 +36,20 @@ internal sealed class TrayService : IDisposable
             if (e.Button == MouseButtons.Left)
                 OpenRequested?.Invoke(null);
         };
+        _icon.MouseDown += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Right) return;
+            Rebuild();
+            _builtForOpen = true;
+        };
         _icon.BalloonTipClicked += (_, _) => OpenRequested?.Invoke(null);
         _menu.Opening += (_, e) =>
         {
-            Rebuild();
+            if (!_builtForOpen) Rebuild();
+            _builtForOpen = false;
             e.Cancel = false;
         };
+        _menu.Opened += (_, _) => TrayMenuPlace.KeepAboveTaskbar(_menu);
         _menu.ShowImageMargin = false;
         _menu.ShowCheckMargin = true;
         _menu.ShowItemToolTips = true;
@@ -52,6 +60,7 @@ internal sealed class TrayService : IDisposable
     }
 
     private bool _disposed;
+    private bool _builtForOpen;
 
     private void Show() => Safe(() => _icon.Visible = true);
 
@@ -340,5 +349,60 @@ internal sealed class TrayService : IDisposable
         _menu.Dispose();
         _image.Dispose();
         _bold?.Dispose();
+    }
+}
+
+internal static class TrayMenuPlace
+{
+    public static void KeepAboveTaskbar(ToolStripDropDown menu)
+    {
+        var screen = Screen.FromPoint(Cursor.Position);
+        var area = Usable(screen.WorkingArea, TaskbarBounds(screen.Bounds));
+        var at = Fit(menu.Bounds, area, Cursor.Position);
+        if (at != menu.Location) menu.Location = at;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct AppBarData
+    {
+        public int Size;
+        public IntPtr Window;
+        public uint CallbackMessage;
+        public uint Edge;
+        public int Left, Top, Right, Bottom;
+        public IntPtr Param;
+    }
+
+    private const uint GetTaskbarPos = 5;
+
+    [System.Runtime.InteropServices.DllImport("shell32.dll")]
+    private static extern UIntPtr SHAppBarMessage(uint message, ref AppBarData data);
+
+    private static Rectangle? TaskbarBounds(Rectangle screen)
+    {
+        var data = new AppBarData { Size = System.Runtime.InteropServices.Marshal.SizeOf<AppBarData>() };
+        if (SHAppBarMessage(GetTaskbarPos, ref data) == UIntPtr.Zero) return null;
+        var bar = Rectangle.FromLTRB(data.Left, data.Top, data.Right, data.Bottom);
+        return bar.IntersectsWith(screen) ? bar : null;
+    }
+
+    public static Rectangle Usable(Rectangle area, Rectangle? taskbar)
+    {
+        if (taskbar is not { } bar || !bar.IntersectsWith(area)) return area;
+        int left = area.Left, top = area.Top, right = area.Right, bottom = area.Bottom;
+        bool wide = bar.Width >= bar.Height;
+        if (wide && bar.Top > area.Top + area.Height / 2) bottom = Math.Min(bottom, bar.Top);
+        else if (wide) top = Math.Max(top, bar.Bottom);
+        else if (bar.Left > area.Left + area.Width / 2) right = Math.Min(right, bar.Left);
+        else left = Math.Max(left, bar.Right);
+        return Rectangle.FromLTRB(left, top, right, bottom);
+    }
+
+    public static Point Fit(Rectangle menu, Rectangle area, Point cursor)
+    {
+        int x = menu.X, y = menu.Y;
+        if (menu.Bottom > area.Bottom) y = Math.Min(cursor.Y, area.Bottom) - menu.Height;
+        if (x + menu.Width > area.Right) x = Math.Min(cursor.X, area.Right) - menu.Width;
+        return new Point(Math.Max(area.Left, x), Math.Max(area.Top, y));
     }
 }

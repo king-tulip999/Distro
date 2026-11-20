@@ -121,7 +121,7 @@ internal static class DiagnosticReport
         sb.AppendLine($"- Overlay {(c.Overlay.Visible ? "shown" : "hidden")}, {c.Overlay.Layouts.Count} layouts, updates every {c.Overlay.UpdateIntervalMs} ms");
         sb.AppendLine($"- {c.WindowProfiles.Profiles.Count} window profiles ({c.WindowProfiles.Profiles.Count(p => p.Auto)} automatic, applying automatically {(c.WindowProfiles.AutoApply ? "on" : "off")}), {c.WindowProfiles.Groups.Count} groups, {c.Displays.Profiles.Count} display profiles");
         sb.AppendLine($"- {ConfigTransfer.Keybinds(c)} keybinds");
-        sb.AppendLine($"- Close in background {(c.Ui.CloseToTray ? "on" : "off")}, start in background {(c.Ui.StartMinimized ? "on" : "off")}, update checks {c.Updates.Check}");
+        sb.AppendLine($"- Close in background {(c.Ui.CloseToTray ? "on" : "off")}, start in background {(c.Ui.StartMinimized ? "on" : "off")}, auto-install updates {(c.Updates.AutoInstall ? "on" : "off")}");
         sb.AppendLine();
 
         sb.AppendLine("## Recent errors (end of error.log)");

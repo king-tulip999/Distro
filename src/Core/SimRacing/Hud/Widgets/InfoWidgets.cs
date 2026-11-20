@@ -650,7 +650,7 @@ internal sealed class LapsWidget : HudWidget
             if (lap.IncidentsGained > 0) marks.Add(PooledText.Number("", lap.IncidentsGained, "x"));
             if (lap.Caution) marks.Add("YEL");
             if (v.Race.TrackLimits.OnLap(lap.Lap) is > 0 and var offs) marks.Add(offs > 1 ? PooledText.Number("OFF ", offs) : "OFF");
-            if (marks.Count > 0) p.Text(PooledText.Join(" ", marks), p.Tiny, p.P.WarnText, rest.Inflated(-6, 0), HAlign.Left);
+            if (marks.Count > 0) p.Text(PooledText.Join(" ", marks), p.Tiny, p.P.WarnText, RectangleF.FromLTRB(rest.X + 12 * p.Density, rest.Y, rest.Right - 6, rest.Bottom), HAlign.Left);
             y += rowH;
         }
     }
@@ -808,8 +808,11 @@ internal sealed class IncidentsWidget : HudWidget
         int count = v.Options.Int("count");
         p.NeedBelow(area, headH + rowH * count);
         var cols = v.Options.Columns("columns");
-        float timeW = p.Measure("00:00:00", p.SmallBold) + 12 * k, lapW = p.Measure("L000", p.SmallBold) + 12 * k,
-            secW = p.Measure("S00", p.SmallBold) + 12 * k, ptsW = p.Measure("VALUE", p.Label) + 8 * k;
+        float gap = 12 * k;
+        float timeW = p.Measure("00:00:00", p.SmallBold) + gap, lapW = p.Measure("L000", p.SmallBold) + gap,
+            secW = p.Measure("S00", p.SmallBold) + gap, ptsW = Math.Max(p.Measure("VALUE", p.Label), p.Measure("99x", p.SmallBold)) + gap;
+        string last = cols.Count > 0 ? cols[^1] : "";
+        float TextWidth(string c, float w) => c == last ? w : w - gap;
         float fixedW = 0;
         foreach (var c in cols) fixedW += c switch { "time" => timeW, "lap" => lapW, "sector" => secW, "points" => ptsW, _ => 0 };
         float stripe = 3 * k, left = area.X + stripe + 6 * k;
@@ -820,7 +823,7 @@ internal sealed class IncidentsWidget : HudWidget
         {
             float w = WidthOf(c);
             string head = c switch { "time" => "TIME", "lap" => "LAP", "sector" => "SEC", "points" => "VALUE", _ => "INCIDENT" };
-            p.Text(head, p.Label, p.LabelColor, new RectangleF(x, area.Y, w, headH), c == "points" ? HAlign.Right : HAlign.Left, VAlign.Center, false);
+            p.Text(head, p.Label, p.LabelColor, new RectangleF(x, area.Y, TextWidth(c, w), headH), c == "points" ? HAlign.Right : HAlign.Left, VAlign.Center, false);
             x += w;
         }
         p.Line(area.X, area.Y + headH - 0.5f, area.Right, area.Y + headH - 0.5f, HudPalette.Alpha(p.P.LineStrong, 110), 1);
@@ -840,14 +843,14 @@ internal sealed class IncidentsWidget : HudWidget
             foreach (var c in cols)
             {
                 float w = WidthOf(c);
-                var cell = new RectangleF(x, y, w, rowH);
+                var cell = new RectangleF(x, y, TextWidth(c, w), rowH);
                 switch (c)
                 {
                     case "time": p.Text(RaceFormat.Clock(e.SessionTime), p.SmallBold, text, cell, HAlign.Left, VAlign.Center, false); break;
                     case "lap": p.Text(e.Lap is { } lap ? PooledText.Number("L", lap) : RaceFormat.Missing, p.SmallBold, text, cell, HAlign.Left, VAlign.Center, false); break;
                     case "sector": p.Text(PooledText.Number("S", e.Sector + 1), p.SmallBold, text, cell, HAlign.Left, VAlign.Center, false); break;
                     case "points": p.Text(PooledText.Number("", e.Points, "x"), p.SmallBold, color, cell, HAlign.Right, VAlign.Center, false); break;
-                    default: p.Text(Name(e.Points), p.SmallBold, text, new RectangleF(x, y, w - 6 * k, rowH), HAlign.Left, VAlign.Center); break;
+                    default: p.Text(Name(e.Points), p.SmallBold, text, cell, HAlign.Left, VAlign.Center); break;
                 }
                 x += w;
             }

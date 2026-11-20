@@ -12,7 +12,7 @@ internal static class RelativeEditor
             new("layout", "Table", HudTab.Layout, true, O("ahead"), O("behind"), O("showHeader"), O("stripes")),
             new("rows", "Rows", HudTab.Layout, true, MyRow, O("lapColors"), O("close"), O("nameFormat"), O("noDigits"), O("proAm"),
                 O("badgeFormat") with { ShowIf = Has("columns", "badge") }),
-            new("timing", "Timing", HudTab.Layout, false, O("timeFormat"), O("decimals"), O("avgLaps") with { ShowIf = Has("columns", "avglap") }),
+            new("timing", "Timing", HudTab.Layout, false, O("timeFormat"), O("decimals"), O("lastLaps") with { ShowIf = Has("columns", "last") }, O("avgLaps") with { ShowIf = Has("columns", "avglap") }),
             new("pit", "Pit", HudTab.Layout, false, O("pitShow") with { ShowIf = Has("columns", "pit") }, O("pitTime") with { ShowIf = Has("columns", "pit") }),
             new("colors", "Colors and flags", HudTab.Layout, false, FlagBorder, O("flagBanner"), O("marks")),
             new("columns", "Columns", HudTab.Content, true, new PickerSetting("columns", ColumnCategories)),

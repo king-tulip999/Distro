@@ -145,6 +145,7 @@ internal static class FanService
             catch (Exception ex) { App.LogError(ex); }
         });
         menu.Items.Add("Stop fan control", null, (_, _) => Leave(app));
+        menu.Opened += (_, _) => TrayMenuPlace.KeepAboveTaskbar(menu);
         _tray = new WinForms.NotifyIcon
         {
             Icon = TrayService.FanIcon(theme) ?? System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!), ContextMenuStrip = menu, Visible = true,
