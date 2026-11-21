@@ -401,8 +401,8 @@ internal static class FieldColumns
         new HudChoice("lap", "Lap of the last stop (L12)"), new HudChoice("since", "Laps since the last stop"), new HudChoice("stops", "Stops made (2×)"));
     public static readonly HudOption PitTime = HudOption.Bool("pitTime", "Time in the pit lane", true, "Seconds in the pit lane beside PIT, counting while a car is in it");
     public static readonly HudOption LastLaps = HudOption.Int("lastLaps", "Last laps shown", 1, 1, RaceState.RecentLapCount,
-        help: "With the Last lap column: 2 or 3 also show the laps before it, newest first");
-    public static readonly HudOption AvgLaps =HudOption.Int("avgLaps", "Laps in the average", 5, 3, 10);
+        help: "With the Last lap column: 2 or 3 also show the laps before it, to its left");
+    public static readonly HudOption AvgLaps = HudOption.Int("avgLaps", "Laps in the average", 5, 3, 10);
     public static readonly HudOption PositionBlock = HudOption.Bool("posBlock", "Your position on a colored block", true);
     public static readonly HudOption FlagEdgeOption = HudOption.Bool("flagEdge", "Flag color around the widget", false, "A border in the color of a yellow, red, blue, white or checkered flag while it's out");
     public static readonly HudOption FlagWidth = HudOption.Int("flagWidth", "Flag border width", 4, 1, 10, "px");
