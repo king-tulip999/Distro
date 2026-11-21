@@ -19,6 +19,8 @@ internal sealed class UpdateService
 
     public static string ReleasesPage => $"https://github.com/{Repository}/releases/latest";
 
+    public static string DiscordInvite => AppIdentity.IsTecnica ? "https://discord.gg/Ehj8DUZrdr" : "https://discord.gg/WeWs6spYep";
+
     private readonly AppServices _app;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromHours(1) };
     private static HttpClient? _http;

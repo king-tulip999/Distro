@@ -789,8 +789,11 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         var project = Ui.LabeledButton("I.External", "Project page", () => Ui.OpenUrl(UpdateService.ProjectPage), "GhostButton");
         var changelog = Ui.LabeledButton("I.FileText", "Changelog", () => ChangelogDialog.Show(_window, _app.Updates, null, justUpdated: false), "GhostButton");
         changelog.Margin = Ui.AfterButton;
+        var discord = Ui.LabeledButton("I.External", "Discord", () => Ui.OpenUrl(UpdateService.DiscordInvite), "GhostButton");
+        discord.Margin = Ui.AfterButton;
         var links = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         links.Children.Add(changelog);
+        links.Children.Add(discord);
         links.Children.Add(project);
         Grid.SetColumn(links, 1);
         about.Children.Add(links);

@@ -12,6 +12,10 @@
 &nbsp;
 [![Website](https://img.shields.io/badge/Website-distrotv.pages.dev-49c8f5?style=for-the-badge)](https://distrotv.pages.dev)
 &nbsp;
+[![Velocita Discord](https://img.shields.io/badge/Discord-Velocita-5865f2?style=for-the-badge)](https://discord.gg/WeWs6spYep)
+&nbsp;
+[![Tecnica Discord](https://img.shields.io/badge/Discord-Tecnica-5865f2?style=for-the-badge)](https://discord.gg/Ehj8DUZrdr)
+&nbsp;
 ![Windows 10 / 11](https://img.shields.io/badge/Windows-10%20%2F%2011-2b2b3a?style=for-the-badge)
 &nbsp;
 ![Free](https://img.shields.io/badge/Free-no%20subscription-2b2b3a?style=for-the-badge)

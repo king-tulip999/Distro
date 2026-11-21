@@ -53,6 +53,11 @@ public partial class App : Application
             HudSheet.Run(this, framesFolder, frames: true);
             return;
         }
+        if (ArgValue(e.Args, HudSheet.SiteFramesArg) is { } siteFramesFolder)
+        {
+            HudSheet.RunSite(this, siteFramesFolder, frames: true);
+            return;
+        }
         if (ArgValue(e.Args, HudSheet.SiteArg) is { } siteFolder)
         {
             HudSheet.RunSite(this, siteFolder);

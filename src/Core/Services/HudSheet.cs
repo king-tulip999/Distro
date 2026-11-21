@@ -12,14 +12,15 @@ internal static class HudSheet
     public const string Arg = "--hud-sheet";
     public const string FramesArg = "--hud-frames";
     public const string SiteArg = "--hud-site";
+    public const string SiteFramesArg = "--hud-site-frames";
 
-    public static void RunSite(App app, string folder)
+    public static void RunSite(App app, string folder, bool frames = false)
     {
         Running = true;
         try
         {
             Directory.CreateDirectory(folder);
-            RenderSite(folder);
+            RenderSite(folder, frames);
         }
         catch (Exception ex)
         {
@@ -28,7 +29,7 @@ internal static class HudSheet
         app.Shutdown();
     }
 
-    private sealed record SiteShot(string Kind, string Label, (string Key, string Value)[] Options, RaceFlags? Flags = null, double? WindFrom = null, double At = 0, bool Fit = false, float H = 0);
+    private sealed record SiteShot(string Kind, string Label, (string Key, string Value)[] Options, RaceFlags? Flags = null, double? WindFrom = null, double At = 0, bool Fit = false, float H = 0, float W = 0);
 
     private sealed class SiteRace
     {
@@ -61,11 +62,23 @@ internal static class HudSheet
             _frame.Sequence = ++_seq;
             Race.Update(_frame);
         }
+
+        public void Run(double until)
+        {
+            while (T < until - 1e-9)
+            {
+                T = Math.Min(until, T + 0.25);
+                _demo.Fill(_frame, T);
+                _frame.Sequence = ++_seq;
+                Race.Update(_frame);
+            }
+        }
     }
 
     private const float SiteScale = 2;
+    private const double SiteClipSeconds = 8;
 
-    private static void RenderSite(string folder)
+    private static void RenderSite(string folder, bool frames)
     {
         static (string, string)[] O(params (string, string)[] o) => o;
         const double Ahead = 0, Cross = Math.PI / 2, Behind = Math.PI;
@@ -95,7 +108,7 @@ internal static class HudSheet
             new("tyres", "Default", O()),
             new("tyres", "Without wear", O(("wear", "false"))),
             new("weather", "Panel", O()),
-            new("weather", "Strip", O(("look", "strip"))),
+            new("weather", "Strip", O(("look", "strip")), W: 340, H: 124),
             new("weather", "°C", O(("temp", "c"))),
             new("weather", "°F", O(("temp", "f"))),
             new("weather", "°C and °F", O(("temp", "both"))),
@@ -134,7 +147,7 @@ internal static class HudSheet
             new("ledboard", "Laps left, no frame", O(("show", "left"), ("frame", "off"))),
             new("ledboard", "Green flag", O(("show", "flag")), RaceFlags.Green | RaceFlags.StartGo, At: 0.4),
             new("ledboard", "Yellow flag", O(("show", "flag")), RaceFlags.Yellow),
-            new("ledboard", "Blue flag", O(("show", "flag")), RaceFlags.Blue),
+            new("ledboard", "Blue flag, edge chase", O(("show", "flag"), ("flagBlue", "chase")), RaceFlags.Blue),
             new("ledboard", "White flag", O(("show", "flag")), RaceFlags.White, At: 0.4),
             new("ledboard", "Checkered flag", O(("show", "flag")), RaceFlags.Checkered),
             new("ledboard", "Black flag", O(("show", "flag")), RaceFlags.Black),
@@ -175,12 +188,10 @@ internal static class HudSheet
             var config = new HudWidgetConfig { Id = "site-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
             foreach (var (key, value) in shot.Options) config.Options[key] = value;
             var frame = site.Race.Frame;
-            var (flags, windDir, windSpeed, yaw) = (frame.Flags, frame.WindDir, frame.WindSpeed, frame.YawNorth);
-            if (shot.Flags is { } f) frame.Flags = f;
-            if (shot.WindFrom is { } from) (frame.WindDir, frame.WindSpeed, frame.YawNorth) = (from, 6.5, 0);
+            var restore = Override(shot, frame, turning: false);
             var view = new HudOptions(def, config);
             SizeF size = def.Natural?.Invoke(view) is { Width: > 0, Height: > 0 } natural ? natural
-                : shot.H > 0 ? new SizeF((float)def.W, shot.H) : shot.Fit ? Fit(def, config, site) : new SizeF((float)def.W, (float)def.H);
+                : shot.H > 0 ? new SizeF(shot.W > 0 ? shot.W : (float)def.W, shot.H) : shot.Fit ? Fit(def, config, site) : new SizeF((float)def.W, (float)def.H);
             if (config.Options.TryGetValue("flagBanner", out var where))
             {
                 var (fl, ft, fr, fb) = HudFlags.Room(where);
@@ -198,12 +209,63 @@ internal static class HudSheet
                 painter.End(surface.Dc, surface.Size);
                 surface.Bitmap!.Save(Path.Combine(folder, file));
             }
-            (frame.Flags, frame.WindDir, frame.WindSpeed, frame.YawNorth) = (flags, windDir, windSpeed, yaw);
+            restore();
+            if (frames) Animate(shot, def, config, size, Path.Combine(folder, Path.GetFileNameWithoutExtension(file)));
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             json.Append(json.Length > 1 ? "," : "").Append(string.Format(inv, "{{\"kind\":\"{0}\",\"label\":\"{1}\",\"file\":\"{2}\",\"w\":{3:0},\"h\":{4:0}}}",
                 def.Kind, System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping.Encode(shot.Label), file, Math.Ceiling(size.Width), Math.Ceiling(size.Height)));
         }
         File.WriteAllText(Path.Combine(folder, "site.json"), json.Append(']').ToString());
+
+        static Action Override(SiteShot shot, TelemetryFrame frame, bool turning)
+        {
+            for (int car = 0; car < frame.CarFlags.Length; car++) frame.CarFlags[car] &= ~RaceFlags.Black;
+            var (flags, windDir, windSpeed, yaw) = (frame.Flags, frame.WindDir, frame.WindSpeed, frame.YawNorth);
+            if (shot.Flags is { } f) frame.Flags = f;
+            if (shot.WindFrom is { } from)
+            {
+                double heading = turning ? yaw ?? 0 : 0;
+                (frame.WindDir, frame.WindSpeed, frame.YawNorth) = (((heading + from) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI), 6.5, heading);
+            }
+            return () => (frame.Flags, frame.WindDir, frame.WindSpeed, frame.YawNorth) = (flags, windDir, windSpeed, yaw);
+        }
+
+        static void Animate(SiteShot shot, HudWidgetDef def, HudWidgetConfig config, SizeF size, string dir)
+        {
+            Directory.CreateDirectory(dir);
+            var site = new SiteRace();
+            site.To(shot.At);
+            site.Settle();
+            double speed = Speeds.GetValueOrDefault(def.Kind, 1);
+            int fps = EveryFrame.Contains(def.Kind) || def.Kind == "ledboard" ? 30 : 15;
+            double start = site.T;
+            var widget = def.Create();
+            var view = new HudOptions(def, config);
+            var palette = HudPalette.Of(site.Settings.Appearance);
+            using var painter = new HudPainter();
+            using var surface = new Core.Overlay.DibSurface();
+            var pixels = new Size((int)Math.Ceiling(size.Width * SiteScale), (int)Math.Ceiling(size.Height * SiteScale));
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var saved = new List<string>();
+            for (int i = 0; i < SiteClipSeconds * fps; i++)
+            {
+                site.Run(start + i * speed / fps);
+                var frame = site.Race.Frame;
+                var restore = Override(shot, frame, turning: true);
+                var g = surface.Ensure(pixels);
+                painter.Simulated = true;
+                painter.IsPreview = true;
+                painter.Begin(g, SiteScale, size, palette, site.Settings.Appearance);
+                widget.Draw(painter, new HudView { Frame = frame, Race = site.Race, Settings = site.Settings, Config = config, Options = view, Def = def });
+                painter.FinishPanels();
+                painter.End(surface.Dc, surface.Size);
+                restore();
+                string name = $"{i:0000}.png";
+                surface.Bitmap!.Save(Path.Combine(dir, name));
+                saved.Add(string.Format(inv, "{{\"t\":{0:0.000},\"f\":\"{1}\"}}", i / (double)fps, name));
+            }
+            File.WriteAllText(Path.Combine(dir, "frames.json"), string.Format(inv, "{{\"kind\":\"{0}\",\"scale\":{1},\"fps\":{2},\"frames\":[{3}]}}", def.Kind, SiteScale, fps, string.Join(",", saved)));
+        }
 
         static SizeF Fit(HudWidgetDef def, HudWidgetConfig config, SiteRace site)
         {
