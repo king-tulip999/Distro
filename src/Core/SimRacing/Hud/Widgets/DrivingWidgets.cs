@@ -244,14 +244,33 @@ internal sealed class FuelWidget : HudWidget
 
     private static (string Value, Color Color) PitExitValue(HudPainter p, HudView v)
     {
+        var (pos, posColor, change, _) = PitExitParts(p, v);
+        return (change.Length == 0 ? pos : PooledText.Concat(pos, " ", change), posColor);
+    }
+
+    private static (string Pos, Color PosColor, string Change, Color ChangeColor) PitExitParts(HudPainter p, HudView v)
+    {
         var x = v.Race.PitExit;
-        if (x is not { Valid: true }) return (v.Frame.OnPitRoad ? "In pit" : RaceFormat.Missing, p.P.Faint);
+        if (x is not { Valid: true }) return (v.Frame.OnPitRoad ? "In pit" : RaceFormat.Missing, p.P.Faint, "", p.P.Faint);
         string pos = PooledText.Number("P", x.ProjectedClassPos);
-        int change = x.CurrentClassPos - x.ProjectedClassPos;
-        if (change != 0) pos = PooledText.Concat(pos, change > 0 ? " +" : " −", PooledText.Number("", Math.Abs(change)));
         if (!x.Calibrated) pos = RaceFormat.About(pos);
-        var color = x.Unreliable ? p.P.Faint : change > 0 ? p.P.GoodText : change < 0 ? p.P.DangerText : p.P.Heading;
-        return (pos, color);
+        int change = x.CurrentClassPos - x.ProjectedClassPos;
+        string gained = change == 0 ? "" : PooledText.Concat(change > 0 ? "+" : "−", PooledText.Number("", Math.Abs(change)));
+        var changeColor = x.Unreliable ? p.P.Faint : change > 0 ? p.P.GoodText : p.P.DangerText;
+        return (pos, x.Unreliable ? p.P.Faint : p.P.Heading, gained, changeColor);
+    }
+
+    private static void DrawPitExit(HudPainter p, HudView v, RectangleF box, HAlign align)
+    {
+        var (pos, posColor, change, changeColor) = PitExitParts(p, v);
+        if (change.Length == 0) { p.Number(pos, p.Bold, posColor, box, align, VAlign.Center); return; }
+        float gap = 5 * p.Density, pw = p.Measure(pos, p.Bold), cw = p.Measure(change, p.SmallBold), total = pw + gap + cw;
+        if (total > box.Width) { p.Text(pos, p.Bold, posColor, box, align, VAlign.Center); return; }
+        float x = align switch { HAlign.Right => box.Right - total, HAlign.Center => box.X + (box.Width - total) / 2, _ => box.X };
+        p.Text(pos, p.Bold, posColor, new RectangleF(x, box.Y, pw + 1, box.Height), HAlign.Left, VAlign.Center, false);
+        float lh = p.LineHeight(p.SmallBold), drop = p.LineHeight(p.Bold) - lh;
+        var cb = new RectangleF(x + pw + gap, box.Y + box.Height / 2 + p.LineHeight(p.Bold) / 2 - lh - drop * 0.22f, cw + 1, lh);
+        p.Text(change, p.SmallBold, changeColor, cb, HAlign.Left, VAlign.Top, false);
     }
 
     private readonly List<(string Id, string Label, string Value, Color? Color)> _top = new();
@@ -402,12 +421,11 @@ internal sealed class FuelWidget : HudWidget
         var ids = v.Options.Columns("head");
         if (ids.Count == 0) return;
         _head.Clear();
-        float dotRoom = 3 * p.Density * 2 + 4;
         for (int i = 0; i < ids.Count; i++)
         {
             Color color = p.P.Heading;
             string label, value;
-            bool dot = false;
+            bool laps = false;
             switch (ids[i])
             {
                 case "togo":
@@ -418,7 +436,7 @@ internal sealed class FuelWidget : HudWidget
                     {
                         color = plan.Reliability switch { EstimateReliability.High => p.P.GoodText, EstimateReliability.Moderate => p.P.WarnText, _ => p.P.DangerText };
                         if (plan.Reliability == EstimateReliability.Moderate || plan.LapsToGoForecast) value = RaceFormat.About(value);
-                        dot = true;
+                        laps = true;
                     }
                     break;
                 case "nextpit":
@@ -452,9 +470,9 @@ internal sealed class FuelWidget : HudWidget
                     value = RaceFormat.Fuel(level, u);
                     break;
             }
-            string shortest = dot && value.EndsWith(" LAPS", StringComparison.Ordinal) ? value[..^5] : value;
-            float natural = Math.Max(p.Measure(p.LabelText(label), p.Label), p.Measure(shortest, p.Bold) + (dot ? dotRoom : 0)) + 10 * p.Density;
-            _head.Add((label, value, color, dot, natural));
+            string shortest = laps && value.EndsWith(" LAPS", StringComparison.Ordinal) ? value[..^5] : value;
+            float natural = Math.Max(p.Measure(p.LabelText(label), p.Label), p.Measure(shortest, p.Bold)) + 10 * p.Density;
+            _head.Add((label, value, color, laps, natural));
         }
         float tileGap = 3 * p.Density;
         NeedColumn(p, _head[0].Natural);
@@ -464,7 +482,7 @@ internal sealed class FuelWidget : HudWidget
         float spare = (box.Width - Used(fit)) / fit, at = box.X;
         for (int i = 0; i < fit; i++)
         {
-            var (label, value, color, dot, natural) = _head[i];
+            var (label, value, color, laps, natural) = _head[i];
             var cell = new RectangleF(at, box.Y, natural + spare, box.Height);
             at += cell.Width + tileGap;
             const HAlign align = HAlign.Center;
@@ -474,15 +492,12 @@ internal sealed class FuelWidget : HudWidget
             var inner = cell.Inflated(0, -2 * p.Density);
             var valueBox = new RectangleF(inner.X, inner.Y, inner.Width, inner.Height - lh);
             p.Text(p.LabelText(label), p.Label, p.LabelColor, new RectangleF(inner.X, inner.Bottom - lh, inner.Width, lh), align, VAlign.Top);
-            if (dot)
+            if (laps)
             {
-                float d = 3 * p.Density;
-                if (p.Measure(value, p.Bold) + d * 2 + 4 > valueBox.Width && value.EndsWith(" LAPS", StringComparison.Ordinal)) value = value[..^5];
-                float w = p.Measure(value, p.Bold) + d * 2 + 4;
-                float x = align switch { HAlign.Right => valueBox.Right - w, HAlign.Center => valueBox.X + (valueBox.Width - w) / 2, _ => valueBox.X };
-                p.Dot(x + d, valueBox.Y + valueBox.Height / 2, d, color);
-                p.Text(value, p.Bold, color, new RectangleF(x + d * 2 + 4, valueBox.Y, valueBox.Right - x - d * 2 - 4, valueBox.Height), HAlign.Left, VAlign.Center);
+                if (p.Measure(value, p.Bold) > valueBox.Width && value.EndsWith(" LAPS", StringComparison.Ordinal)) value = value[..^5];
+                p.Text(value, p.Bold, color, valueBox, align, VAlign.Center);
             }
+            else if (ids[i] == "pitexit") DrawPitExit(p, v, valueBox, align);
             else p.Number(value, p.Bold, color, valueBox, align, VAlign.Center);
         }
 
@@ -684,7 +699,8 @@ internal sealed class FuelWidget : HudWidget
             float vw = Math.Min(inner.Width * 0.6f, p.Measure(value, p.Bold) + 12 * p.Density);
             var valueBox = inner.Right(vw, out var labelBox);
             p.Text(p.LabelText(label), p.Label, p.LabelColor, labelBox, HAlign.Left, VAlign.Center);
-            p.Number(value, p.Bold, color ?? p.P.Heading, valueBox, HAlign.Right, VAlign.Center);
+            if (id == "pitexit") DrawPitExit(p, v, valueBox, HAlign.Right);
+            else p.Number(value, p.Bold, color ?? p.P.Heading, valueBox, HAlign.Right, VAlign.Center);
             p.Item("top", id, row);
         }
     }

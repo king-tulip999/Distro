@@ -33,6 +33,11 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (AppIdentity.SimHub)
+        {
+            SimHubEngine.Run(this, e.Args);
+            return;
+        }
         if (e.Args.Contains(FanService.Arg, StringComparer.OrdinalIgnoreCase))
         {
             FanService.Run(this);
@@ -378,6 +383,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        SimHubEngine.Stop();
         _fieldLog?.Dispose();
         _services?.Dispose();
         SingleInstance.Release();

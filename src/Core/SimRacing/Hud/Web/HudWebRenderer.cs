@@ -160,15 +160,22 @@ internal sealed class HudWebRenderer : IDisposable
 
     public static IReadOnlyList<HudWebOverlay> Overlays { get; } = HudCatalog.All.Select(d => new HudWebOverlay(d.Kind, d.Name, d.W, d.H)).ToList();
 
+    public bool OnlyLayout { get; init; }
+
+    public bool SampleWhenIdle { get; init; }
+
+    public Func<HudWidgetConfig, TelemetryFrame, bool>? Shows { get; init; }
+
     public int Render(IReadOnlyList<HudWebClient> clients, TelemetryFrame frame, RaceState race, RaceHudSettings settings, HudLayout? layout, HudPalette palette, bool dirty)
     {
         int fastest = 0;
         bool live = frame.Status == SimStatus.Connected;
-        bool sampled = !live && AdvanceSample(clients, settings);
+        bool idle = SampleWhenIdle && frame.Status == SimStatus.NotRunning;
+        bool sampled = !live && AdvanceSample(clients, settings, idle);
         foreach (var group in _groups.Values) group.Clear();
         foreach (var client in clients)
         {
-            var key = (client.Kind, client.Width, client.Height, sampled && client.Sample);
+            var key = (client.Kind, client.Width, client.Height, sampled && (client.Sample || idle));
             if (!_groups.TryGetValue(key, out var group)) _groups[key] = group = new List<HudWebClient>();
             group.Add(client);
         }
@@ -227,9 +234,9 @@ internal sealed class HudWebRenderer : IDisposable
         return fastest;
     }
 
-    private bool AdvanceSample(IReadOnlyList<HudWebClient> clients, RaceHudSettings settings)
+    private bool AdvanceSample(IReadOnlyList<HudWebClient> clients, RaceHudSettings settings, bool idle)
     {
-        bool wanted = false;
+        bool wanted = idle && clients.Count > 0;
         foreach (var c in clients) wanted |= c.Sample;
         if (!wanted) return false;
         _sampleSettings = settings;
@@ -253,13 +260,13 @@ internal sealed class HudWebRenderer : IDisposable
             foreach (var w in layout.Widgets)
             {
                 if (!string.Equals(w.Kind, def.Kind, StringComparison.OrdinalIgnoreCase)) continue;
-                if (w.Enabled) return w;
+                if (w.Enabled || OnlyLayout) return w;
                 any ??= w;
             }
             if (any is not null) return any;
         }
         if (!_fallbacks.TryGetValue(def.Kind, out var fallback))
-            _fallbacks[def.Kind] = fallback = new HudWidgetConfig { Id = "web-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H, Background = def.Background };
+            _fallbacks[def.Kind] = fallback = new HudWidgetConfig { Id = "web-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H, Background = def.Background, Enabled = !OnlyLayout };
         return fallback;
     }
 
@@ -267,6 +274,7 @@ internal sealed class HudWebRenderer : IDisposable
     {
         var config = t.Config!;
         if (frame.Status != SimStatus.Connected || pixels.W < 8 || pixels.H < 8 || config.W <= 0 || config.H <= 0) return Empty;
+        if (OnlyLayout && !config.Enabled || Shows?.Invoke(config, frame) == false) return Empty;
         var view = new HudView { Frame = frame, Race = race, Settings = settings, Config = config, Options = t.Options!, Def = t.Def };
         if ((config.OnlyWhenNeeded ?? t.Def.HideWhenEmpty) == true && !t.Widget!.HasContent(view)) return Empty;
         float scale = (float)Math.Min(pixels.W / config.W, pixels.H / config.H);

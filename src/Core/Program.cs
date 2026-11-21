@@ -9,7 +9,7 @@ namespace Core;
 internal static class Program
 {
     internal const string ExtractVariable = "DOTNET_BUNDLE_EXTRACT_BASE_DIR";
-    internal static string RuntimePrefix => AppIdentity.Name + "-runtime";
+    internal static string RuntimePrefix => AppIdentity.DataName + "-runtime";
 
     private static readonly string[] BackgroundArgs = { "--minimized", "--updated", "--update-failed", "--fan-service", "--stay-in-tray" };
 
@@ -18,6 +18,13 @@ internal static class Program
     public static void Run(AppKind kind, string[] args)
     {
         AppIdentity.Use(kind);
+        if (StartedProtected(args)) return;
+        RunApp();
+    }
+
+    public static void RunSimHub(string[] args)
+    {
+        AppIdentity.UseSimHub();
         if (StartedProtected(args)) return;
         RunApp();
     }
@@ -36,7 +43,7 @@ internal static class Program
         {
             string? current = Environment.GetEnvironmentVariable(ExtractVariable);
             if (current is not null) Environment.SetEnvironmentVariable(ExtractVariable, null);
-            if (!Environment.IsPrivilegedProcess || Environment.ProcessPath is not { } exe || File.Exists(Path.Combine(AppContext.BaseDirectory, AppIdentity.Name + ".dll"))) return false;
+            if (!Environment.IsPrivilegedProcess || Environment.ProcessPath is not { } exe || File.Exists(Path.Combine(AppContext.BaseDirectory, Path.GetFileNameWithoutExtension(exe) + ".dll"))) return false;
             if (current is not null && IsRuntimeFolder(current, ProtectedRoot) && AdminsOnly(new DirectoryInfo(current))) return false;
             if (ProtectedRuntimeFolder() is not { } folder) return false;
 

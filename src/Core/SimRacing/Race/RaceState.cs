@@ -53,6 +53,8 @@ internal sealed class RaceState
 
     public TrackLimits TrackLimits { get; } = new();
 
+    public Func<double>? Clock { get; init; }
+
     public WeatherTrend Weather { get; } = new();
 
     public TrackMaps.TurnNames Turns { get; private set; } = TrackMaps.TurnNames.None;
@@ -86,39 +88,6 @@ internal sealed class RaceState
         AddEvent(f, where.Length > 0 ? $"Off track · {where} ({n})" : $"Off track ({n})", AlertLevel.Warning);
         if (n >= Alerts.Threshold("track.limits"))
             Alerts.Fire("track.limits", Now, RaceFormat.Count(n, "off-track"), where.Length > 0 ? "Last at " + where : null);
-    }
-
-    internal static (int Clean, int Consistent, double ConsistentWithin, int Near, double NearWithin, bool Races)? GoalTargets(RaceHudSettings s)
-    {
-        foreach (var layout in s.Layouts)
-            foreach (var w in layout.Widgets)
-                if (w.Enabled && string.Equals(w.Kind, "goals", StringComparison.OrdinalIgnoreCase) && Hud.HudCatalog.Find("goals") is { } def)
-                {
-                    var o = new Hud.HudOptions(def, w);
-                    var on = o.Columns("goals");
-                    return (on.Contains("clean") ? o.Int("cleanLaps") : 0, on.Contains("consistent") ? o.Int("consistentLaps") : 0, o.Number("consistentWithin"),
-                        on.Contains("near") ? o.Int("nearLaps") : 0, o.Number("nearWithin"), o.Bool("races"));
-                }
-        return null;
-    }
-
-    private readonly HashSet<GoalKind> _goalsDone = new();
-
-    private void CheckGoals()
-    {
-        if (GoalTargets(_settings()) is not { } g || Frame.SessionKind == SessionKind.Race && !g.Races) return;
-        var laps = Laps.Laps;
-        Check(g.Clean > 0 ? PracticeGoals.CleanStreak(laps, g.Clean) : null, $"{RaceFormat.Count(g.Clean, "clean lap")} in a row");
-        Check(g.Consistent > 0 ? PracticeGoals.Consistent(laps, g.Consistent, g.ConsistentWithin) : null,
-            $"{RaceFormat.Count(g.Consistent, "lap")} within {g.ConsistentWithin:0.0#} {Units.S}");
-        Check(g.Near > 0 ? PracticeGoals.NearBest(laps, g.Near, g.NearWithin) : null, $"{RaceFormat.Count(g.Near, "lap")} within {g.NearWithin:0.0#} {Units.S} of your best");
-
-        void Check(GoalProgress? p, string what)
-        {
-            if (p is not { Done: true } done || !_goalsDone.Add(done.Kind)) return;
-            Alerts.Fire("goal.done", Now, "Goal reached", what, "goal.done:" + done.Kind);
-            AddEvent(Frame, "Goal reached · " + what, AlertLevel.Good);
-        }
     }
 
     public TelemetryFrame Frame { get; private set; } = new();
@@ -346,7 +315,7 @@ internal sealed class RaceState
 
     public void Update(TelemetryFrame f)
     {
-        Now = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+        Now = Clock?.Invoke() ?? Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
         if (f.Sequence == _lastSeq) { Alerts.Visible(Now); return; }
         _lastSeq = f.Sequence;
         Frame = f;
@@ -440,7 +409,6 @@ internal sealed class RaceState
         Gaps.Clear();
         TrackLimits.Clear();
         Weather.Clear();
-        _goalsDone.Clear();
         _pitExit.Reset();
         _spotter.Reset();
         _startPositions.Clear();
@@ -566,7 +534,6 @@ internal sealed class RaceState
             double pct = (lap.Time / stats.Average - 1) * 100;
             if (pct > Alerts.Threshold("pace.drop")) Alerts.Fire("pace.drop", Now, "Pace dropping", $"{RaceFormat.LapTime(lap.Time)} · +{pct:0.0}% on your average");
         }
-        CheckGoals();
     }
 
     private void UpdateFuel(TelemetryFrame f, RaceHudSettings s)

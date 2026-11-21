@@ -104,6 +104,12 @@ internal sealed class SimRacingPlugin : Plugin
 
     protected override void OnStart(AppServices app)
     {
+        if (AppIdentity.SimHub)
+        {
+            Hud = new HudHost(app);
+            Hud.SetActive(true);
+            return;
+        }
         Liveries = new LiveryPictures(app);
         Liveries.SetActive(LiveryPictures.On(app));
         Hud = new HudHost(app);

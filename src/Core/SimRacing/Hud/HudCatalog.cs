@@ -41,9 +41,6 @@ internal static class HudCatalog
               Limits = "Cars are placed along the track's center line from their distance round the lap; tracks without a bundled map show none." },
         new("laps", "Lap history", "Your laps with deltas, what happened on them, fuel used, and consistency.", 320, 260, () => new LapsWidget())
             { MinW = 200, MinH = 110, DefaultHz = 2, Options = LapsWidget.Options, Editor = Editors.LapsEditor.Def },
-        new("goals", "Practice goals", "Targets for a practice run with live progress, as a lap list or big counters: clean or consistent laps in a row, laps close to your best or under a time, clean laps and clean minutes.", 300, 240, () => new GoalsWidget())
-            { MinW = 180, MinH = 80, DefaultHz = 2, Options = GoalsWidget.Options, Editor = Editors.GoalsEditor.Def, HideWhenEmpty = true, Natural = GoalsWidget.Natural,
-              Limits = "Counts the laps the overlay sees this session; laps with incident points or pit road don't count." },
         new("notes", "Notes", "Your notes for this track and car: the next corner's note lights up as you get close, with the notes for the whole track under it.", 300, 140, () => new NotesWidget())
             { FixedSize = true, MinW = 180, MinH = 60, DefaultHz = 5, Options = NotesWidget.Options, Editor = Editors.NotesEditor.Def, HideWhenEmpty = true,
               Limits = "Notes are written in Session Stats, on the Performance card for each car and track." },

@@ -24,7 +24,7 @@ internal sealed class UpdateService
     private readonly AppServices _app;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromHours(1) };
     private static HttpClient? _http;
-    private static HttpClient Http => _http ??= CreateClient();
+    internal static HttpClient Http => _http ??= CreateClient();
 
     private readonly DispatcherTimer _retry = new();
     private readonly DispatcherTimer _autoWait = new() { Interval = TimeSpan.FromMinutes(5) };
@@ -283,9 +283,9 @@ internal sealed class UpdateService
     internal static string TrustedPage(string? url) =>
         url is not null && url.StartsWith($"https://github.com/{Repository}/", StringComparison.OrdinalIgnoreCase) ? url : ReleasesPage;
 
-    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(30);
+    internal static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(30);
 
-    private static async Task<int> ReadOrStall(Stream source, byte[] buffer, CancellationTokenSource stall)
+    internal static async Task<int> ReadOrStall(Stream source, byte[] buffer, CancellationTokenSource stall)
     {
         try { return await source.ReadAsync(buffer, stall.Token); }
         catch (OperationCanceledException) when (stall.IsCancellationRequested) { throw new IOException("The download stopped (no data for 30 seconds)."); }
@@ -339,7 +339,7 @@ internal sealed class UpdateService
         return Parse(doc.RootElement);
     }
 
-    private static string ReleasesApi => $"https://api.github.com/repos/{Repository}/releases?per_page=30";
+    internal static string ReleasesApi => $"https://api.github.com/repos/{Repository}/releases?per_page=30";
 
     public async Task<List<ReleaseInfo>> ReleasesUpToInstalledAsync()
     {
@@ -378,7 +378,7 @@ internal sealed class UpdateService
             var list = assets.EnumerateArray()
                 .Select(a => (Name: Str(a, "name") ?? "", Url: Str(a, "browser_download_url"), Size: a.ValueKind == JsonValueKind.Object && a.TryGetProperty("size", out var s) && s.TryGetInt64(out long n) ? n : 0))
                 .ToList();
-            var pick = list.FirstOrDefault(a => a.Name.Equals(AppIdentity.ExeName, StringComparison.OrdinalIgnoreCase));
+            var pick = list.FirstOrDefault(a => a.Name.Equals(AssetName, StringComparison.OrdinalIgnoreCase));
             if (pick.Url is not null)
             {
                 exe = pick.Url;
@@ -391,6 +391,10 @@ internal sealed class UpdateService
         return new ReleaseInfo(version, tag, root.TryGetProperty("body", out var body) && body.ValueKind == JsonValueKind.String ? body.GetString() ?? "" : "",
             TrustedPage(root.TryGetProperty("html_url", out var page) && page.ValueKind == JsonValueKind.String ? page.GetString() : null), exe, size, checksum, published, signature);
     }
+
+    public const string SimHubZip = "Velocita-SimHub.zip";
+
+    internal static string AssetName => AppIdentity.SimHub ? SimHubZip : AppIdentity.ExeName;
 
     internal static bool TryVersion(string tag, out Version version)
     {

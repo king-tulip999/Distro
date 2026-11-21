@@ -34,7 +34,7 @@ internal sealed class HudHost : IDisposable
     private (bool Connected, SessionKind Kind, string? Car, int? Track, int Num) _sessionKey;
     private IReadOnlyList<HudMonitor>? _monitors;
     private HudWebServer? _web;
-    private readonly HudWebRenderer _webRenderer = new();
+    private readonly HudWebRenderer _webRenderer;
     private bool _webDirty = true;
     private readonly HudVr _vr;
 
@@ -77,6 +77,7 @@ internal sealed class HudHost : IDisposable
     {
         _app = app;
         Race = new RaceState(() => Settings, app.PitLoss, app.LapProfiles) { MapLoader = TrackMaps.TrackMapLibrary.ForRace };
+        _webRenderer = AppIdentity.SimHub ? new HudWebRenderer { OnlyLayout = true, SampleWhenIdle = true, Shows = WebShows } : new HudWebRenderer();
         _vr = new HudVr(app);
         _vr.Changed += OnVrChanged;
         _timer.Tick += (_, _) => SafeTick();
@@ -432,6 +433,9 @@ internal sealed class HudHost : IDisposable
         _simBar ??= new HudSimBar();
         _simBar.Show(this, Palette, _toolbar is null ? 24 : 70);
     }
+
+    private bool WebShows(HudWidgetConfig w, TelemetryFrame f) =>
+        ShowWhen(f) && w.ShowsIn(f.SessionKind.ToString()) && !(w.HideInReplay && f.IsReplayPlaying) && !(w.OnlyOnTrack && !f.Driving);
 
     private bool ShowWhen(TelemetryFrame f) => Settings.ShowWhen switch
     {

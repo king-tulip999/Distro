@@ -120,7 +120,8 @@ public sealed class RaceHudSettings
 
     public static string SessionKind(string session) => string.Equals(session, "Warmup", StringComparison.OrdinalIgnoreCase) ? "Practice" : session;
 
-    public static readonly string[] RemovedKinds = { "blindspot", "spotter", "h2h", "pit", "flags", "dash", "trackmap", "radio", "spotterbox" };
+    public static readonly string[] RemovedKinds = { "blindspot", "spotter", "h2h", "pit", "flags", "dash", "trackmap", "radio", "spotterbox", "goals" };
+    public static readonly string[] RemovedAlerts = { "goal.done" };
 
     public string? ToggleHotkey { get; set; }
     public string? EditHotkey { get; set; }
@@ -270,7 +271,7 @@ public sealed class RaceHudSettings
         Fuel.Clamp();
         GridSize = Math.Clamp(GridSize, MinGrid, MaxGrid);
         var alerts = new Dictionary<string, HudAlertSetting>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (id, a) in Alerts ?? new()) if (id is not null && a is not null) alerts[id] = a;
+        foreach (var (id, a) in Alerts ?? new()) if (id is not null && a is not null && !RemovedAlerts.Contains(id, StringComparer.OrdinalIgnoreCase)) alerts[id] = a;
         Alerts = alerts;
         static List<string> Clean(List<string>? list) =>
             (list ?? new()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).Take(MaxKnown).ToList();

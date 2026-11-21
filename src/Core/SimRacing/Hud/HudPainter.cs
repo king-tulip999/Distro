@@ -188,6 +188,8 @@ internal sealed class HudPainter : IDisposable
 
     public bool IsPreview { get; set; }
 
+    public bool PlaysEntrances { get; set; }
+
     public List<(string Key, string Id)>? Overflow { get; set; }
 
     public Font Tiny => Font(10f, false);

@@ -275,7 +275,7 @@ internal sealed partial class RaceHudWidgets
                 Changed();
             });
         when.Add(SettingRows.Row("Only in", "None ticked = every session.", true, sessions));
-        if (Layout is { } owner) when.Add(SettingRows.Row("Keybind", null, true, KeybindBox(owner, w)));
+        if (Layout is { } owner && !AppIdentity.SimHub) when.Add(SettingRows.Row("Keybind", null, true, KeybindBox(owner, w)));
 
         var look = new List<FrameworkElement>();
         foreach (var colorRow in RaceHudSection.LookRows(S.Appearance, () => { Changed(); if (_preview is not null) DrawPreview(w); }, () => _list.Dispatcher.BeginInvoke(Fill, System.Windows.Threading.DispatcherPriority.Background), (t, d, c, _) => SettingRows.Row(t, d, true, c)))
@@ -335,6 +335,12 @@ internal sealed partial class RaceHudWidgets
         var panels = new MasonryPanel { MinColumnWidth = PanelMinWidth, MaxColumns = 4, Gap = 14, EvenBottoms = true };
         panels.Children.Add(Card("When shown", when));
         var lookCard = Card("Panel and redraw", look);
+        if (AppIdentity.SimHub)
+        {
+            panels.MaxColumns = 2;
+            panels.Children.Add(lookCard);
+            return (new StackPanel { Children = { panels, ActionsRow(w) } }, panels, new FrameworkElement[] { lookCard });
+        }
         var placeCard = Card("Placement", place);
         panels.Children.Add(web);
         panels.Children.Add(lookCard);
@@ -479,7 +485,7 @@ internal sealed partial class RaceHudWidgets
             Fill();
         });
         dup.Margin = Ui.AfterButton;
-        actions.Children.Add(dup);
+        if (!AppIdentity.SimHub) actions.Children.Add(dup);
         var reset = Ui.LabeledButton("I.Undo", "Default options", () =>
         {
             var before = new Dictionary<string, string>(w.Options, StringComparer.OrdinalIgnoreCase);
@@ -584,16 +590,20 @@ internal sealed partial class RaceHudWidgets
             };
             menu.Items.Add(item);
         }
-        if (widgets.Count > 0) menu.Items.Add(new Separator());
         var add = new MenuItem { Header = "Add widget", Icon = new Icon { Data = Ui.Res<Geometry>("I.Plus"), Width = 12, Height = 12 } };
         foreach (var def in HudCatalog.All.OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase))
         {
+            if (AppIdentity.SimHub && widgets.Any(x => string.Equals(x.Kind, def.Kind, StringComparison.OrdinalIgnoreCase))) continue;
             var kind = def;
             var sub = new MenuItem { Header = def.Name, ToolTip = def.Description };
             sub.Click += (_, _) => Add(kind);
             add.Items.Add(sub);
         }
-        menu.Items.Add(add);
+        if (add.Items.Count > 0)
+        {
+            if (widgets.Count > 0) menu.Items.Add(new Separator());
+            menu.Items.Add(add);
+        }
         menu.Closed += (_, _) => { if (toggled) Fill(); };
         menu.IsOpen = true;
     }

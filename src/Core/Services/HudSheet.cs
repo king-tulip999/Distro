@@ -29,7 +29,7 @@ internal static class HudSheet
         app.Shutdown();
     }
 
-    private sealed record SiteShot(string Kind, string Label, (string Key, string Value)[] Options, RaceFlags? Flags = null, double? WindFrom = null, double At = 0, bool Fit = false, float H = 0, float W = 0);
+    private sealed record SiteShot(string Kind, string Label, (string Key, string Value)[] Options, RaceFlags? Flags = null, double? WindFrom = null, double At = 0, bool Fit = false, float H = 0, float W = 0, double Speed = 0);
 
     private sealed class SiteRace
     {
@@ -42,7 +42,7 @@ internal static class HudSheet
 
         public SiteRace()
         {
-            Race = new RaceState(() => Settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
+            Race = new RaceState(() => Settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace, Clock = () => T };
         }
 
         public void To(double at)
@@ -77,6 +77,8 @@ internal static class HudSheet
 
     private const float SiteScale = 2;
     private const double SiteClipSeconds = 8;
+    private static readonly HashSet<string> Searched = new(StringComparer.OrdinalIgnoreCase) { "tyres", "incidents", "alerts", "laps", "notes", "events" };
+    private static readonly Dictionary<string, double> SiteSpeeds = new(StringComparer.OrdinalIgnoreCase) { ["block"] = 1, ["incidents"] = 60, ["notes"] = 10, ["laps"] = 80 };
 
     private static void RenderSite(string folder, bool frames)
     {
@@ -108,7 +110,7 @@ internal static class HudSheet
             new("tyres", "Default", O()),
             new("tyres", "Without wear", O(("wear", "false"))),
             new("weather", "Panel", O()),
-            new("weather", "Strip", O(("look", "strip")), W: 340, H: 124),
+            new("weather", "Strip", O(("look", "strip")), W: 340, H: 124, Speed: 300),
             new("weather", "°C", O(("temp", "c"))),
             new("weather", "°F", O(("temp", "f"))),
             new("weather", "°C and °F", O(("temp", "both"))),
@@ -121,10 +123,6 @@ internal static class HudSheet
             new("incidents", "Default", O()),
             new("events", "Default", O()),
             new("events", "Longer timeline", O(("count", "14")), H: 330),
-            new("goals", "Lap list", O()),
-            new("goals", "Counters", O(("look", "counters"))),
-            new("goals", "Six goals", O(("goals", "clean,consistent,near,under,total,minutes")), Fit: true),
-            new("goals", "Six counters", O(("look", "counters"), ("goals", "clean,consistent,near,under,total,minutes")), Fit: true),
             new("notes", "Default", O()),
             new("alerts", "Default", O()),
             new("result", "Card", O()),
@@ -138,9 +136,9 @@ internal static class HudSheet
             new("inputs", "Pedals and RPM", O(("show", "throttle,brake,rpm"))),
             new("block", "Speed", O(("source", "speed"))),
             new("block", "RPM with a bar", O(("source", "rpm"), ("visual", "bar"))),
-            new("block", "Fuel", O(("source", "fuel"))),
+            new("block", "Fuel", O(("source", "fuel")), Speed: 20),
             new("block", "Throttle with a bar", O(("source", "throttle"), ("visual", "bar"))),
-            new("block", "Gear", O(("source", "gear"))),
+            new("block", "Gear", O(("source", "gear")), Speed: 2),
             new("ledboard", "Gear", O(("show", "gear"))),
             new("ledboard", "Waving green flag", O(("show", "flag")), RaceFlags.Green, At: 0.3),
             new("ledboard", "Position, white frame", O(("show", "pos"), ("frame", "white"))),
@@ -188,7 +186,7 @@ internal static class HudSheet
             var config = new HudWidgetConfig { Id = "site-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
             foreach (var (key, value) in shot.Options) config.Options[key] = value;
             var frame = site.Race.Frame;
-            var restore = Override(shot, frame, turning: false);
+            var restore = Override(shot, frame, clip: null);
             var view = new HudOptions(def, config);
             SizeF size = def.Natural?.Invoke(view) is { Width: > 0, Height: > 0 } natural ? natural
                 : shot.H > 0 ? new SizeF(shot.W > 0 ? shot.W : (float)def.W, shot.H) : shot.Fit ? Fit(def, config, site) : new SizeF((float)def.W, (float)def.H);
@@ -217,27 +215,35 @@ internal static class HudSheet
         }
         File.WriteAllText(Path.Combine(folder, "site.json"), json.Append(']').ToString());
 
-        static Action Override(SiteShot shot, TelemetryFrame frame, bool turning)
+        static Action Override(SiteShot shot, TelemetryFrame frame, double? clip)
         {
             for (int car = 0; car < frame.CarFlags.Length; car++) frame.CarFlags[car] &= ~RaceFlags.Black;
             var (flags, windDir, windSpeed, yaw) = (frame.Flags, frame.WindDir, frame.WindSpeed, frame.YawNorth);
             if (shot.Flags is { } f) frame.Flags = f;
             if (shot.WindFrom is { } from)
             {
-                double heading = turning ? yaw ?? 0 : 0;
-                (frame.WindDir, frame.WindSpeed, frame.YawNorth) = (((heading + from) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI), 6.5, heading);
+                double heading = clip is null ? 0 : yaw ?? 0;
+                (frame.WindDir, frame.WindSpeed, frame.YawNorth) = (heading + from, 6.5, heading);
             }
+            if (clip is { } c && frame.WindDir is { } dir && frame.WindSpeed is { } speed)
+            {
+                double turn = 2 * Math.PI * c / SiteClipSeconds;
+                frame.WindSpeed = speed * (1 + 0.22 * Math.Sin(turn * 2) + 0.08 * Math.Sin(turn * 5 + 1));
+                frame.WindDir = dir + 0.2 * Math.Sin(turn + 0.5);
+            }
+            if (frame.WindDir is { } wrap) frame.WindDir = (wrap % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
             return () => (frame.Flags, frame.WindDir, frame.WindSpeed, frame.YawNorth) = (flags, windDir, windSpeed, yaw);
         }
 
         static void Animate(SiteShot shot, HudWidgetDef def, HudWidgetConfig config, SizeF size, string dir)
         {
             Directory.CreateDirectory(dir);
+            double speed = shot.Speed > 0 ? shot.Speed : SiteSpeeds.GetValueOrDefault(def.Kind, Speeds.GetValueOrDefault(def.Kind, 1));
             var site = new SiteRace();
-            site.To(shot.At);
+            site.To(Searched.Contains(def.Kind) ? SiteBusiest(shot, def, config, size, speed) : shot.At);
+            double from = site.T;
             site.Settle();
-            double speed = Speeds.GetValueOrDefault(def.Kind, 1);
-            int fps = EveryFrame.Contains(def.Kind) || def.Kind == "ledboard" ? 30 : 15;
+            int fps = EveryFrame.Contains(def.Kind) || def.Kind is "ledboard" or "block" or "result" ? 30 : 15;
             double start = site.T;
             var widget = def.Create();
             var view = new HudOptions(def, config);
@@ -247,14 +253,16 @@ internal static class HudSheet
             var pixels = new Size((int)Math.Ceiling(size.Width * SiteScale), (int)Math.Ceiling(size.Height * SiteScale));
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             var saved = new List<string>();
-            for (int i = 0; i < SiteClipSeconds * fps; i++)
+            double seconds = def.Kind == "result" ? 4 : SiteClipSeconds;
+            for (int i = 0; i < seconds * fps; i++)
             {
                 site.Run(start + i * speed / fps);
                 var frame = site.Race.Frame;
-                var restore = Override(shot, frame, turning: true);
+                var restore = Override(shot, frame, i / (double)fps);
                 var g = surface.Ensure(pixels);
                 painter.Simulated = true;
                 painter.IsPreview = true;
+                painter.PlaysEntrances = true;
                 painter.Begin(g, SiteScale, size, palette, site.Settings.Appearance);
                 widget.Draw(painter, new HudView { Frame = frame, Race = site.Race, Settings = site.Settings, Config = config, Options = view, Def = def });
                 painter.FinishPanels();
@@ -264,7 +272,56 @@ internal static class HudSheet
                 surface.Bitmap!.Save(Path.Combine(dir, name));
                 saved.Add(string.Format(inv, "{{\"t\":{0:0.000},\"f\":\"{1}\"}}", i / (double)fps, name));
             }
-            File.WriteAllText(Path.Combine(dir, "frames.json"), string.Format(inv, "{{\"kind\":\"{0}\",\"scale\":{1},\"fps\":{2},\"frames\":[{3}]}}", def.Kind, SiteScale, fps, string.Join(",", saved)));
+            File.WriteAllText(Path.Combine(dir, "frames.json"), string.Format(inv, "{{\"kind\":\"{0}\",\"scale\":{1},\"fps\":{2},\"speed\":{3},\"start\":{4:0.0},\"frames\":[{5}]}}", def.Kind, SiteScale, fps, speed, from, string.Join(",", saved)));
+        }
+
+        static double SiteBusiest(SiteShot shot, HudWidgetDef def, HudWidgetConfig config, SizeF size, double speed)
+        {
+            var site = new SiteRace();
+            var widget = def.Create();
+            var view = new HudOptions(def, config);
+            var palette = HudPalette.Of(site.Settings.Appearance);
+            using var painter = new HudPainter();
+            using var surface = new Core.Overlay.DibSurface();
+            var pixels = new Size((int)Math.Ceiling(size.Width), (int)Math.Ceiling(size.Height));
+            var previous = new int[pixels.Width * pixels.Height];
+            var current = new int[previous.Length];
+            var times = new List<double>();
+            var changes = new List<double>();
+            double step = 0.5 * speed;
+            for (double at = SearchFrom; at < SearchTo; at += step)
+            {
+                site.Run(at);
+                var frame = site.Race.Frame;
+                var restore = Override(shot, frame, clip: null);
+                var g = surface.Ensure(pixels);
+                painter.Simulated = true;
+                painter.IsPreview = true;
+                painter.Begin(g, 1, size, palette, site.Settings.Appearance);
+                widget.Draw(painter, new HudView { Frame = frame, Race = site.Race, Settings = site.Settings, Config = config, Options = view, Def = def });
+                painter.FinishPanels();
+                painter.End(surface.Dc, surface.Size);
+                restore();
+                var bitmap = surface.Bitmap!;
+                var data = bitmap.LockBits(new Rectangle(Point.Empty, pixels), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                for (int y = 0; y < pixels.Height; y++)
+                    System.Runtime.InteropServices.Marshal.Copy(data.Scan0 + y * data.Stride, current, y * pixels.Width, pixels.Width);
+                bitmap.UnlockBits(data);
+                int differing = 0;
+                for (int i = 0; i < current.Length; i++) if (current[i] != previous[i]) differing++;
+                times.Add(at);
+                changes.Add(times.Count == 1 ? 0 : Math.Min(0.15, differing / (double)current.Length));
+                (previous, current) = (current, previous);
+            }
+            int window = (int)Math.Round(SiteClipSeconds * speed / step);
+            double best = -1, bestAt = shot.At;
+            for (int i = 1; i + window <= changes.Count; i++)
+            {
+                double score = 0;
+                for (int j = i + 1; j < i + window; j++) score += changes[j];
+                if (score > best) (best, bestAt) = (score, times[i]);
+            }
+            return bestAt;
         }
 
         static SizeF Fit(HudWidgetDef def, HudWidgetConfig config, SiteRace site)
@@ -415,9 +472,6 @@ internal static class HudSheet
 
             foreach (var (kind, file, options) in new[]
             {
-                ("goals", "goals-counters", new[] { ("look", "counters") }),
-                ("goals", "goals-six", new[] { ("goals", "clean,consistent,near,under,total,minutes") }),
-                ("goals", "goals-counters-six", new[] { ("look", "counters"), ("goals", "clean,consistent,near,under,total,minutes") }),
                 ("result", "result-banner", new[] { ("look", "banner") }),
                 ("result", "result-stamp", new[] { ("look", "stamp") }),
                 ("result", "result-story", new[] { ("look", "story") }),
@@ -512,7 +566,7 @@ internal static class HudSheet
             foreach (var kind in new[] { "relative", "standings", "fuel" })
                 Save(HudCatalog.Find(kind)!, HudCatalog.Find(kind)!.W, HudCatalog.Find(kind)!.H, Path.Combine(dir, kind + "@150.png"), 1.5f);
 
-            foreach (var kind in new[] { "radar", "goals" })
+            foreach (var kind in new[] { "radar" })
                 Save(HudCatalog.Find(kind)!, HudCatalog.Find(kind)!.W, HudCatalog.Find(kind)!.H, Path.Combine(dir, kind + "@250.png"), 2.5f);
 
             void Save(HudWidgetDef def, double w, double h, string path, float scale = 1, params (string Key, string Value)[] options)
@@ -608,7 +662,7 @@ internal static class HudSheet
     private static readonly Dictionary<string, double> Speeds = new(StringComparer.OrdinalIgnoreCase)
     {
         ["relative"] = 4, ["standings"] = 12, ["timing"] = 2, ["laps"] = 40, ["fuel"] = 20, ["session"] = 10, ["alerts"] = 3,
-        ["traffic"] = 4, ["map"] = 4, ["tyres"] = 4, ["weather"] = 30, ["wind"] = 6, ["goals"] = 40, ["notes"] = 8, ["events"] = 30, ["block"] = 40,
+        ["traffic"] = 4, ["map"] = 4, ["tyres"] = 4, ["weather"] = 30, ["wind"] = 6, ["notes"] = 8, ["events"] = 30, ["block"] = 40,
     };
 
     private static void RenderFrames(string folder)

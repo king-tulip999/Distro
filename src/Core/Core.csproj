@@ -39,6 +39,7 @@
     <!-- the two apps start the shared code; tests/Core.Tests checks internal logic directly -->
     <InternalsVisibleTo Include="Tecnica" />
     <InternalsVisibleTo Include="Velocita" />
+    <InternalsVisibleTo Include="VelocitaSimHub" />
     <InternalsVisibleTo Include="Core.Tests" />
   </ItemGroup>
 

@@ -2,9 +2,9 @@ namespace Core.Services;
 
 internal static class SingleInstance
 {
-    private static string MutexName => $@"Local\{AppIdentity.Name}.SingleInstance";
-    private static string ShowEventName => $@"Local\{AppIdentity.Name}.ShowWindow";
-    private static string QuitEventName => $@"Local\{AppIdentity.Name}.Quit";
+    private static string MutexName => $@"Local\{AppIdentity.DataName}.SingleInstance";
+    private static string ShowEventName => $@"Local\{AppIdentity.DataName}.ShowWindow";
+    private static string QuitEventName => $@"Local\{AppIdentity.DataName}.Quit";
 
     private static Mutex? _mutex;
     private static EventWaitHandle? _showEvent;

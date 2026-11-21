@@ -13,7 +13,7 @@ internal static class HudPresets
 
     public const string DefaultName = "Default";
 
-    public static List<HudLayout> DefaultLayouts() => new()
+    public static List<HudLayout> DefaultLayouts() => AppIdentity.SimHub ? SimHubLayouts() : new()
     {
         new HudLayout
         {
@@ -27,6 +27,13 @@ internal static class HudPresets
             },
         },
     };
+
+    internal static List<HudLayout> SimHubLayouts()
+    {
+        var layout = new HudLayout { Name = DefaultName };
+        foreach (var def in HudCatalog.All) layout.Widgets.Add(W(def.Kind, HudAnchor.TopLeft, 0, 0, def.W, def.H));
+        return new() { layout };
+    }
 
     public static List<HudLayoutRule> DefaultRules() => new();
 

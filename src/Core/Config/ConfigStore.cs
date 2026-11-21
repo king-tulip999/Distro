@@ -11,7 +11,7 @@ public static class ConfigStore
 {
     private static readonly string AppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 
-    public static string Folder => Path.Combine(AppData, AppIdentity.Name);
+    public static string Folder => Path.Combine(AppData, AppIdentity.DataName);
 
     public static string FilePath => Path.Combine(Folder, "config.json");
 

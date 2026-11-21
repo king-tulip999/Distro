@@ -61,17 +61,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         _status.Margin = new Thickness(0, 0, 10, 0);
         _titleTools.Children.Add(_status);
         _titleTools.Children.Add(_statusChip);
-        _arrange.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
-        _titleTools.Children.Add(_arrange);
-        var power = Ui.Switch(S.Enabled, on => Host?.SetEnabled(on));
-        var powerTitle = ToggleCards.RowTitle("Show the overlay");
-        Ui.AddInfo(powerTitle, "Shows over borderless and windowed iRacing, not exclusive fullscreen. Nothing is injected into the sim. When each widget shows is set per widget and under Overlay settings.");
-        ToggleCards.Row(power, powerTitle, null);
-        power.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
-        power.VerticalAlignment = VerticalAlignment.Center;
-        power.HorizontalAlignment = HorizontalAlignment.Left;
-        _titleTools.Children.Add(power);
-        System.Windows.Automation.AutomationProperties.SetName(power, "iRacing Overlay");
+        if (!AppIdentity.SimHub) TitleSwitches();
 
         _segments = Ui.PageTabs(Tabs, 0, i => { _tab = i; Build(); Motion.FadeIn(_body); }, "hudtabs");
         _segments.HorizontalAlignment = HorizontalAlignment.Left;
@@ -83,6 +73,21 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         Ui.Anchor(this, "simracing.hud");
         RefreshStatus();
         RefreshArrange();
+    }
+
+    private void TitleSwitches()
+    {
+        _arrange.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
+        _titleTools.Children.Add(_arrange);
+        var power = Ui.Switch(S.Enabled, on => Host?.SetEnabled(on));
+        var powerTitle = ToggleCards.RowTitle("Show the overlay");
+        Ui.AddInfo(powerTitle, "Shows over borderless and windowed iRacing, not exclusive fullscreen. Nothing is injected into the sim. When each widget shows is set per widget and under Overlay settings.");
+        ToggleCards.Row(power, powerTitle, null);
+        power.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
+        power.VerticalAlignment = VerticalAlignment.Center;
+        power.HorizontalAlignment = HorizontalAlignment.Left;
+        _titleTools.Children.Add(power);
+        System.Windows.Automation.AutomationProperties.SetName(power, "iRacing Overlay");
     }
 
     public FrameworkElement TitleTools => _titleTools;
@@ -123,6 +128,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private void RefreshArrange()
     {
         _arrange.Children.Clear();
+        if (AppIdentity.SimHub) return;
         var h = Host;
         if (h?.Editing == true)
         {
@@ -268,7 +274,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         SyncEditLayout();
         var t = _app.Telemetry;
         var h = Host;
-        var (text, soft, deep) = !S.Enabled ? ("Off", "DangerSoft", "Danger")
+        var (text, soft, deep) = !S.Enabled && !AppIdentity.SimHub ? ("Off", "DangerSoft", "Danger")
             : t.Simulated && _app.Demo ? ("Simulated (demo)", "PlumSoft", "PlumDeep")
             : t.Status switch
             {
@@ -290,7 +296,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         }
         string why = h?.MatchedRule is { } rule ? $"Layout picked by a rule: {rule.Describe()} · " : "";
         string state = h?.OnScreen == true ? (why.Length == 0 ? "On screen" : "on screen") : ShowWhenText(why.Length == 0);
-        _status.Text = _app.Demo || !S.Enabled ? ""
+        _status.Text = _app.Demo || !S.Enabled || AppIdentity.SimHub ? ""
             : why + state + (h?.Editing == true ? " · arranging" : "");
         _status.Visibility = _status.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -653,6 +659,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private StackPanel HudSettingsTab()
     {
         var root = HudSettings(_app, Changed, Build, RefreshStatus);
+        if (AppIdentity.SimHub) return root;
         var web = BrowserSources(_app, Changed);
         Ui.Anchor(web, WebAnchor);
         root.Children.Insert(Math.Min(1, root.Children.Count), web);
@@ -783,7 +790,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         }, S.ShowWhen.ToString(), c => { S.ShowWhen = Enum.Parse<HudShowWhen>(c.Id!); changed(); statusChanged?.Invoke(); }, 194);
         var stdLook = new HudAppearance();
         Ui.SettingDefault D(Func<bool> same, Action reset, string shown) => new(same, () => { reset(); changed(); rebuild(); }, shown);
-        root.Children.Add(Group("Overlay", null,
+        var overlayRows = new List<UIElement>
+        {
             Ui.SettingRow("Show the widgets", null, when),
             Ui.SettingRow("Click-through", "Clicks go to the game. Off: click a driver in the Relative or Standings to highlight them in both (the window never takes the keyboard).",
                 Ui.Switch(!S.Interactive, on => { S.Interactive = !on; changed(); })),
@@ -791,13 +799,23 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 D(() => S.Units == HudUnits.Metric, () => S.Units = HudUnits.Metric, "Metric")),
             Ui.SettingRow("Speed in mph", "Other values keep the units above.", Ui.Switch(S.SpeedInMph, on => { S.SpeedInMph = on; changed(); })),
             Ui.SettingRow("Clock", null, Ui.Segmented(new[] { "12h", "24h" }, S.Clock24h ? 1 : 0, i => { S.Clock24h = i == 1; changed(); }, "hudclock")),
-            Ui.SettingRow("Hide app when iRacing connects", "Velocita goes to the tray; the overlay keeps running.", Ui.Switch(S.HideAppOnConnect, on => { S.HideAppOnConnect = on; changed(); }))));
-        var keys = new KeybindTree(app, e => e.Id.StartsWith("hud.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true) { Style = null, Padding = new Thickness(0), Margin = new Thickness(-5, 5, 0, 0) };
-        root.Children.Add(new Tile
+            Ui.SettingRow("Hide app when iRacing connects", "Velocita goes to the tray; the overlay keeps running.", Ui.Switch(S.HideAppOnConnect, on => { S.HideAppOnConnect = on; changed(); })),
+        };
+        if (AppIdentity.SimHub)
         {
-            Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing),
-            Child = new StackPanel { Children = { Ui.Text("Keybinds", "H3"), keys } },
-        });
+            overlayRows.RemoveAt(overlayRows.Count - 1);
+            overlayRows.RemoveAt(1);
+        }
+        root.Children.Add(Group("Overlay", null, overlayRows.ToArray()));
+        if (!AppIdentity.SimHub)
+        {
+            var keys = new KeybindTree(app, e => e.Id.StartsWith("hud.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true) { Style = null, Padding = new Thickness(0), Margin = new Thickness(-5, 5, 0, 0) };
+            root.Children.Add(new Tile
+            {
+                Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing),
+                Child = new StackPanel { Children = { Ui.Text("Keybinds", "H3"), keys } },
+            });
+        }
         root.Children.Add(Group("Look", null, LookRows(a, changed, rebuild, (t, d, c, f) => Ui.SettingRow(t, d, c, f is null ? null : D(f.Value.Same, f.Value.Reset, f.Value.Shown))).Concat(new UIElement[] {
             Ui.SettingRow("Background", null, Ui.SliderWithValue(0, 100, a.Background, "{0:0}%", v => { a.Background = (int)v; changed(); }),
                 D(() => a.Background == stdLook.Background, () => a.Background = stdLook.Background, stdLook.Background + "%")),
@@ -805,6 +823,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 D(() => a.Corner == stdLook.Corner, () => a.Corner = stdLook.Corner, stdLook.Corner + " px")),
             Ui.SettingRow("Outline", null, Ui.Switch(a.Outline, on => { a.Outline = on; changed(); }),
                 D(() => a.Outline == stdLook.Outline, () => a.Outline = stdLook.Outline, stdLook.Outline ? "On" : "Off")) }).ToArray()));
+        if (AppIdentity.SimHub) return root;
         var grid = Ui.SliderWithValue(RaceHudSettings.MinGrid, RaceHudSettings.MaxGrid, S.GridSize, "{0:0} px", v =>
         {
             S.GridSize = (int)v;

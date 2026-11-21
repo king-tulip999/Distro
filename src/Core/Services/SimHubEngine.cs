@@ -1,0 +1,149 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.Windows;
+using System.Windows.Threading;
+using Core.Config;
+using Core.Plugins;
+using Core.Plugins.BuiltIn;
+using Core.SimRacing.Hud;
+using Core.SimRacing.Hud.Web;
+using Core.Theme;
+using Core.Views;
+
+namespace Core.Services;
+
+internal static class SimHubEngine
+{
+    public const int Port = 8648;
+    public const string ParentArg = "--parent";
+    public const string FolderArg = "--simhub";
+    public const string SettingsArg = "--settings";
+
+    private static AppServices? _services;
+    private static HudHost? _hud;
+    private static SimHubUpdater? _updater;
+
+    public static HudHost? Hud => _hud;
+
+    public static ReleaseInfo? UpdateReady => _updater?.Ready;
+
+    public static void Run(App app, string[] args)
+    {
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        if (!SingleInstance.TryAcquire())
+        {
+            if (Arg(args, FolderArg) is null || args.Contains(SettingsArg, StringComparer.OrdinalIgnoreCase)) SingleInstance.SignalExisting();
+            app.Shutdown();
+            return;
+        }
+        app.DispatcherUnhandledException += (_, e) =>
+        {
+            e.Handled = true;
+            App.LogError(e.Exception);
+        };
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            App.LogError(e.Exception);
+            e.SetObserved();
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => { if (e.ExceptionObject is Exception ex) App.LogError(ex); };
+
+        PluginManager.DiscoverEarly();
+        Controls.ClickGuard.Install();
+        MenuFollow.Install();
+        Motion.InstallPress();
+        Ui.InstallDropDownWheel();
+        Controls.SliderFace.InstallDragAnywhere();
+        TipPlacement.Install();
+        TextBalance.Install();
+
+        var config = ConfigStore.Load(out _);
+        if (Arg(args, ShotArg) is not null) ConfigStore.ReadOnly = true;
+        Prepare(config.SimRacing.Hud);
+        config.Ui.Theme = AppTheme.Glow;
+        Grr.GrrResources.Install();
+        Themes.Register(Grr.GrrTheme.Spec);
+        foreach (var themeSet in ThemeSets.All)
+            Themes.SetPick(themeSet, themeSet.Get(config.Ui));
+        ThemeManager.Apply(config.Ui.Theme);
+
+        _services = new AppServices(false, config);
+        if (_services.Plugins.Find(PluginIds.SimRacing) is SimRacingPlugin racing)
+        {
+            racing.Start(_services);
+            _hud = racing.Hud;
+        }
+
+        if (Arg(args, FolderArg) is { } folder)
+        {
+            if (_hud is not null) SimHubDashboards.Install(folder, _hud);
+            if (Arg(args, ParentArg) is not null && Arg(args, ShotArg) is null)
+            {
+                _updater = new SimHubUpdater(folder);
+                _updater.Start();
+            }
+        }
+
+        SingleInstance.Listen(() => app.Dispatcher.BeginInvoke(new Action(ShowSettings)));
+        SingleInstance.ListenForQuit(() => app.Dispatcher.BeginInvoke(new Action(App.Quit)));
+        if (int.TryParse(Arg(args, ParentArg), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parent)) WatchParent(app, parent);
+        if (args.Contains(SettingsArg, StringComparer.OrdinalIgnoreCase)) ShowSettings();
+        if (Arg(args, ShotArg) is { } shots && _services is not null) SimHubWindow.Shoot(_services, shots);
+    }
+
+    public const string ShotArg = "--shot";
+
+    internal static void Prepare(RaceHudSettings hud)
+    {
+        hud.Enabled = false;
+        hud.WebOverlays = true;
+        hud.WebRemote = false;
+        hud.WebPort = Port;
+        hud.VrOverlays = false;
+        hud.Interactive = false;
+    }
+
+    private static void ShowSettings()
+    {
+        if (_services is null || _hud is null) return;
+        SimHubWindow.Open(_services, _hud);
+    }
+
+    private static void WatchParent(App app, int pid)
+    {
+        Process parent;
+        try { parent = Process.GetProcessById(pid); }
+        catch (ArgumentException)
+        {
+            app.Dispatcher.BeginInvoke(new Action(App.Quit), DispatcherPriority.Background);
+            return;
+        }
+        Task.Run(async () =>
+        {
+            using (parent)
+                await parent.WaitForExitAsync().ConfigureAwait(false);
+            await app.Dispatcher.BeginInvoke(new Action(ParentClosed));
+        });
+    }
+
+    private static void ParentClosed()
+    {
+        if (_updater?.InstallOnExit() != true) App.Quit();
+    }
+
+    public static void Stop()
+    {
+        _updater?.Stop();
+        _updater = null;
+        if (_services is not { } services) return;
+        _services = null;
+        _hud = null;
+        services.Dispose();
+    }
+
+    private static string? Arg(string[] args, string name)
+    {
+        int i = Array.FindIndex(args, a => a.Equals(name, StringComparison.OrdinalIgnoreCase));
+        return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+    }
+}

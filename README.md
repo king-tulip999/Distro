@@ -10,6 +10,8 @@
 
 [![Download](https://img.shields.io/github/v/release/king-tulip999/Distro?label=Download&style=for-the-badge&color=e0157a)](https://github.com/king-tulip999/Distro/releases/latest)
 &nbsp;
+[![Download for SimHub](https://img.shields.io/badge/Download-for%20SimHub-e0157a?style=for-the-badge)](https://github.com/king-tulip999/Distro/releases/latest/download/Velocita-SimHub.zip)
+&nbsp;
 [![Website](https://img.shields.io/badge/Website-distrotv.pages.dev-49c8f5?style=for-the-badge)](https://distrotv.pages.dev)
 &nbsp;
 [![Velocita Discord](https://img.shields.io/badge/Discord-Velocita-5865f2?style=for-the-badge)](https://discord.gg/WeWs6spYep)
@@ -66,7 +68,7 @@ Two separate apps: take one or both. Neither needs the other.
 
 - **Pit exit:** where a stop right now would put you, learned per track and car.
 - **Strategy:** fuel saving to skip a stop.
-- **Practice goals, notes per corner, track limits and a race result card.**
+- **Notes per corner, track limits and a race result card.**
 - **VR:** any widget can show in your headset through SteamVR or OpenXR, fixed in the cockpit or following your head. Set its position, distance and width per widget, or match where it sits on the monitor.
 
 **Widget editor:** click any part of a widget to change it, drag columns into your own order, and pick when it shows.
@@ -84,7 +86,7 @@ Two separate apps: take one or both. Neither needs the other.
 
 ### Session Stats
 
-Your iRacing history, kept on your PC: result cards, goals, ratings, personal bests, and lap-by-lap telemetry comparison.
+Your iRacing history, kept on your PC: result cards, ratings, personal bests, and lap-by-lap telemetry comparison.
 
 <details>
 <summary><b>See Session Stats</b></summary>
