@@ -31,6 +31,12 @@ internal static class SimHubEngine
     public const string EmbedFile = "embed.txt";
 
     private static string EmbedEventName => $@"Local\{AppIdentity.DataName}.Embed";
+    private static string DetachEventName => $@"Local\{AppIdentity.DataName}.Detach";
+    private static string ClosingEventName => $@"Local\{AppIdentity.DataName}.Closing";
+    private static readonly TimeSpan ParentExitGrace = TimeSpan.FromSeconds(10);
+    private static bool _watchingParent;
+    private static bool _parentHandled;
+    private static DispatcherTimer? _parentGrace;
 
     public static void Run(App app, string[] args)
     {
@@ -91,6 +97,8 @@ internal static class SimHubEngine
 
         SingleInstance.Listen(() => app.Dispatcher.BeginInvoke(new Action(ShowSettings)));
         ListenForEmbed(app);
+        Listen(app, DetachEventName, "SimHub detach", SimHubEmbed.Detach);
+        Listen(app, ClosingEventName, "SimHub closing", SimHubClosing);
         SingleInstance.ListenForQuit(() => app.Dispatcher.BeginInvoke(new Action(App.Quit)));
         if (int.TryParse(Arg(args, ParentArg), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parent)) WatchParent(app, parent);
         if (args.Contains(SettingsArg, StringComparer.OrdinalIgnoreCase)) ShowSettings();
@@ -130,6 +138,37 @@ internal static class SimHubEngine
         thread.Start();
     }
 
+    private static void Listen(App app, string eventName, string threadName, Action onUi)
+    {
+        var signal = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
+        var thread = new Thread(() =>
+        {
+            while (signal.WaitOne())
+                app.Dispatcher.BeginInvoke(onUi);
+        })
+        { IsBackground = true, Name = threadName };
+        thread.Start();
+    }
+
+    private static void SimHubClosing()
+    {
+        SimHubEmbed.Detach();
+        if (!_watchingParent || _parentHandled || _parentGrace is not null) return;
+        _parentGrace = new DispatcherTimer { Interval = ParentExitGrace };
+        _parentGrace.Tick += OnParentGraceOver;
+        _parentGrace.Start();
+    }
+
+    private static void OnParentGraceOver(object? sender, EventArgs e)
+    {
+        if (_parentGrace is { } grace)
+        {
+            grace.Stop();
+            grace.Tick -= OnParentGraceOver;
+        }
+        ParentClosed();
+    }
+
     private static IntPtr? ReadEmbedParent()
     {
         try
@@ -152,6 +191,7 @@ internal static class SimHubEngine
             app.Dispatcher.BeginInvoke(new Action(App.Quit), DispatcherPriority.Background);
             return;
         }
+        _watchingParent = true;
         Task.Run(async () =>
         {
             using (parent)
@@ -162,6 +202,9 @@ internal static class SimHubEngine
 
     private static void ParentClosed()
     {
+        if (_parentHandled) return;
+        _parentHandled = true;
+        SimHubEmbed.Detach();
         if (_updater?.InstallOnExit() != true) App.Quit();
     }
 

@@ -7,7 +7,8 @@ namespace Core.Views;
 internal static class SimHubEmbed
 {
     private const int WsChild = 0x40000000, WsVisible = 0x10000000, WsClipChildren = 0x02000000, WsClipSiblings = 0x04000000;
-    private const int WmDestroy = 0x0002;
+    private const int WsExNoParentNotify = 0x00000004;
+    private const int WmDestroy = 0x0002, SwHide = 0;
 
     private static HwndSource? _source;
     private static SimHubPanel? _panel;
@@ -22,6 +23,7 @@ internal static class SimHubEmbed
         {
             ParentWindow = parent,
             WindowStyle = WsChild | WsVisible | WsClipChildren | WsClipSiblings,
+            ExtendedWindowStyle = WsExNoParentNotify,
             PositionX = 0,
             PositionY = 0,
             Width = Math.Max(1, room.Right - room.Left),
@@ -40,6 +42,11 @@ internal static class SimHubEmbed
         _source = null;
         _panel?.Hide();
         source.RemoveHook(Hook);
+        if (IsWindow(source.Handle))
+        {
+            ShowWindow(source.Handle, SwHide);
+            SetParent(source.Handle, IntPtr.Zero);
+        }
         source.RootVisual = null;
         source.Dispose();
     }
@@ -69,6 +76,13 @@ internal static class SimHubEmbed
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetParent(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetParent(IntPtr child, IntPtr parent);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr hwnd, int command);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

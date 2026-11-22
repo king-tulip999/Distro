@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace VelocitaSimHubPlugin;
@@ -12,6 +15,13 @@ internal static class Engine
     public const string ExeName = "VelocitaSimHub.exe";
     private const string InstanceName = @"Local\Velocita SimHub.SingleInstance";
     private const string EmbedName = @"Local\Velocita SimHub.Embed";
+    private const string DetachName = @"Local\Velocita SimHub.Detach";
+    private const string ClosingName = @"Local\Velocita SimHub.Closing";
+    private const uint GwChild = 5, PmNoRemove = 0;
+    private static readonly TimeSpan ReleaseTimeout = TimeSpan.FromSeconds(2);
+    private static readonly HashSet<IntPtr> Hosts = new();
+
+    public static bool Closing { get; private set; }
 
     public static string Folder => Path.GetDirectoryName(typeof(Engine).Assembly.Location) ?? AppDomain.CurrentDomain.BaseDirectory;
 
@@ -67,6 +77,7 @@ internal static class Engine
 
     public static void Embed(IntPtr panelParent)
     {
+        if (Closing) return;
         try
         {
             Directory.CreateDirectory(DataFolder);
@@ -78,4 +89,70 @@ internal static class Engine
         {
         }
     }
+
+    public static void AddHost(IntPtr host)
+    {
+        lock (Hosts) Hosts.Add(host);
+    }
+
+    public static void Release(IntPtr host)
+    {
+        lock (Hosts) Hosts.Remove(host);
+        if (HasPanel(host) && Signal(DetachName)) WaitForRelease(new[] { host });
+    }
+
+    public static void Close()
+    {
+        Closing = true;
+        IntPtr[] hosts;
+        lock (Hosts) hosts = Hosts.ToArray();
+        if (Signal(ClosingName)) WaitForRelease(hosts);
+    }
+
+    public static bool HasPanel(IntPtr host) => host != IntPtr.Zero && IsWindow(host) && GetWindow(host, GwChild) != IntPtr.Zero;
+
+    private static bool Signal(string name)
+    {
+        try
+        {
+            using var signal = EventWaitHandle.OpenExisting(name);
+            signal.Set();
+            return true;
+        }
+        catch (Exception ex) when (ex is WaitHandleCannotBeOpenedException or UnauthorizedAccessException or IOException)
+        {
+            return false;
+        }
+    }
+
+    private static void WaitForRelease(IntPtr[] hosts)
+    {
+        var clock = Stopwatch.StartNew();
+        while (clock.Elapsed < ReleaseTimeout && Array.Exists(hosts, HasPanel))
+        {
+            PeekMessage(out _, IntPtr.Zero, 0, 0, PmNoRemove);
+            Thread.Sleep(10);
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMessage
+    {
+        public IntPtr Window;
+        public uint Message;
+        public IntPtr WParam, LParam;
+        public uint Time;
+        public int X, Y;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PeekMessage(out NativeMessage message, IntPtr window, uint filterMin, uint filterMax, uint remove);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindow(IntPtr hwnd, uint command);
 }

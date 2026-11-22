@@ -36,7 +36,7 @@ internal sealed class SettingsView : UserControl
         _status.Text = !Engine.Installed ? Engine.ExeName + " is missing from the SimHub folder: copy it next to Velocita.SimHub.Plugin.dll and restart SimHub."
             : Engine.Problem is { } problem && !Engine.Running ? "Velocita isn't running: " + problem
             : "Loading Velocita…";
-        if (!Engine.Installed || _host.Handle == IntPtr.Zero) return;
+        if (Engine.Closing || !Engine.Installed || _host.Handle == IntPtr.Zero) return;
         if (!Engine.Running)
         {
             if (DateTime.UtcNow - _asked < TimeSpan.FromSeconds(5)) return;
@@ -67,10 +67,15 @@ internal sealed class SettingsView : UserControl
         protected override HandleRef BuildWindowCore(HandleRef hwndParent)
         {
             var handle = CreateWindowEx(0, "static", "", WsChild | WsVisible | WsClipChildren, 0, 0, 1, 1, hwndParent.Handle, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+            Engine.AddHost(handle);
             return new HandleRef(this, handle);
         }
 
-        protected override void DestroyWindowCore(HandleRef hwnd) => DestroyWindow(hwnd.Handle);
+        protected override void DestroyWindowCore(HandleRef hwnd)
+        {
+            Engine.Release(hwnd.Handle);
+            DestroyWindow(hwnd.Handle);
+        }
 
         protected override void OnWindowPositionChanged(Rect rcBoundingBox)
         {

@@ -30,14 +30,12 @@ public class VelocitaPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
 
     public void DataUpdate(PluginManager pluginManager, ref GameData data)
     {
-        if (_sinceCheck.ElapsedMilliseconds < CheckEveryMs) return;
+        if (Engine.Closing || _sinceCheck.ElapsedMilliseconds < CheckEveryMs) return;
         _sinceCheck.Restart();
         if (!Engine.Running) Engine.Start();
     }
 
-    public void End(PluginManager pluginManager)
-    {
-    }
+    public void End(PluginManager pluginManager) => Engine.Close();
 
     public Control GetWPFSettingsControl(PluginManager pluginManager) => new SettingsView();
 
