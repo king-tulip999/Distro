@@ -154,7 +154,7 @@ internal sealed partial class RaceHudWidgets
         w.Vr = HudVrPlacement.Cockpit;
         if (w.VrWidth <= 0) PlaceInVr(w);
         _selected = w.Id;
-        _tab = PlacementTab;
+        _tab = AppIdentity.SimHub ? VrTab : PlacementTab;
         Fill();
         _list.Dispatcher.BeginInvoke(() => { if (PageOf(_pickedCard) is { } page) page.ScrollToEnd(); }, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
@@ -256,7 +256,7 @@ internal sealed partial class RaceHudWidgets
 
     private PanelTarget? _pendingTarget;
 
-    private const string LookTab = "Look", WhenTab = "When shown", PlacementTab = "Placement";
+    private const string LookTab = "Look", WhenTab = "When shown", PlacementTab = "Placement", VrTab = "VR";
 
     private const double ComboWidth = 194;
 
@@ -265,7 +265,11 @@ internal sealed partial class RaceHudWidgets
         var groups = new List<(string Tab, string Title, Func<List<FrameworkElement>> Rows)>();
         groups.Add((LookTab, "Panel and redraw", () => LookRows(w, def)));
         groups.Add((WhenTab, "When shown", () => WhenRows(w, def)));
-        if (AppIdentity.SimHub) return groups;
+        if (AppIdentity.SimHub)
+        {
+            groups.Add((VrTab, "VR", () => VrRows(w)));
+            return groups;
+        }
         groups.Add((PlacementTab, "Placement", () => PlaceRows(w)));
         groups.Add((PlacementTab, "Browser source", () => BrowserSourceRows(w)));
         groups.Add((PlacementTab, "VR", () => VrRows(w)));
@@ -386,13 +390,13 @@ internal sealed partial class RaceHudWidgets
             SettingRows.Row(label, help, true, Ui.SliderWithValue(-HudWidgetConfig.MaxVrAngle, HudWidgetConfig.MaxVrAngle, Math.Round(degrees), v => $"{v:0}°", v => { set(v); Changed(); }, ComboWidth - 42, 1));
         rows.Add(Angle("Turn", "Positive turns the face to the right.", w.VrTurn, v => w.VrTurn = v));
         rows.Add(Angle("Tilt", "Positive tilts the face up.", w.VrTilt, v => w.VrTilt = v));
-        var match = Ui.LabeledButton("I.Target", "Match the screen position", () =>
+        var match = Ui.LabeledButton("I.Target", AppIdentity.SimHub ? "Put it back in front of me" : "Match the screen position", () =>
         {
             PlaceInVr(w);
             Changed();
             Fill();
         }, "GhostButton");
-        match.ToolTip = "Puts it where it sits on the monitor, as if the monitor were 1.2 m wide and 1 m ahead";
+        match.ToolTip = AppIdentity.SimHub ? "Back to its starting spot, 1 m ahead and just below your eyes" : "Puts it where it sits on the monitor, as if the monitor were 1.2 m wide and 1 m ahead";
         match.HorizontalAlignment = HorizontalAlignment.Left;
         match.Margin = new Thickness(0, 4, 0, 4);
         rows.Add(match);
@@ -407,7 +411,8 @@ internal sealed partial class RaceHudWidgets
         face.Margin = new Thickness(0, 0, 0, 4);
         rows.Add(face);
         rows.Add(SettingRows.Row("Curve around your head", "In OpenXR games only where the headset supports curved panels.", true, Ui.Switch(w.VrCurve, v => { w.VrCurve = v; Changed(); })));
-        rows.Add(SettingRows.Row("Hide on the monitor", "Only while the headset shows it. Still shown while arranging.", true, Ui.Switch(w.VrOnly, v => { w.VrOnly = v; Changed(); })));
+        if (!AppIdentity.SimHub)
+            rows.Add(SettingRows.Row("Hide on the monitor", "Only while the headset shows it. Still shown while arranging.", true, Ui.Switch(w.VrOnly, v => { w.VrOnly = v; Changed(); })));
         if (!S.VrOverlays)
         {
             var off = Ui.LabeledButton("I.Settings", "Overlay settings", () => _section.ShowSettings(RaceHudSection.VrAnchor), "GhostButton");

@@ -109,8 +109,13 @@ internal sealed class VrEditor
         {
             float half = (Width - Pad * 3) / 2;
             y += 6;
-            list.Add(new(VrEditorPart.Curve, -1, new RectangleF(Pad, y, half, 30)));
-            list.Add(new(VrEditorPart.VrOnly, -1, new RectangleF(Pad * 2 + half, y, half, 30)));
+            // Velocita for SimHub draws nothing on the monitor, so only the curve toggle applies there.
+            if (AppIdentity.SimHub) list.Add(new(VrEditorPart.Curve, -1, new RectangleF(Pad, y, Width - Pad * 2, 30)));
+            else
+            {
+                list.Add(new(VrEditorPart.Curve, -1, new RectangleF(Pad, y, half, 30)));
+                list.Add(new(VrEditorPart.VrOnly, -1, new RectangleF(Pad * 2 + half, y, half, 30)));
+            }
             y += 36;
             list.Add(new(VrEditorPart.Face, -1, new RectangleF(Pad, y, Width - Pad * 2, 30)));
         }

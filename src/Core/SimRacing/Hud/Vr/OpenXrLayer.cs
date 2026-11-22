@@ -11,6 +11,33 @@ internal static class OpenXrLayer
     private const string ImplicitKey = @"Software\Khronos\OpenXR\1\ApiLayers\Implicit";
     private const string DllFile = "VelocitaXr.dll", ManifestFile = "VelocitaXr.json";
 
+    // Velocita and Velocita for SimHub register the same layer: each holds a named claim while its VR widgets are on,
+    // and neither removes the layer while the other still has a claim.
+    private static readonly string[] Claimants = { "Velocita", "Velocita SimHub" };
+    private static Mutex? _claim;
+
+    private static string ClaimName(string dataName) => @"Local\VelocitaXrLayer." + dataName.Replace(' ', '.');
+
+    public static void Claim(bool on)
+    {
+        if (on) _claim ??= new Mutex(false, ClaimName(AppIdentity.DataName));
+        else
+        {
+            _claim?.Dispose();
+            _claim = null;
+        }
+    }
+
+    public static bool ClaimedElsewhere()
+    {
+        foreach (string name in Claimants)
+        {
+            if (string.Equals(name, AppIdentity.DataName, StringComparison.OrdinalIgnoreCase)) continue;
+            if (Mutex.TryOpenExisting(ClaimName(name), out var other)) { other.Dispose(); return true; }
+        }
+        return false;
+    }
+
     public static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), AppIdentity.Name, "OpenXR");
 
     public static string ManifestPath => Path.Combine(Folder, ManifestFile);

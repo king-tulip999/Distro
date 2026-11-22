@@ -15,7 +15,8 @@ internal sealed class HotkeyService : IDisposable
 
     public void RegisterAll()
     {
-        if (_app.Demo || _pauseCount > 0)
+        // Velocita for SimHub hides keybinds: global keys there would clash with Velocita's own.
+        if (_app.Demo || _pauseCount > 0 || AppIdentity.SimHub)
             return;
 
         _manager ??= new HotkeyManager();

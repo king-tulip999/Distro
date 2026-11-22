@@ -663,7 +663,13 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private StackPanel HudSettingsTab()
     {
         var root = HudSettings(_app, Changed, Build, RefreshStatus);
-        if (AppIdentity.SimHub) return root;
+        if (AppIdentity.SimHub)
+        {
+            var headset = VrHeadsets(_app, Changed);
+            Ui.Anchor(headset, VrAnchor);
+            root.Children.Insert(Math.Min(1, root.Children.Count), headset);
+            return root;
+        }
         var web = BrowserSources(_app, Changed);
         Ui.Anchor(web, WebAnchor);
         root.Children.Insert(Math.Min(1, root.Children.Count), web);
@@ -704,7 +710,9 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             Ui.SettingRow(label, help, Ui.SliderWithValue(-max * 100, max * 100, Math.Round(metres * 100), v => $"{v:0} {Units.Cm}", v => { set(v / 100); S.ClampVrShift(); changed(); Host()?.SettingsChanged(save: false); }, 190, 1));
         string adjustKey = Core.Hotkeys.Hotkey.Display(S.VrAdjustHotkey);
         var tile = Group("VR headsets", null,
-            Ui.SettingRow("VR widgets", "Widgets set to show in VR appear in SteamVR and in OpenXR games, iRacing included. Each widget's spot is on its page.", toggle),
+            Ui.SettingRow("VR widgets", AppIdentity.SimHub
+                ? "Widgets set to show in VR appear in SteamVR and in iRacing through OpenXR, drawn by this plugin, not as SimHub overlays. Each widget's spot is on its page. Turn this on in only one of Velocita and Velocita for SimHub."
+                : "Widgets set to show in VR appear in SteamVR and in OpenXR games, iRacing included. Each widget's spot is on its page.", toggle),
             status,
             Ui.SubHeader("Move every cockpit widget"),
             Shift("Sideways", "Right is positive.", HudWidgetConfig.VrReach, S.VrShiftX, v => S.VrShiftX = v),
@@ -714,7 +722,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             EditInHeadset(),
             new TextBlock
             {
-                Text = (string.IsNullOrWhiteSpace(S.VrAdjustHotkey) ? "" : $"{adjustKey} also opens it. ")
+                Text = (string.IsNullOrWhiteSpace(S.VrAdjustHotkey) || AppIdentity.SimHub ? "" : $"{adjustKey} also opens it. ")
                     + "A panel opens in front of you: the mouse or a SteamVR controller picks a widget and moves it. Right-click or Done gives the mouse back.",
                 Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4),
             });

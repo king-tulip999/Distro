@@ -127,6 +127,21 @@ Your league's next race, standings and results, if you race with GRR. Off unless
 <img src="screenshots/velocita-grr-cup.jpg" alt="GRR League">
 </details>
 
+### Light on your PC
+
+Measured with all six apps running side by side in the same live iRacing session for 10 minutes, each showing comparable standings or relative widgets. Every process an app starts is counted. Lower is better.
+
+| App | CPU (average, % of one core) | Memory (average private) |
+| --- | ---: | ---: |
+| **Velocita 4.39** | **0.4%** | **242 MB** |
+| Pacelense 0.11.2 | 2.5% | 372 MB |
+| iOverlay 2.0.0.67 | 10.3% | 386 MB |
+| RaceLab 8.7.2 | 22.2% | 943 MB |
+| RacePulse 0.4.4 | 50.2% | 1,650 MB |
+| Edge Overlays 2.0.3 | 57.5% | 851 MB |
+
+<sub>November 22, 2026. Ryzen 7 7800X3D, Radeon RX 7900 XTX, Windows 11.</sub>
+
 <br>
 
 ## <img src="screenshots/tecnica-icon.png" width="28" alt=""> Tecnica

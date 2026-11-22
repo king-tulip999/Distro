@@ -89,6 +89,18 @@ internal static class VrPlacement
         w.VrWidth = spot.Width;
     }
 
+    // Velocita for SimHub has no monitor spots to copy: widgets start in a grid just below eye level, left to right, then lower rows.
+    public static void PlaceInFront(HudWidgetConfig w, SizeF layout, int index)
+    {
+        const double ColumnStep = 0.42, RowStep = 0.3, Top = -0.12;
+        int column = index % 3, row = index / 3 % 3;
+        w.VrX = column == 0 ? 0 : column == 1 ? -ColumnStep : ColumnStep;
+        w.VrY = Math.Clamp(Top - row * RowStep, -HudWidgetConfig.VrReach, HudWidgetConfig.VrReach);
+        w.VrDistance = ScreenDistance;
+        w.VrWidth = Math.Clamp(layout.Width / 1920.0 * ScreenWidth, HudWidgetConfig.MinVrWidth, HudWidgetConfig.MaxVrWidth);
+        (w.VrTurn, w.VrTilt) = FacingHead(w.VrX, w.VrY, w.VrDistance);
+    }
+
     public static Size Pixels(SizeF layout, int maxPixels)
     {
         if (layout.Width <= 0 || layout.Height <= 0) return new Size(1, 1);

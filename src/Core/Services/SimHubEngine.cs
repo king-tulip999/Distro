@@ -119,7 +119,6 @@ internal static class SimHubEngine
         hud.WebOverlays = true;
         hud.WebRemote = false;
         hud.WebPort = Port;
-        hud.VrOverlays = false;
         hud.Interactive = false;
         hud.AutoSwitch = false;
     }

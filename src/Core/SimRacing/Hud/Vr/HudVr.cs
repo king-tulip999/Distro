@@ -37,8 +37,14 @@ internal sealed class HudVr : IDisposable
     private bool _on, _steamSeen, _readerSeen;
     private uint _nextId;
     private int _retry;
+    // Its own one-second beat: Velocita for SimHub never starts the app-wide tick.
+    private readonly System.Windows.Threading.DispatcherTimer _beat = new(System.Windows.Threading.DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
 
-    public HudVr(AppServices app) => _app = app;
+    public HudVr(AppServices app)
+    {
+        _app = app;
+        _beat.Tick += (_, _) => OnTick();
+    }
 
     public bool On => _on;
 
@@ -59,8 +65,13 @@ internal sealed class HudVr : IDisposable
         if (_app.Demo) setting = false;
         if (_installed != setting)
         {
+            OpenXrLayer.Claim(setting);
             if (setting) Problem = OpenXrLayer.Install();
-            else if (_installed == true || OpenXrLayer.Installed) { OpenXrLayer.Remove(); Problem = null; }
+            else
+            {
+                if ((_installed == true || OpenXrLayer.Installed) && !OpenXrLayer.ClaimedElsewhere()) OpenXrLayer.Remove();
+                Problem = null;
+            }
             _installed = setting;
         }
         bool want = setting && active;
@@ -73,12 +84,12 @@ internal sealed class HudVr : IDisposable
             _app.Watcher.Started += OnStarted;
             _app.Watcher.Stopped += OnStopped;
             _app.Watcher.Acquire(Consumer, new[] { SteamVrServer });
-            _app.Tick += OnTick;
+            _beat.Start();
             if (_app.Watcher.IsRunning(SteamVrServer)) _steam.Connect();
         }
         else
         {
-            _app.Tick -= OnTick;
+            _beat.Stop();
             _app.Watcher.Started -= OnStarted;
             _app.Watcher.Stopped -= OnStopped;
             _app.Watcher.Release(Consumer);
@@ -225,7 +236,7 @@ internal sealed class HudVr : IDisposable
     {
         if (_on)
         {
-            _app.Tick -= OnTick;
+            _beat.Stop();
             _app.Watcher.Started -= OnStarted;
             _app.Watcher.Stopped -= OnStopped;
             _app.Watcher.Release(Consumer);

@@ -203,6 +203,7 @@ internal sealed class HudHost : IDisposable
     private void OnVrChanged()
     {
         foreach (var s in _slots.Values) s.Dirty = true;
+        if (AppIdentity.SimHub) Refresh();
         if (_holding && !_timer.Enabled) SafeTick();
         Changed?.Invoke();
     }
@@ -314,7 +315,10 @@ internal sealed class HudHost : IDisposable
         Refresh();
     }
 
-    private bool WantsTelemetry => _active && (Settings.Enabled && !_app.Demo || _preview || _editing || _watchers > 0 || WebClients > 0);
+    private bool WantsTelemetry => _active && (Settings.Enabled && !_app.Demo || _preview || _editing || _watchers > 0 || WebClients > 0 || HeadsetOnly);
+
+    // Velocita for SimHub has no desktop windows: SimHub shows the monitor overlays, so its own widgets go to the headset only.
+    private bool HeadsetOnly => AppIdentity.SimHub && Settings.VrOverlays && !_app.Demo && _vr.Showing;
 
     private void Refresh()
     {
@@ -420,14 +424,15 @@ internal sealed class HudHost : IDisposable
         Race.Update(frame);
         _tickPalette = CurrentPalette();
         ResolveLayout(force: false);
-        bool show = !_app.Demo && (_editing || _preview || Settings.Enabled && !_hidden && ShowWhen(frame));
+        bool show = !_app.Demo && (_editing || _preview || (Settings.Enabled || HeadsetOnly) && !_hidden && ShowWhen(frame));
         int fastest = 0;
         bool anyShown = false;
         long now = Stopwatch.GetTimestamp();
         foreach (var s in _slots.Values)
         {
             bool visible = show && s.Config.Enabled && (_editing || !HiddenByKeybind(s.Config)) && (_editing || frame.Status != SimStatus.Connected
-                || s.Config.ShowsIn(frame.SessionKind.ToString()) && !(s.Config.HideInReplay && frame.IsReplayPlaying) && !(s.Config.OnlyOnTrack && !frame.Driving));
+                || s.Config.ShowsIn(frame.SessionKind.ToString()) && !(s.Config.HideInReplay && frame.IsReplayPlaying) && !(s.Config.OnlyOnTrack && !frame.Driving))
+                && (!AppIdentity.SimHub || _vr.Wants(s.Config));
             if (!visible)
             {
                 if (s.Window?.Visible == true) { s.Window.Hide(); s.Window.ReleaseSurface(); }
@@ -501,7 +506,7 @@ internal sealed class HudHost : IDisposable
         long start = Stopwatch.GetTimestamp();
         var monitor = HudGeometry.MonitorFor(s.Config.Monitor, Monitors);
         var fit = SizeOf(s.Config, Race);
-        bool onMonitor = !(s.Config.VrOnly && !_editing && _vr.Wants(s.Config));
+        bool onMonitor = !AppIdentity.SimHub && !(s.Config.VrOnly && !_editing && _vr.Wants(s.Config));
         if (!onMonitor && s.Window?.Visible == true) { s.Window.Hide(); s.Window.ReleaseSurface(); }
         if (onMonitor)
         {
@@ -561,7 +566,7 @@ internal sealed class HudHost : IDisposable
         }
         if (_vr.Wants(s.Config))
         {
-            try { DrawVr(s, frame, fit, monitor); }
+            try { DrawVr(s, frame, fit); }
             catch (Exception ex)
             {
                 LogOnce("vr", ex);
@@ -579,9 +584,9 @@ internal sealed class HudHost : IDisposable
         if (since >= 2) { s.PerSecond = s.Draws / since; s.Draws = 0; s.CountSince = Stopwatch.GetTimestamp(); }
     }
 
-    private void DrawVr(Slot s, TelemetryFrame frame, SizeF fit, HudMonitor monitor)
+    private void DrawVr(Slot s, TelemetryFrame frame, SizeF fit)
     {
-        if (s.Config.VrWidth <= 0) VrPlacement.PlaceFromScreen(s.Config, HudGeometry.Place(s.Config, monitor, fit), monitor.Bounds);
+        if (s.Config.VrWidth <= 0) PlaceInVr(s.Config);
         var size = VrPlacement.Pixels(fit, VrShare.MaxPixels);
         var target = _vr.Begin(s.Config.Id, size);
         var painter = target.Painter;
@@ -811,6 +816,12 @@ internal sealed class HudHost : IDisposable
 
     public void PlaceInVr(HudWidgetConfig config)
     {
+        if (AppIdentity.SimHub)
+        {
+            int others = Settings.Layout(_layoutName)?.Widgets.Count(w => !ReferenceEquals(w, config) && w.Vr != HudVrPlacement.Off && w.VrWidth > 0) ?? 0;
+            VrPlacement.PlaceInFront(config, SizeOf(config, Race), others);
+            return;
+        }
         var monitor = HudGeometry.MonitorFor(config.Monitor, Monitors);
         VrPlacement.PlaceFromScreen(config, HudGeometry.Place(config, monitor, SizeOf(config, Race)), monitor.Bounds);
     }
