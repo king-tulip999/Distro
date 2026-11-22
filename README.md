@@ -57,45 +57,50 @@ Two separate apps: take one or both. Neither needs the other.
 
 ## <img src="screenshots/velocita-icon.png" width="28" alt=""> Velocita
 
+> For racing in iRacing: overlays, your stats and the tools around the sim.
+
 ### iRacing Overlay
 
 20 widgets: relative, standings, fuel and strategy, delta, radar, track map, inputs, tires, weather and more. Drag them around in the car with `Ctrl+Alt+E`, save layouts per car or track, add any widget to OBS as a browser source, or show them in your VR headset.
 
-- **Pit exit:** where a stop right now would put you, learned per track and car.
-- **Strategy:** fuel saving to skip a stop.
-- **Notes per corner, track limits and a race result card.**
-- **VR:** any widget can show in your headset through SteamVR or OpenXR, fixed in the cockpit or following your head. Set its position, distance and width per widget, or match where it sits on the monitor.
-
-**Widget editor:** click any part of a widget to change it, drag columns into your own order, and pick when it shows.
-
-**Alerts:** fuel, pit speed, traffic, flags, incidents, track limits and weather, each with its own threshold.
-
-**Fuel:** set your reserve, margin and pit stop time, and see exactly how every number is worked out.
+| Feature | What it does |
+| --- | --- |
+| **Pit exit** | Where a stop right now would put you, learned per track and car |
+| **Strategy** | Fuel saving to skip a stop |
+| **Track notes** | Notes per corner, track limits and a race result card |
+| **VR** | Any widget in your headset through SteamVR or OpenXR, fixed in the cockpit or following your head, placed per widget or matched to the monitor |
+| **Widget editor** | Click any part of a widget to change it, drag columns into your own order, and pick when it shows |
+| **Alerts** | Fuel, pit speed, traffic, flags, incidents, track limits and weather, each with its own threshold |
+| **Fuel** | Your reserve, margin and pit stop time, with every number's working shown |
 
 ### Session Stats
 
 Your iRacing history, kept on your PC: result cards, ratings, personal bests, and lap-by-lap telemetry comparison.
 
-**Lap analysis:** compare laps on speed, throttle, brake, steering and gear, see which corners cost the most time, then replay them side by side on the track with live inputs for every car.
-
-**Overview:** your season at a glance: race-by-race results, rating changes, recent sessions, when you drive, and your cars and tracks.
-
-**Each session:** finish, pace, consistency, conditions, every lap and sector, tire wear per run, and your progress at that track.
+| Feature | What it does |
+| --- | --- |
+| **Lap analysis** | Compare laps on speed, throttle, brake, steering and gear, see which corners cost the most time, then replay them side by side on the track with live inputs for every car |
+| **Overview** | Your season at a glance: race-by-race results, rating changes, recent sessions, when you drive, and your cars and tracks |
+| **Each session** | Finish, pace, consistency, conditions, every lap and sector, tire wear per run, and your progress at that track |
 
 ### iRacing tools
 
-- **Setup Manager:** every setup sorted by car and class, with new downloads picked up.
-- **FOV calculator:** single or triple screens, compared side by side and written straight into iRacing.
-- **iRacing settings:** every iRacing setting in plain language, searchable, with what you changed from the defaults and one-click undo.
-- **iRacing keybinds:** every in-sim keybind per profile, with what's set, missing or changed.
-- **Bass shakers:** engine, shifts, ABS, curbs and the rev limiter through any sound output.
-- **Trading Paints and Garage 61:** start them with Velocita or when iRacing starts, and see your own paint on car pictures across the app.
+| Feature | What it does |
+| --- | --- |
+| **Setup Manager** | Every setup sorted by car and class, with new downloads picked up |
+| **FOV calculator** | Single or triple screens, compared side by side and written straight into iRacing |
+| **iRacing settings** | Every iRacing setting in plain language, searchable, with what you changed from the defaults and one-click undo |
+| **iRacing keybinds** | Every in-sim keybind per profile, with what's set, missing or changed |
+| **Bass shakers** | Engine, shifts, ABS, curbs and the rev limiter through any sound output |
+| **Trading Paints and Garage 61** | Start them with Velocita or when iRacing starts, and see your own paint on car pictures across the app |
 
 ### GRR League
 
 Your league's next race, standings and results, if you race with GRR. Off unless you turn it on.
 
-**Every series:** a countdown to the next race, the schedule, your championship position and season form, the title fight and the latest results.
+| Feature | What it does |
+| --- | --- |
+| **Every series** | A countdown to the next race, the schedule, your championship position and season form, the title fight and the latest results |
 
 ### Light on your PC
 
@@ -116,25 +121,16 @@ Measured with all six apps running side by side in the same live iRacing session
 
 ## <img src="screenshots/tecnica-icon.png" width="28" alt=""> Tecnica
 
-### Displays
+> For setting up the PC: screens, windows, fans and what your hardware is doing.
 
-Monitors, resolution, HDR, wallpapers and audio saved as profiles. Switch from desk to rig with one keybind.
-
-**Profile editor:** layout, HDR, taskbar, audio devices, volume and a wallpaper per monitor.
-
-### Window Profiles
-
-Any program at an exact size and spot, borderless, applied the moment it starts. Great for stretching a game across triples.
-
-**Profile editor:** size, position, borders, a start delay and a keybind, with a picture of where the window lands.
-
-### Performance Overlay
-
-FPS, 1% lows, temperatures and usage over your game, in whatever order you like.
-
-### Fan Control
-
-Curves, per-fan limits, presets and a failsafe that hands the fans back to the BIOS if anything goes wrong.
+| Feature | What it does |
+| --- | --- |
+| **Displays** | Monitors, resolution, HDR, wallpapers and audio saved as profiles. Switch from desk to rig with one keybind |
+| **Display profile editor** | Layout, HDR, taskbar, audio devices, volume and a wallpaper per monitor |
+| **Window Profiles** | Any program at an exact size and spot, borderless, applied the moment it starts. Great for stretching a game across triples |
+| **Window profile editor** | Size, position, borders, a start delay and a keybind, with a picture of where the window lands |
+| **Performance Overlay** | FPS, 1% lows, temperatures and usage over your game, in whatever order you like |
+| **Fan Control** | Curves, per-fan limits, presets and a failsafe that hands the fans back to the BIOS if anything goes wrong |
 
 <br>
 
