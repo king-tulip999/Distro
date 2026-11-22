@@ -61,11 +61,6 @@ Two separate apps: take one or both. Neither needs the other.
 
 20 widgets: relative, standings, fuel and strategy, delta, radar, track map, inputs, tires, weather and more. Drag them around in the car with `Ctrl+Alt+E`, save layouts per car or track, add any widget to OBS as a browser source, or show them in your VR headset.
 
-<details>
-<summary><b>See every widget</b></summary>
-<br>
-<img src="screenshots/all-overlays.png" alt="All iRacing Overlay widgets">
-
 - **Pit exit:** where a stop right now would put you, learned per track and car.
 - **Strategy:** fuel saving to skip a stop.
 - **Notes per corner, track limits and a race result card.**
@@ -73,37 +68,19 @@ Two separate apps: take one or both. Neither needs the other.
 
 **Widget editor:** click any part of a widget to change it, drag columns into your own order, and pick when it shows.
 
-<img src="screenshots/velocita-overlay-editor.jpg" alt="Widget editor">
-
 **Alerts:** fuel, pit speed, traffic, flags, incidents, track limits and weather, each with its own threshold.
 
-<img src="screenshots/velocita-overlay-alerts.jpg" alt="Overlay alerts">
-
 **Fuel:** set your reserve, margin and pit stop time, and see exactly how every number is worked out.
-
-<img src="screenshots/velocita-overlay-fuel.jpg" alt="Fuel settings">
-</details>
 
 ### Session Stats
 
 Your iRacing history, kept on your PC: result cards, ratings, personal bests, and lap-by-lap telemetry comparison.
 
-<details>
-<summary><b>See Session Stats</b></summary>
-<br>
-
 **Lap analysis:** compare laps on speed, throttle, brake, steering and gear, see which corners cost the most time, then replay them side by side on the track with live inputs for every car.
-
-<img src="screenshots/velocita-lap-analysis.jpg" alt="Lap analysis and replay">
 
 **Overview:** your season at a glance: race-by-race results, rating changes, recent sessions, when you drive, and your cars and tracks.
 
-<img src="screenshots/velocita-stats.jpg" alt="Session Stats overview">
-
 **Each session:** finish, pace, consistency, conditions, every lap and sector, tire wear per run, and your progress at that track.
-
-<img src="screenshots/velocita-race.jpg" alt="A race session">
-</details>
 
 ### iRacing tools
 
@@ -118,14 +95,7 @@ Your iRacing history, kept on your PC: result cards, ratings, personal bests, an
 
 Your league's next race, standings and results, if you race with GRR. Off unless you turn it on.
 
-<details>
-<summary><b>See GRR League</b></summary>
-<br>
-
 **Every series:** a countdown to the next race, the schedule, your championship position and season form, the title fight and the latest results.
-
-<img src="screenshots/velocita-grr-cup.jpg" alt="GRR League">
-</details>
 
 ### Light on your PC
 
@@ -150,51 +120,21 @@ Measured with all six apps running side by side in the same live iRacing session
 
 Monitors, resolution, HDR, wallpapers and audio saved as profiles. Switch from desk to rig with one keybind.
 
-<details>
-<summary><b>See Displays</b></summary>
-<br>
-<img src="screenshots/tecnica-displays.jpg" alt="Displays">
-
 **Profile editor:** layout, HDR, taskbar, audio devices, volume and a wallpaper per monitor.
-
-<img src="screenshots/tecnica-display-editor.jpg" alt="Display profile editor">
-</details>
 
 ### Window Profiles
 
 Any program at an exact size and spot, borderless, applied the moment it starts. Great for stretching a game across triples.
 
-<details>
-<summary><b>See Window Profiles</b></summary>
-<br>
-<img src="screenshots/tecnica-window-profiles.jpg" alt="Window Profiles">
-
 **Profile editor:** size, position, borders, a start delay and a keybind, with a picture of where the window lands.
-
-<img src="screenshots/tecnica-window-editor.jpg" alt="Window profile editor">
-</details>
 
 ### Performance Overlay
 
 FPS, 1% lows, temperatures and usage over your game, in whatever order you like.
 
-<details>
-<summary><b>See Performance Overlay</b></summary>
-<br>
-<img src="screenshots/tecnica-performance-overlay.jpg" alt="Performance Overlay">
-</details>
-
 ### Fan Control
 
 Curves, per-fan limits, presets and a failsafe that hands the fans back to the BIOS if anything goes wrong.
-
-<details>
-<summary><b>See Fan Control</b></summary>
-<br>
-<img src="screenshots/tecnica-fans.jpg" alt="Fan Control">
-<br><br>
-<img src="screenshots/tecnica-fan-curves.jpg" alt="Fan curves">
-</details>
 
 <br>
 
