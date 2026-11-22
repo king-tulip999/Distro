@@ -199,8 +199,10 @@ internal static class TrackMapBuild
             try
             {
                 using var doc = JsonDocument.Parse(File.ReadAllText(file).TrimStart('﻿'), options);
-                if (doc.RootElement.TryGetProperty("GPX", out var g) && g.TryGetProperty("ONTRACK", out _))
-                    index[Path.GetFileNameWithoutExtension(file)] = doc.RootElement.Clone();
+                var root = doc.RootElement;
+                bool linked = root.TryGetProperty("GPX", out var g) && g.TryGetProperty("ONTRACK", out _);
+                if (linked || InlinePoints(root, "ONTRACK").Count >= 20)
+                    index[Path.GetFileNameWithoutExtension(file)] = root.Clone();
             }
             catch (JsonException) { }
         }
@@ -209,16 +211,34 @@ internal static class TrackMapBuild
 
     private static ImportResult FromGpx(string key, int? id, string trackName, JsonElement json, string dir)
     {
-        string? File(string layer) => json.GetProperty("GPX").TryGetProperty(layer, out var f) && f.GetString() is { Length: > 0 } name && System.IO.File.Exists(Path.Combine(dir, name))
+        bool linked = json.TryGetProperty("GPX", out var gpx);
+        string? File(string layer) => linked && gpx.TryGetProperty(layer, out var f) && f.GetString() is { Length: > 0 } name && System.IO.File.Exists(Path.Combine(dir, name))
             ? System.IO.File.ReadAllText(Path.Combine(dir, name)) : null;
-        if (File("ONTRACK") is not { } track) return new(null, "GPX route file missing", Array.Empty<string>());
-        var points = TrackMapImport.GpxPoints(track);
+        List<(double Lat, double Lon)>? Route(string layer) =>
+            linked ? File(layer) is { } xml ? TrackMapImport.GpxPoints(xml) : null
+                : InlinePoints(json, layer) is { Count: > 0 } inline ? inline : null;
+        if (Route("ONTRACK") is not { } points) return new(null, "GPX route file missing", Array.Empty<string>());
         if (points.Count < 20) return new(null, $"GPX route has {points.Count} points", Array.Empty<string>());
         double lat0 = points.Average(p => p.Lat), lon0 = points.Average(p => p.Lon);
         var line = TrackMapImport.Project(points, lat0, lon0);
         if (line.Count > 2 && TrackMap.Distance(line[0], line[^1]) is > 1 and var gap && gap < TrackMap.Perimeter(line.ToArray(), false) * 0.03) line.Add(line[0]);
-        List<PointF>? pit = File("ONPITROAD") is { } pitXml ? TrackMapImport.Project(TrackMapImport.GpxPoints(pitXml), lat0, lon0) : null;
+        List<PointF>? pit = linked && Route("ONPITROAD") is { } pitPoints ? TrackMapImport.Project(pitPoints, lat0, lon0) : null;
         return TrackMapImport.FromPath(key, id, trackName, TrackMapSource.Gpx, line, pit);
+    }
+
+    internal static List<(double Lat, double Lon)> InlinePoints(JsonElement root, string layer)
+    {
+        var points = new List<(double Pct, double Lat, double Lon)>();
+        if (!root.TryGetProperty(layer, out var section) || section.ValueKind != JsonValueKind.Object) return new();
+        foreach (var p in section.EnumerateObject())
+        {
+            if (!double.TryParse(p.Name, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double pct)) continue;
+            if (p.Value.ValueKind != JsonValueKind.Object
+                || !p.Value.TryGetProperty("Latitude", out var lat) || lat.ValueKind != JsonValueKind.Number
+                || !p.Value.TryGetProperty("Longitude", out var lon) || lon.ValueKind != JsonValueKind.Number) continue;
+            points.Add((pct, lat.GetDouble(), lon.GetDouble()));
+        }
+        return points.OrderBy(p => p.Pct).Select(p => (p.Lat, p.Lon)).ToList();
     }
 
     private static string Str(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";

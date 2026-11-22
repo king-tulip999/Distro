@@ -24,13 +24,17 @@ public class VelocitaPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
     public void Init(PluginManager pluginManager)
     {
         this.AttachDelegate("Running", () => Engine.Running);
-        if (!Engine.Running) Engine.Start();
+        this.AttachDelegate("On", () => Engine.On);
+        this.AddAction("Toggle", (_, _) => Engine.Toggle());
+        this.AddAction("TurnOn", (_, _) => Engine.SetOn(true));
+        this.AddAction("TurnOff", (_, _) => Engine.SetOn(false));
+        if (Engine.On && !Engine.Running) Engine.Start();
         _sinceCheck.Restart();
     }
 
     public void DataUpdate(PluginManager pluginManager, ref GameData data)
     {
-        if (Engine.Closing || _sinceCheck.ElapsedMilliseconds < CheckEveryMs) return;
+        if (Engine.Closing || !Engine.On || _sinceCheck.ElapsedMilliseconds < CheckEveryMs) return;
         _sinceCheck.Restart();
         if (!Engine.Running) Engine.Start();
     }

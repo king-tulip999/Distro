@@ -66,7 +66,7 @@ public partial class MainWindow : Window, IModalHost
         ThemeManager.Changed += OnThemeChanged;
         ThemeManager.Changing += OnThemeChanging;
         ThemeManager.Applying += OnThemeApplying;
-        IsVisibleChanged += (_, _) => { UpdatePageSensors(); UpdatePageActive(); ScheduleTrim(); };
+        IsVisibleChanged += (_, _) => { ReturnToDroppedPage(); UpdatePageSensors(); UpdatePageActive(); ScheduleTrim(); };
         _trimTimer.Tick += (_, _) =>
         {
             _trimTimer.Stop();
@@ -620,9 +620,16 @@ public partial class MainWindow : Window, IModalHost
         Dispatcher.BeginInvoke(new Action(CompactMemory), DispatcherPriority.ContextIdle);
     }
 
+    private string? _droppedPage;
+
     private void CompactMemory()
     {
         if (OnScreen) return;
+        if (!IsVisible)
+        {
+            DropHiddenPages();
+            ReleaseGraphics();
+        }
         CollectAll();
         try { using var me = System.Diagnostics.Process.GetCurrentProcess(); SetProcessWorkingSetSize(me.Handle, -1, -1); }
         catch (Exception ex) { App.LogError(ex); }
@@ -650,6 +657,29 @@ public partial class MainWindow : Window, IModalHost
 
     [DllImport("kernel32.dll")]
     private static extern bool SetProcessWorkingSetSize(IntPtr process, nint min, nint max);
+
+    private void DropHiddenPages()
+    {
+        if (_current is null || _modal is not null || SetupOpen || _themeRebuildKey is not null) return;
+        _droppedPage = _current;
+        WatchSections(null);
+        DropPages(keepCurrent: false);
+        _current = null;
+    }
+
+    private void ReleaseGraphics()
+    {
+        if (PresentationSource.FromVisual(this) is HwndSource { CompositionTarget: { } target })
+            target.RenderMode = RenderMode.SoftwareOnly;
+    }
+
+    private void ReturnToDroppedPage()
+    {
+        if (IsVisible) ApplyLight();
+        if (!IsVisible || _current is not null || _droppedPage is not { } key) return;
+        _droppedPage = null;
+        Navigate(key);
+    }
 
     private void DropPages(bool keepCurrent)
     {
@@ -777,7 +807,7 @@ public partial class MainWindow : Window, IModalHost
                 _app.Config.Ui.TrayTipShown = true;
                 _app.Save();
                 _app.Tray.ShowBalloon($"{AppIdentity.Name} is still running",
-                    $"Keybinds, fan control and the overlay keep working. Click the {AppIdentity.Name} icon to open it again, or right-click it to quit.",
+                    $"{(AppIdentity.IsTecnica ? "Keybinds, fan control and the overlay" : "Keybinds and the iRacing overlay")} keep working. Click the {AppIdentity.Name} icon to open it again, or right-click it to quit.",
                     NoticeKind.Info);
             }
             return;

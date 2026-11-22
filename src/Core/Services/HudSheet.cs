@@ -595,6 +595,14 @@ internal static class HudSheet
                 Save(mixRelative, mixRelative.W, mixRelative.H, Path.Combine(dir, $"mix-{at}-outlines.png"), 1, ("classBorder", "true"));
             }
 
+            var mapDef = HudCatalog.Find("map")!;
+            frame.Simulated = false;
+            frame.Session = new SimRacing.Telemetry.SessionInfo { TrackName = "unmapped sheet track", TrackDisplayName = "Unmapped track" };
+            frame.Sequence = ++seq;
+            race.Update(frame);
+            Save(mapDef, mapDef.W, mapDef.H, Path.Combine(dir, "map-none.png"));
+            Save(mapDef, mapDef.MinW, mapDef.MinH, Path.Combine(dir, "map-none-min.png"));
+
             void Save(HudWidgetDef def, double w, double h, string path, float scale = 1, params (string Key, string Value)[] options)
             {
                 var config = new HudWidgetConfig { Id = "sheet-" + def.Kind, Kind = def.Kind, W = w, H = h };

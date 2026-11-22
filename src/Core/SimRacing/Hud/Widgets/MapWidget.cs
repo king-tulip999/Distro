@@ -24,7 +24,7 @@ internal sealed class MapWidget : HudWidget
     private const double TurnSettleSeconds = 0.3;
 
     private Task<TrackMap?>? _loading;
-    private (int? Id, string Name, string Display, bool Sample) _for;
+    private (int? Id, string Name, string Display, bool Sample, int Generation) _for;
     private TrackMap? _map;
     private TrackMap? _builtFor;
     private RectangleF _extent;
@@ -42,7 +42,7 @@ internal sealed class MapWidget : HudWidget
     {
         var s = f.Session;
         bool sample = f.Simulated;
-        var key = (s.TrackId, s.TrackName, s.TrackDisplayName, sample);
+        var key = (s.TrackId, s.TrackName, s.TrackDisplayName, sample, TrackMapLibrary.Generation);
         if (_loading is null || key != _for)
         {
             _for = key;
@@ -62,8 +62,15 @@ internal sealed class MapWidget : HudWidget
         var area = p.Header("Track map", f.Session.TrackDisplayName);
         if (Map(p, f) is not { } map)
         {
-            string text = _loading is { IsCompleted: false } ? "Loading the map" : "No map for this track";
-            p.Text(text, p.Body, p.P.Muted, area, HAlign.Center, VAlign.Center);
+            if (_loading is { IsCompleted: false })
+            {
+                p.Text("Loading the map", p.Body, p.P.Muted, area, HAlign.Center, VAlign.Center);
+                return;
+            }
+            float line = p.LineHeight(p.Body);
+            var upper = new RectangleF(area.X, area.Y + area.Height / 2 - line, area.Width, line);
+            p.Text("No map yet", p.Body, p.P.Muted, upper, HAlign.Center, VAlign.Center);
+            p.Text("Drive one clean lap", p.Body, p.P.Muted, upper with { Y = upper.Bottom }, HAlign.Center, VAlign.Center);
             return;
         }
         float d = p.Density;

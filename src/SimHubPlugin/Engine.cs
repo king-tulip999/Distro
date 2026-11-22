@@ -17,11 +17,17 @@ internal static class Engine
     private const string EmbedName = @"Local\Velocita SimHub.Embed";
     private const string DetachName = @"Local\Velocita SimHub.Detach";
     private const string ClosingName = @"Local\Velocita SimHub.Closing";
+    private const string QuitName = @"Local\Velocita SimHub.Quit";
+    private const string OffFile = "off.txt";
     private const uint GwChild = 5, PmNoRemove = 0;
     private static readonly TimeSpan ReleaseTimeout = TimeSpan.FromSeconds(2);
     private static readonly HashSet<IntPtr> Hosts = new();
 
+    private static bool? _on;
+
     public static bool Closing { get; private set; }
+
+    public static bool On => _on ??= !File.Exists(Path.Combine(DataFolder, OffFile));
 
     public static string Folder => Path.GetDirectoryName(typeof(Engine).Assembly.Location) ?? AppDomain.CurrentDomain.BaseDirectory;
 
@@ -77,7 +83,7 @@ internal static class Engine
 
     public static void Embed(IntPtr panelParent)
     {
-        if (Closing) return;
+        if (Closing || !On) return;
         try
         {
             Directory.CreateDirectory(DataFolder);
@@ -88,6 +94,34 @@ internal static class Engine
         catch (Exception ex) when (ex is WaitHandleCannotBeOpenedException or UnauthorizedAccessException or IOException)
         {
         }
+    }
+
+    public static void Toggle() => SetOn(!On);
+
+    public static void SetOn(bool on)
+    {
+        if (Closing || on == On) return;
+        try
+        {
+            Directory.CreateDirectory(DataFolder);
+            string path = Path.Combine(DataFolder, OffFile);
+            if (on) File.Delete(path);
+            else File.WriteAllText(path, "");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            SimHub.Logging.Current.Error("Velocita: couldn't save the on / off choice", ex);
+        }
+        _on = on;
+        if (on)
+        {
+            if (!Running) Start();
+            return;
+        }
+        IntPtr[] hosts;
+        lock (Hosts) hosts = Hosts.ToArray();
+        if (Signal(DetachName)) WaitForRelease(hosts);
+        Signal(QuitName);
     }
 
     public static void AddHost(IntPtr host)

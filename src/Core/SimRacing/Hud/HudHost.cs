@@ -83,9 +83,19 @@ internal sealed class HudHost : IDisposable
         _timer.Tick += (_, _) => SafeTick();
         app.Telemetry.StatusChanged += OnStatusChanged;
         app.Telemetry.SimStarted += OnSimStarted;
+        if (!app.Demo) app.Telemetry.AddObserver(LearnMap);
         SystemEvents.DisplaySettingsChanged += OnDisplaysChanged;
         Theme.ThemeManager.Changed += OnThemeChanged;
         TakeThemeAccent();
+    }
+
+    private readonly TrackMaps.TrackMapLearner _mapLearner = new();
+
+    private void LearnMap(TelemetryFrame f)
+    {
+        if (_mapLearner.Feed(f) is not { } learned) return;
+        var s = f.Session;
+        _ = Task.Run(() => TrackMaps.TrackMapLibrary.LearnAsync(learned, s.TrackId, s.TrackName, s.TrackDisplayName, s.TrackConfig));
     }
 
     private void OnStatusChanged(SimStatus status)
@@ -1362,6 +1372,7 @@ internal sealed class HudHost : IDisposable
         Theme.ThemeManager.Changed -= OnThemeChanged;
         _app.Telemetry.StatusChanged -= OnStatusChanged;
         _app.Telemetry.SimStarted -= OnSimStarted;
+        _app.Telemetry.RemoveObserver(LearnMap);
         _active = false;
         _editing = false;
         _preview = false;

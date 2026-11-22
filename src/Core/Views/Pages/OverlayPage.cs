@@ -390,7 +390,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         Canvas.SetTop(_preview, Math.Round(maxY / 2));
     }
 
-    private const double PreviewScale = 0.75;
+    private const double PreviewScale = 0.9;
     private const double PreviewRoom = 0.8;
 
     private (string? Group, OverlayMetric? Metric) _lit;

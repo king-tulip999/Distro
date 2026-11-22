@@ -1035,14 +1035,12 @@ internal static class StatsSections
         best.Children.Add(Scoped("Personal best", "all time, in the car and track you drove last"));
         if (charts.Bests.FirstOrDefault() is { } pb)
         {
-            var carZone = RaceParts.CarSpot(pb.Car, 128, 116, 330, carArea: CarArea);
             var outline = new Border
             {
-                Width = OutlineWidth, Height = OutlineHeight, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, 12, CarArea, 0), IsHitTestVisible = false,
+                Width = OutlineWidth, Height = OutlineHeight, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, OutlineInset, 0), IsHitTestVisible = false,
                 Child = new TrackSketch(pb.Track, pb.Config, "Place4Text", 4, lap: true) { PlayOnLoad = true, TrackId = pb.TrackId, TrackName = pb.TrackName },
             };
-            block.Children.Add(carZone);
             block.Children.Add(outline);
             var lap = RaceParts.BigFigure(StatFormat.LapTime(pb.Best), 54, "Place4Text");
             lap.HorizontalAlignment = HorizontalAlignment.Left;
@@ -1055,10 +1053,8 @@ internal static class StatsSections
             best.Children.Add(figures);
             block.SizeChanged += (_, e) =>
             {
-                var shown = e.NewSize.Width - best.ActualWidth >= CarRoom ? Visibility.Visible : Visibility.Collapsed;
-                if (carZone.Car is { } shownCar && shownCar.Visibility != shown) shownCar.Visibility = shown;
                 double text = best.Margin.Left + new FrameworkElement[] { best.Children[0] as FrameworkElement ?? figures, figures }.Max(t => t.ActualWidth);
-                var map = e.NewSize.Width - text - CarArea >= OutlineWidth + 16 ? Visibility.Visible : Visibility.Collapsed;
+                var map = e.NewSize.Width - text - OutlineInset >= OutlineWidth + 16 ? Visibility.Visible : Visibility.Collapsed;
                 if (outline.Visibility != map) outline.Visibility = map;
             };
             var facts = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
@@ -1110,8 +1106,7 @@ internal static class StatsSections
     }
 
     internal const double CardWidth = 300, CardGap = 16;
-    private const double CarRoom = 300;
-    private const double CarArea = 380;
+    private const double OutlineInset = 23;
     private const double OutlineWidth = 170, OutlineHeight = 104;
 
     private static TextBlock Scoped(string title, string scope)

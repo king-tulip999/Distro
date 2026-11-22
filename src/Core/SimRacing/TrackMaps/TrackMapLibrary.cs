@@ -172,6 +172,32 @@ internal static class TrackMapLibrary
         }
     }
 
+    private static int _generation;
+
+    public static int Generation => Volatile.Read(ref _generation);
+
+    public static async Task LearnAsync(TrackMap learned, int? trackId, string trackName, string display, string config)
+    {
+        if (await ForSession(trackId, trackName, display, config).ConfigureAwait(false) is not null) return;
+        string path = Path.Combine(LearnedFolder, learned.Key + ".svg");
+        try
+        {
+            Directory.CreateDirectory(LearnedFolder);
+            string temp = path + ".tmp";
+            await File.WriteAllTextAsync(temp, learned.ToSvg()).ConfigureAwait(false);
+            File.Move(temp, path, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            App.LogError(ex);
+            return;
+        }
+        lock (Lock)
+            foreach (var key in _maps.Where(m => m.Value.IsCompletedSuccessfully && m.Value.Result is null).Select(m => m.Key).ToList())
+                _maps.Remove(key);
+        Interlocked.Increment(ref _generation);
+    }
+
     private static TrackMap? LoadLearned(string key)
     {
         string path = Path.Combine(LearnedFolder, key + ".svg");

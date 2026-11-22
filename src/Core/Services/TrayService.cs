@@ -243,7 +243,8 @@ internal sealed class TrayService : IDisposable
         }
         if (!AppIdentity.IsTecnica) _menu.Items.Add(themes);
         _menu.Items.Add(new ToolStripMenuItem("Settings", null, (_, _) => OpenRequested?.Invoke("settings")));
-        var exit = new ToolStripMenuItem($"Quit {AppIdentity.Name}") { ToolTipText = $"Closes {AppIdentity.Name}. With fan control on, it asks whether a small helper keeps your fan curves running." };
+        var exit = new ToolStripMenuItem($"Quit {AppIdentity.Name}");
+        if (AppIdentity.IsTecnica) exit.ToolTipText = $"Closes {AppIdentity.Name}. With fan control on, it asks whether a small helper keeps your fan curves running.";
         exit.Click += (_, _) => ExitRequested?.Invoke();
         _menu.Items.Add(exit);
         TrayTheme.Apply(_menu);

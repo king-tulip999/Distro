@@ -62,11 +62,11 @@ internal sealed class RaceState
     public Func<SessionInfo, bool, Task<TrackMaps.TrackMap?>>? MapLoader { get; init; }
 
     private Task<TrackMaps.TrackMap?>? _turnsLoading;
-    private (int? Id, string Name, bool Sample)? _turnsFor;
+    private (int? Id, string Name, bool Sample, int Generation)? _turnsFor;
 
     private void SyncTurns(TelemetryFrame f)
     {
-        var key = (f.Session.TrackId, f.Session.TrackName, f.Simulated);
+        var key = (f.Session.TrackId, f.Session.TrackName, f.Simulated, TrackMaps.TrackMapLibrary.Generation);
         if (key != _turnsFor)
         {
             _turnsFor = key;
