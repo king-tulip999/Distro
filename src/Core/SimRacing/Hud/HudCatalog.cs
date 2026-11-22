@@ -39,6 +39,9 @@ internal static class HudCatalog
         new("map", "Track map", "The track from iRacing's own maps, upright or turning with your car, whole or zoomed in on you, with the pit lane, start / finish and turn numbers, and every car as a dot in its class color; you stand out.", 300, 260, () => new MapWidget())
             { FixedSize = true, MinW = 140, MinH = 120, DefaultHz = 15, MovingHz = 60, Moves = MapWidget.Moves, Background = 0, Options = MapWidget.Options, Editor = Editors.MapEditor.Def,
               Limits = "Cars are placed along the track's center line from their distance round the lap; tracks without a bundled map show none." },
+        new("flatmap", "Flat track map", "The lap laid out as a line: the whole lap, the stretch around you, one line per class, a line that bends at each turn, or a thin bar along a screen edge, with every car as a dot in its class color.", 600, 118, () => new FlatMapWidget())
+            { MinW = 160, MinH = 34, DefaultHz = 15, MovingHz = 30, Moves = FlatMapWidget.Moves, Options = FlatMapWidget.Options, Editor = Editors.FlatMapEditor.Def,
+              Limits = "Cars are placed from their distance round the lap. Turn numbers, the pit lane and the bends come from the track map; tracks without a bundled map show a straight line." },
         new("laps", "Lap history", "Your laps with deltas, what happened on them, fuel used, and consistency.", 320, 260, () => new LapsWidget())
             { MinW = 200, MinH = 110, DefaultHz = 2, Options = LapsWidget.Options, Editor = Editors.LapsEditor.Def },
         new("notes", "Notes", "Your notes for this track and car: the next corner's note lights up as you get close, with the notes for the whole track under it.", 300, 140, () => new NotesWidget())

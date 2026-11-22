@@ -2,6 +2,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include <d3d11.h>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <cwchar>
@@ -32,6 +33,7 @@ constexpr int XR_TYPE_SWAPCHAIN_CREATE_INFO = 9;
 constexpr int XR_TYPE_INSTANCE_PROPERTIES = 32;
 constexpr int XR_TYPE_COMPOSITION_LAYER_QUAD = 36;
 constexpr int XR_TYPE_REFERENCE_SPACE_CREATE_INFO = 37;
+constexpr int XR_TYPE_SPACE_LOCATION = 42;
 constexpr int XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO = 55;
 constexpr int XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO = 56;
 constexpr int XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO = 57;
@@ -126,6 +128,7 @@ struct XrSwapchainImageAcquireInfo { int type; const void* next; };
 struct XrSwapchainImageWaitInfo { int type; const void* next; XrDuration timeout; };
 struct XrSwapchainImageReleaseInfo { int type; const void* next; };
 struct XrReferenceSpaceCreateInfo { int type; const void* next; int referenceSpaceType; XrPosef poseInReferenceSpace; };
+struct XrSpaceLocation { int type; void* next; XrFlags64 locationFlags; XrPosef pose; };
 struct XrSwapchainSubImage { XrSwapchain swapchain; XrRect2Di imageRect; uint32_t imageArrayIndex; };
 struct XrCompositionLayerQuad
 {
@@ -158,6 +161,7 @@ typedef XrResult (*PFN_xrWaitSwapchainImage)(XrSwapchain, const XrSwapchainImage
 typedef XrResult (*PFN_xrReleaseSwapchainImage)(XrSwapchain, const XrSwapchainImageReleaseInfo*);
 typedef XrResult (*PFN_xrCreateReferenceSpace)(XrSession, const XrReferenceSpaceCreateInfo*, XrSpace*);
 typedef XrResult (*PFN_xrDestroySpace)(XrSpace);
+typedef XrResult (*PFN_xrLocateSpace)(XrSpace, XrSpace, XrTime, XrSpaceLocation*);
 
 namespace
 {
@@ -176,7 +180,7 @@ namespace
         uint64_t writerTick;
         uint64_t readerTick;
         uint32_t count;
-        uint32_t reserved;
+        uint32_t recenter;
     };
 
     struct SharedSlot
@@ -191,8 +195,27 @@ namespace
         uint32_t pad;
     };
 
+    constexpr uint32_t ReportAt = 2048;
+
+    struct LayerReport
+    {
+        uint64_t tick;
+        int32_t endFrameResult;
+        uint32_t widgetsSent;
+        uint32_t framesWithWidgets;
+        uint32_t framesRejected;
+        uint32_t maxLayers;
+        uint32_t flags;
+        int64_t format;
+        int32_t swapchainResult;
+        uint32_t pad;
+        char runtime[128];
+    };
+
     static_assert(sizeof(SharedHeader) == 32, "header");
     static_assert(sizeof(SharedSlot) == 64, "slot");
+    static_assert(sizeof(LayerReport) == 176, "report");
+    static_assert(ReportAt >= sizeof(SharedHeader) + MaxSlots * sizeof(SharedSlot) && ReportAt + sizeof(LayerReport) <= HeaderBytes, "report place");
 
     struct Quad
     {
@@ -222,6 +245,7 @@ namespace
         PFN_xrReleaseSwapchainImage releaseSwapchainImage = nullptr;
         PFN_xrCreateReferenceSpace createReferenceSpace = nullptr;
         PFN_xrDestroySpace destroySpace = nullptr;
+        PFN_xrLocateSpace locateSpace = nullptr;
     };
 
     std::mutex g_lock;
@@ -232,7 +256,9 @@ namespace
     XrSession g_session = nullptr;
     ID3D11Device* g_device = nullptr;
     ID3D11DeviceContext* g_context = nullptr;
-    XrSpace g_local = nullptr, g_view = nullptr;
+    XrSpace g_local = nullptr, g_view = nullptr, g_anchored = nullptr;
+    uint32_t g_recenterSeen = 0;
+    bool g_recenterKnown = false;
     int64_t g_format = 0;
     bool g_swizzle = false;
     uint32_t g_maxLayers = 16;
@@ -246,6 +272,48 @@ namespace
     const XrBaseHeader* g_built[MaxSlots];
     bool g_cylinder = false;
     std::vector<uint8_t> g_scratch;
+    char g_runtimeName[128] = {};
+    bool g_rejected = false;
+    int32_t g_lastEndFrame = 0;
+    int32_t g_lastSwapchain = 0;
+    uint32_t g_lastSent = 0;
+    uint32_t g_framesWithWidgets = 0;
+    uint32_t g_framesRejected = 0;
+
+    void WriteReport()
+    {
+        if (!g_shared) return;
+        auto report = reinterpret_cast<LayerReport*>(g_shared + ReportAt);
+        report->endFrameResult = g_lastEndFrame;
+        report->widgetsSent = g_lastSent;
+        report->framesWithWidgets = g_framesWithWidgets;
+        report->framesRejected = g_framesRejected;
+        report->maxLayers = g_maxLayers;
+        report->flags = (g_cylinder ? 1u : 0u) | (g_rejected ? 2u : 0u) | (g_device ? 4u : 0u) | (g_format ? 8u : 0u);
+        report->format = g_format;
+        report->swapchainResult = g_lastSwapchain;
+        memcpy(report->runtime, g_runtimeName, sizeof(report->runtime));
+        MemoryBarrier();
+        report->tick = GetTickCount64();
+    }
+
+    HANDLE g_processClaim = nullptr;
+
+    bool ClaimProcess()
+    {
+        if (g_processClaim) return true;
+        wchar_t name[64] = {};
+        swprintf_s(name, L"Local\\VelocitaXrActive.%lu", GetCurrentProcessId());
+        HANDLE claim = CreateMutexW(nullptr, FALSE, name);
+        if (!claim) return false;
+        if (GetLastError() == ERROR_ALREADY_EXISTS)
+        {
+            CloseHandle(claim);
+            return false;
+        }
+        g_processClaim = claim;
+        return true;
+    }
 
     bool IsTargetProcess()
     {
@@ -299,6 +367,7 @@ namespace
         if (g_mapping) CloseHandle(g_mapping);
         g_shared = nullptr;
         g_mapping = nullptr;
+        g_recenterKnown = false;
     }
 
     void DropQuad(Quad& q)
@@ -312,7 +381,8 @@ namespace
         for (auto& q : g_quads) DropQuad(q);
         if (g_local && g_next.destroySpace) g_next.destroySpace(g_local);
         if (g_view && g_next.destroySpace) g_next.destroySpace(g_view);
-        g_local = g_view = nullptr;
+        if (g_anchored && g_next.destroySpace) g_next.destroySpace(g_anchored);
+        g_local = g_view = g_anchored = nullptr;
         if (g_context) g_context->Release();
         if (g_device) g_device->Release();
         g_context = nullptr;
@@ -334,7 +404,9 @@ namespace
         info.faceCount = 1;
         info.arraySize = 1;
         info.mipCount = 1;
-        if (g_next.createSwapchain(g_session, &info, &q.swapchain) != XR_SUCCESS) { q.swapchain = nullptr; return false; }
+        XrResult created = g_next.createSwapchain(g_session, &info, &q.swapchain);
+        g_lastSwapchain = created;
+        if (created != XR_SUCCESS) { q.swapchain = nullptr; return false; }
         uint32_t count = 0;
         if (g_next.enumerateSwapchainImages(q.swapchain, 0, &count, nullptr) != XR_SUCCESS || count == 0) { DropQuad(q); return false; }
         std::vector<XrSwapchainImageD3D11KHR> images(count);
@@ -378,10 +450,42 @@ namespace
         return ok;
     }
 
-    uint32_t BuildQuads()
+    void Recenter(XrTime time)
+    {
+        if (!g_next.locateSpace || !g_local || !g_view) return;
+        XrSpaceLocation head{};
+        head.type = XR_TYPE_SPACE_LOCATION;
+        if (g_next.locateSpace(g_view, g_local, time, &head) != XR_SUCCESS || (head.locationFlags & 0x3) != 0x3) return;
+        const XrQuaternionf& q = head.pose.orientation;
+        float forwardX = -2 * (q.x * q.z + q.w * q.y);
+        float forwardZ = -(1 - 2 * (q.x * q.x + q.y * q.y));
+        float yaw = std::fabs(forwardX) + std::fabs(forwardZ) < 1e-6f ? 0.0f : std::atan2(-forwardX, -forwardZ);
+        XrReferenceSpaceCreateInfo space{};
+        space.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO;
+        space.referenceSpaceType = 2;
+        space.poseInReferenceSpace.orientation = { 0, std::sin(yaw / 2), 0, std::cos(yaw / 2) };
+        space.poseInReferenceSpace.position = head.pose.position;
+        XrSpace anchored = nullptr;
+        if (g_next.createReferenceSpace(g_session, &space, &anchored) != XR_SUCCESS) return;
+        if (g_anchored) g_next.destroySpace(g_anchored);
+        g_anchored = anchored;
+    }
+
+    uint32_t BuildQuads(XrTime time)
     {
         if (!g_session || !g_device || !g_format || !OpenShared()) return 0;
         auto header = reinterpret_cast<SharedHeader*>(g_shared);
+        uint32_t recenter = header->recenter;
+        if (!g_recenterKnown)
+        {
+            g_recenterSeen = recenter;
+            g_recenterKnown = true;
+        }
+        else if (recenter != g_recenterSeen)
+        {
+            g_recenterSeen = recenter;
+            Recenter(time);
+        }
         ULONGLONG now = GetTickCount64();
         header->readerTick = now;
         bool stale = now - header->writerTick > StaleMs;
@@ -414,7 +518,7 @@ namespace
             if (!q.ready) continue;
             SharedSlot s = *slot;
             if (s.mode == 0 || s.w != q.w || s.h != q.h) continue;
-            XrSpace space = s.mode == 2 ? g_view : g_local;
+            XrSpace space = s.mode == 2 ? g_view : g_anchored ? g_anchored : g_local;
             if (!space) continue;
             XrSwapchainSubImage sub{};
             sub.swapchain = q.swapchain;
@@ -464,22 +568,38 @@ namespace
         std::lock_guard<std::mutex> guard(g_lock);
         if (g_faulted || session != g_session || !info) return g_next.endFrame(session, info);
         uint32_t quads = 0;
-        try { quads = BuildQuads(); }
+        try { quads = BuildQuads(info->displayTime); }
         catch (...)
         {
             g_faulted = true;
             quads = 0;
         }
-        if (quads == 0) return g_next.endFrame(session, info);
         uint32_t room = g_maxLayers > info->layerCount ? g_maxLayers - info->layerCount : 0;
         if (quads > room) quads = room;
-        if (quads == 0) return g_next.endFrame(session, info);
+        if (g_rejected) quads = 0;
+        g_lastSent = quads;
+        if (quads == 0)
+        {
+            WriteReport();
+            return g_next.endFrame(session, info);
+        }
         g_layers.assign(info->layers, info->layers + info->layerCount);
         for (uint32_t i = 0; i < quads; i++) g_layers.push_back(g_built[i]);
         XrFrameEndInfo copy = *info;
         copy.layerCount = uint32_t(g_layers.size());
         copy.layers = g_layers.data();
-        return g_next.endFrame(session, &copy);
+        XrResult result = g_next.endFrame(session, &copy);
+        g_lastEndFrame = result;
+        g_framesWithWidgets++;
+        if (result < 0)
+        {
+            g_framesRejected++;
+            XrResult plain = g_next.endFrame(session, info);
+            if (plain >= 0) g_rejected = true;
+            result = plain;
+        }
+        WriteReport();
+        return result;
     }
 
     void PickFormat()
@@ -518,6 +638,12 @@ namespace
     void SetUpSession(XrInstance instance, const XrSessionCreateInfo* info, XrSession session, ID3D11Device* device)
     {
         DropSession();
+        g_rejected = false;
+        g_lastEndFrame = 0;
+        g_lastSwapchain = 0;
+        g_lastSent = 0;
+        g_framesWithWidgets = 0;
+        g_framesRejected = 0;
         g_session = session;
         g_device = device;
         g_device->AddRef();
@@ -629,6 +755,7 @@ namespace
         Load("xrReleaseSwapchainImage", g_next.releaseSwapchainImage);
         Load("xrCreateReferenceSpace", g_next.createReferenceSpace);
         Load("xrDestroySpace", g_next.destroySpace);
+        Load("xrLocateSpace", g_next.locateSpace);
         bool complete = g_next.destroyInstance && g_next.getInstanceProperties && g_next.createSession && g_next.destroySession && g_next.endFrame
             && g_next.enumerateSwapchainFormats && g_next.createSwapchain && g_next.destroySwapchain && g_next.enumerateSwapchainImages
             && g_next.acquireSwapchainImage && g_next.waitSwapchainImage && g_next.releaseSwapchainImage && g_next.createReferenceSpace && g_next.destroySpace;
@@ -637,7 +764,9 @@ namespace
         props.type = XR_TYPE_INSTANCE_PROPERTIES;
         if (g_next.getInstanceProperties(g_instance, &props) != XR_SUCCESS) return result;
         props.runtimeName[sizeof(props.runtimeName) - 1] = 0;
+        memcpy(g_runtimeName, props.runtimeName, sizeof(g_runtimeName));
         if (strstr(props.runtimeName, "SteamVR") != nullptr) return result;
+        if (!ClaimProcess()) return result;
         g_active = true;
         return result;
     }

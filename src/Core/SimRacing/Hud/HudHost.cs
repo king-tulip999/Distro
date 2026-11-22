@@ -764,6 +764,21 @@ internal sealed class HudHost : IDisposable
         return new VrPose(0, y, distance, width, turn, tilt, 0);
     }
 
+    public void RecenterVr()
+    {
+        if (!_vr.Showing)
+        {
+            _app.Notify("Nothing to recenter", !_vr.On ? "VR widgets are off in Overlay settings." : "No headset is showing VR widgets right now.", NoticeKind.Info);
+            return;
+        }
+        if (!_vr.Recenter())
+        {
+            _app.Notify("Couldn't recenter", "The headset's position wasn't available. Try again while wearing it.", NoticeKind.Info);
+            return;
+        }
+        VrRedraw();
+    }
+
     public void VrNext()
     {
         if (_editor is null) return;

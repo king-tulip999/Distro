@@ -37,7 +37,7 @@ See every widget, Session Stats and Tecnica feature on the **[website](https://d
 <h3>Velocita</h3>
 For racing in iRacing
 <br><br>
-<sub>Overlays · Session Stats · Setups · FOV · Bass shakers</sub>
+<sub>Overlays · Session Stats · Setups · FOV</sub>
 <br><br>
 </td>
 <td width="50%" align="center">
@@ -91,7 +91,6 @@ Your iRacing history, kept on your PC: result cards, ratings, personal bests, an
 | **FOV calculator** | Single or triple screens, compared side by side and written straight into iRacing |
 | **iRacing settings** | Every iRacing setting in plain language, searchable, with what you changed from the defaults and one-click undo |
 | **iRacing keybinds** | Every in-sim keybind per profile, with what's set, missing or changed |
-| **Bass shakers** | Engine, shifts, ABS, curbs and the rev limiter through any sound output |
 | **Trading Paints and Garage 61** | Start them with Velocita or when iRacing starts, and see your own paint on car pictures across the app |
 
 ### GRR League

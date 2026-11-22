@@ -507,7 +507,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             return combo;
         }
         parts.Children.Add(Part("Show layout", Ui.Combo(S.Layouts.Select(l => new Choice(l.Name, l.Name)), rule.Layout, c => { rule.Layout = c.Id!; Changed(); RefreshStatus(); }, 122)));
-        parts.Children.Add(Part("In", Ui.Combo(new[]
+        parts.Children.Add(Part("Session", Ui.Combo(new[]
         {
             new Choice("", "Every session"), new Choice("Practice", "Practice"), new Choice("Qualify", "Qualifying"), new Choice("Race", "Race"),
             new Choice("TimeTrial", "Time trials"),
@@ -703,6 +703,50 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             if (warn) status.SetResourceReference(TextBlock.ForegroundProperty, "WarnDeep");
             else status.ClearValue(TextBlock.ForegroundProperty);
             status.Visibility = text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            RefreshAdmin(vr);
+        }
+        var adminNote = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4) };
+        string? adminError = null;
+        bool adminBusy = false;
+        Button adminSetUp = null!, adminUpdate = null!, adminRemove = null!;
+        StackPanel adminRow = null!;
+        adminSetUp = Ui.LabeledButton("I.Shield", "Set up for iRacing as admin", () => RunAdmin(false), "GhostButton");
+        adminUpdate = Ui.LabeledButton("I.Shield", "Update for iRacing as admin", () => RunAdmin(false), "GhostButton");
+        adminRemove = Ui.LabeledButton("I.Trash", "Remove admin setup", () => RunAdmin(true), "GhostButton");
+        adminSetUp.ToolTip = adminUpdate.ToolTip = adminRemove.ToolTip = "One Windows administrator prompt";
+        adminUpdate.Margin = new Thickness(0, 0, 8, 0);
+        var adminButtons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4), Children = { adminSetUp, adminUpdate, adminRemove } };
+        adminRow = new StackPanel { Children = { adminNote, adminButtons } };
+        void RefreshAdmin(SimRacing.Hud.Vr.HudVr? vr)
+        {
+            bool installed = !app.Demo && SimRacing.Hud.Vr.OpenXrLayer.MachineInstalled;
+            bool current = installed && SimRacing.Hud.Vr.OpenXrLayer.MachineCurrent;
+            bool admin = vr?.IracingAsAdmin == true;
+            bool show = S.VrOverlays && !app.Demo && (admin || installed || adminError is not null);
+            adminRow.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            if (!show) return;
+            bool warn = true;
+            adminNote.Text = adminError
+                ?? (!installed ? "iRacing is running as administrator, so Windows keeps the VR layer out of it. Set it up once for iRacing as admin, then restart iRacing."
+                    : !current ? "The VR layer for iRacing as admin is out of date. Update it, then restart iRacing."
+                    : "Set up for iRacing as admin.");
+            if (adminError is null && current) warn = false;
+            if (warn) adminNote.SetResourceReference(TextBlock.ForegroundProperty, "WarnDeep");
+            else adminNote.ClearValue(TextBlock.ForegroundProperty);
+            adminSetUp.Visibility = installed ? Visibility.Collapsed : Visibility.Visible;
+            adminUpdate.Visibility = installed && !current ? Visibility.Visible : Visibility.Collapsed;
+            adminRemove.Visibility = installed ? Visibility.Visible : Visibility.Collapsed;
+            adminSetUp.IsEnabled = adminUpdate.IsEnabled = adminRemove.IsEnabled = !adminBusy;
+        }
+        async void RunAdmin(bool remove)
+        {
+            if (adminBusy || app.Demo) return;
+            adminBusy = true;
+            adminError = null;
+            RefreshAdmin(Host()?.Vr);
+            adminError = await SimRacing.Hud.Vr.OpenXrLayer.SetUpMachine(remove);
+            adminBusy = false;
+            RefreshAdmin(Host()?.Vr);
         }
         var toggle = Ui.Switch(S.VrOverlays, on => { S.VrOverlays = on; changed(); Host()?.SyncVr(); app.Hotkeys.RegisterAll(); Refresh(); });
         Refresh();
@@ -714,10 +758,19 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 ? "Widgets set to show in VR appear in SteamVR and in iRacing through OpenXR, drawn by this plugin, not as SimHub overlays. Each widget's spot is on its page. Turn this on in only one of Velocita and Velocita for SimHub."
                 : "Widgets set to show in VR appear in SteamVR and in OpenXR games, iRacing included. Each widget's spot is on its page.", toggle),
             status,
+            adminRow,
             Ui.SubHeader("Move every cockpit widget"),
             Shift("Sideways", "Right is positive.", HudWidgetConfig.VrReach, S.VrShiftX, v => S.VrShiftX = v),
             Shift("Height", "Up is positive.", HudWidgetConfig.VrReach, S.VrShiftY, v => S.VrShiftY = v),
             Shift("Distance", "Further is positive.", RaceHudSettings.MaxVrShiftDistance, S.VrShiftDistance, v => S.VrShiftDistance = v),
+            Recenter(),
+            new TextBlock
+            {
+                Text = "Puts the cockpit widgets back in front of where your head is now, for when they drift out of line with the car. "
+                    + (string.IsNullOrWhiteSpace(S.VrRecenterHotkey) || AppIdentity.SimHub ? "" : $"{Core.Hotkeys.Hotkey.Display(S.VrRecenterHotkey)} does it too. ")
+                    + "Lasts until the game or SteamVR restarts.",
+                Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4),
+            },
             Ui.SubHeader("Edit in the headset"),
             EditInHeadset(),
             new TextBlock
@@ -726,6 +779,13 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                     + "A panel opens in front of you: the mouse or a SteamVR controller picks a widget and moves it. Right-click or Done gives the mouse back.",
                 Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4),
             });
+        FrameworkElement Recenter()
+        {
+            var button = Ui.LabeledButton("I.Target", "Recenter VR widgets", () => Host()?.RecenterVr(), "GhostButton");
+            button.HorizontalAlignment = HorizontalAlignment.Left;
+            button.Margin = new Thickness(0, 4, 0, 0);
+            return button;
+        }
         FrameworkElement EditInHeadset()
         {
             var open = Ui.LabeledButton("I.Move", "Edit VR widgets in the headset", () => Host()?.ToggleVrAdjust(), "GhostButton");
@@ -1157,19 +1217,19 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             Ui.SettingRow("Laps measured", "Recent clean green-flag laps used for fuel per lap.", Box(fuel.Window, "laps", 1, 30, 1, 0, v => fuel.Window = (int)v),
                 D(() => fuel.Window == std.Window, () => fuel.Window = std.Window, RaceFormat.Count(std.Window, "lap")),
                 "Fuel per lap comes from this many recent clean laps under green; newer laps count more and a lap far from the rest is left out."),
-            Ui.SettingRow("Extra consumption", "For a pace that uses more than your clean laps.", Box(fuel.ExtraPercent, "%", 0, 25, 0.5, 1, v => fuel.ExtraPercent = v),
+            Ui.SettingRow("Extra consumption", "Adds this much to fuel per lap, for a faster pace than your clean laps.", Box(fuel.ExtraPercent, "%", 0, 25, 0.5, 1, v => fuel.ExtraPercent = v),
                 D(() => fuel.ExtraPercent == std.ExtraPercent, () => fuel.ExtraPercent = std.ExtraPercent, "0%"),
                 "This share of the expected fuel to the flag is added, for a pace or style that uses more than your clean laps did."),
             Ui.SubHeader("Extra fuel"),
-            Ui.SettingRow("Safety reserve", "Extra fuel for lap-to-lap variation.",
+            Ui.SettingRow("Safety reserve", "Covers lap-to-lap variation, worked out from your recent laps.",
                 Ui.Segmented(new[] { "Aggressive", "Balanced", "Conservative" }, (int)fuel.Safety, i => { fuel.Safety = (FuelSafety)i; Changed(); RefreshFormulas(); }, "fuelsafety"),
                 D(() => fuel.Safety == std.Safety, () => fuel.Safety = std.Safety, std.Safety.ToString()),
                 "Extra fuel for how much your laps vary, how sure the average is and how fuel use drifts over a stint (at least 1 / 1.5 / 2% of the fuel to the flag): Aggressive ≈ enough 9 times in 10, Balanced ≈ 19 in 20, Conservative ≈ 99 in 100. A model, not a guarantee; it needs 2 clean laps."),
-            Ui.SettingRow("Margin at the flag", "Your own fuel on top of the reserve.", Box(fuel.MarginLaps, "laps", 0, 10, 0.1, 1, v => fuel.MarginLaps = v),
+            Ui.SettingRow("Margin at the flag", "Laps of fuel still in the tank when the race ends.", Box(fuel.MarginLaps, "laps", 0, 10, 0.1, 1, v => fuel.MarginLaps = v),
                 D(() => fuel.MarginLaps == std.MarginLaps, () => fuel.MarginLaps = std.MarginLaps, $"{std.MarginLaps:0.0} laps")),
-            Ui.SettingRow("Fixed reserve", "Kept on top of everything else.", Box(fuel.ReserveLiters, "L", 0, 50, 0.1, 1, v => fuel.ReserveLiters = v),
+            Ui.SettingRow("Fixed reserve", "Always kept in the tank on top of the rest.", Box(fuel.ReserveLiters, "L", 0, 50, 0.1, 1, v => fuel.ReserveLiters = v),
                 D(() => fuel.ReserveLiters == std.ReserveLiters, () => fuel.ReserveLiters = std.ReserveLiters, "0 L")),
-            Ui.SettingRow("Extra distance", "A long pit lane, the lap after the flag.", Box(fuel.ExtraKm, Units.Km, 0, 50, 0.1, 1, v => fuel.ExtraKm = v),
+            Ui.SettingRow("Extra distance", "Driven beyond the race distance, like a long pit lane or the lap after the flag.", Box(fuel.ExtraKm, Units.Km, 0, 50, 0.1, 1, v => fuel.ExtraKm = v),
                 D(() => fuel.ExtraKm == std.ExtraKm, () => fuel.ExtraKm = std.ExtraKm, $"0 {Units.Km}"),
                 "Distance on top of the race (a long pit lane, the lap after the flag), turned into laps of this track."),
             Ui.SubHeader("Stops"),

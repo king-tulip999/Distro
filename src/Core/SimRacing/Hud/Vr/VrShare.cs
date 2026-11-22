@@ -9,7 +9,7 @@ internal sealed class VrShare : IDisposable
     public const string MapName = "Local\\VelocitaVr";
     public const uint Magic = 0x31525856, Version = 1;
     public const int MaxSlots = 16, HeaderBytes = 4096, SlotPixelBytes = 2 * 1024 * 1024, MaxPixels = SlotPixelBytes / 4;
-    private const int SlotHeaderStart = 32, SlotHeaderBytes = 64, ReaderFreshMs = 3000;
+    private const int RecenterAt = 28, SlotHeaderStart = 32, SlotHeaderBytes = 64, ReaderFreshMs = 3000;
 
     private MemoryMappedFile? _file;
     private MemoryMappedViewAccessor? _view;
@@ -78,6 +78,36 @@ internal sealed class VrShare : IDisposable
         }
         Thread.MemoryBarrier();
         v.Write(at, seq + 2);
+    }
+
+    public const int ReportAt = 2048, ReportBytes = 176, RuntimeNameBytes = 128;
+
+    internal readonly record struct LayerReport(long Tick, int EndFrameResult, uint WidgetsSent, uint FramesWithWidgets, uint FramesRejected,
+        uint MaxLayers, uint Flags, long Format, int SwapchainResult, string Runtime)
+    {
+        public bool Cylinder => (Flags & 1) != 0;
+        public bool Rejected => (Flags & 2) != 0;
+        public bool HasDevice => (Flags & 4) != 0;
+        public bool HasFormat => (Flags & 8) != 0;
+    }
+
+    public LayerReport? ReadReport()
+    {
+        if (_view is not { } v) return null;
+        long tick = v.ReadInt64(ReportAt);
+        if (tick == 0) return null;
+        var name = new byte[RuntimeNameBytes];
+        v.ReadArray(ReportAt + 48, name, 0, name.Length);
+        int end = Array.IndexOf(name, (byte)0);
+        string runtime = System.Text.Encoding.UTF8.GetString(name, 0, end < 0 ? name.Length : end);
+        return new LayerReport(tick, v.ReadInt32(ReportAt + 8), v.ReadUInt32(ReportAt + 12), v.ReadUInt32(ReportAt + 16), v.ReadUInt32(ReportAt + 20),
+            v.ReadUInt32(ReportAt + 24), v.ReadUInt32(ReportAt + 28), v.ReadInt64(ReportAt + 32), v.ReadInt32(ReportAt + 40), runtime);
+    }
+
+    public void Recenter()
+    {
+        if (_view is not { } v) return;
+        v.Write(RecenterAt, v.ReadUInt32(RecenterAt) + 1);
     }
 
     public void Hide(int slot)

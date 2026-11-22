@@ -88,13 +88,11 @@ public sealed class SimRacingSettings
 
     public RaceHudSettings Hud { get; set; } = new();
 
-    public ShakerSettings Shakers { get; set; } = new();
-
     public List<PanelSlot> PanelLayout { get; set; } = new();
 
     public int PanelLayoutVersion { get; set; }
 
-    public static readonly string[] RemovedPanels = { "engineer", "fuel" };
+    public static readonly string[] RemovedPanels = { "engineer", "fuel", "shakers" };
 
     public void MigratePanelLayout()
     {

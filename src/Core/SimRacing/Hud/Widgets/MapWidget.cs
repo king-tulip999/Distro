@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Globalization;
+using Core.SimRacing.Race;
 using Core.SimRacing.Telemetry;
 using Core.SimRacing.TrackMaps;
 
@@ -14,7 +16,14 @@ internal sealed class MapWidget : HudWidget
         HudOption.Number("zoom", "Zoom", 1, 1, 8, 0.5, null, "1 shows the whole track; above that the map closes in on your car"),
         HudOption.Bool("rotate", "Turn with my car", false, "Your direction of travel points up"),
         HudOption.Bool("turns", "Turn numbers", true, "Numbers that would overlap are left out"),
-        HudOption.Bool("positions", "Positions on the dots", true, "Class positions inside the dots once they are big enough"),
+        HudOption.Choice("dotStyle", "Style", "dot", new HudChoice("dot", "Dot"), new HudChoice("pill", "Pill"), new HudChoice("circle", "Circle")),
+        HudOption.Number("dotSize", "Dot size", 100, 50, 300, 10, "%"),
+        HudOption.Number("myDotSize", "My dot size", 100, 50, 300, 10, "%", "Compared with the other dots"),
+        HudOption.Bool("positions", "Text on the dots", true, "Shown once the dots are big enough"),
+        HudOption.Choice("dotText", "Text", "position", new HudChoice("position", "Class position"), new HudChoice("number", "Car number")),
+        HudOption.Bool("spread", "Spread packs along the track", true, "Cars in a pack slide a little along the track so their numbers fit"),
+        HudOption.Int("maxMove", "Max move", 8, 0, 20, "%", "How far, as a share of a lap, a car may slide from where it really is"),
+        HudOption.Bool("lapColors", "Lap colors", false, "Race only. Red edge: lapping you. Blue edge: a lap or more behind you"),
         HudOption.Bool("pit", "Cars on pit road", true, "Dimmed where iRacing places them along the track"),
     };
 
@@ -23,9 +32,8 @@ internal sealed class MapWidget : HudWidget
     private const double HeadingLookMetres = 25;
     private const double TurnSettleSeconds = 0.3;
 
-    private Task<TrackMap?>? _loading;
-    private (int? Id, string Name, string Display, bool Sample, int Generation) _for;
-    private TrackMap? _map;
+    private readonly HudMapSource _maps = new();
+    private TrackMap? _angleFor;
     private TrackMap? _builtFor;
     private RectangleF _extent;
     private GraphicsPath? _surface, _centre, _pit, _pitLines;
@@ -37,22 +45,32 @@ internal sealed class MapWidget : HudWidget
     private readonly Matrix _toScreen = new();
     private readonly Matrix _back = new();
     private readonly List<RectangleF> _labels = new();
+    private const float LabelReach = 0.95f;
+    private readonly float[] _dotX = new float[TelemetryFrame.MaxCars], _dotY = new float[TelemetryFrame.MaxCars], _dotR = new float[TelemetryFrame.MaxCars];
+    private readonly int[] _dotCar = new int[TelemetryFrame.MaxCars];
+    private readonly Color[] _dotColor = new Color[TelemetryFrame.MaxCars];
+    private readonly bool[] _dotCovered = new bool[TelemetryFrame.MaxCars];
+    private const float BadgeHeight = 1.8f;
+    private const double TextReturnSeconds = 0.2;
+    private const double SlideSettleSeconds = 0.05;
+    private const float SlidePixelsPerSecond = 240;
+    private readonly Badge[] _badges = new Badge[TelemetryFrame.MaxCars];
+    private readonly int[] _order = new int[TelemetryFrame.MaxCars], _chain = new int[TelemetryFrame.MaxCars], _blockCount = new int[TelemetryFrame.MaxCars];
+    private readonly double[] _orderKey = new double[TelemetryFrame.MaxCars], _chainKey = new double[TelemetryFrame.MaxCars];
+    private readonly double[] _real = new double[TelemetryFrame.MaxCars], _need = new double[TelemetryFrame.MaxCars], _placed = new double[TelemetryFrame.MaxCars], _blockSum = new double[TelemetryFrame.MaxCars];
+    private readonly double[] _shown = new double[TelemetryFrame.MaxCars];
+    private readonly bool[] _hasShown = new bool[TelemetryFrame.MaxCars];
+    private readonly long[] _clearSince = new long[TelemetryFrame.MaxCars];
+    private long _badgesAt;
 
-    private TrackMap? Map(HudPainter p, TelemetryFrame f)
+    private struct Badge
     {
-        var s = f.Session;
-        bool sample = f.Simulated;
-        var key = (s.TrackId, s.TrackName, s.TrackDisplayName, sample, TrackMapLibrary.Generation);
-        if (_loading is null || key != _for)
-        {
-            _for = key;
-            _map = null;
-            _angleSet = false;
-            _loading = sample ? TrackMapLibrary.ByKey(TrackMapLibrary.SampleKey) : TrackMapLibrary.ForSession(s.TrackId, s.TrackName, s.TrackDisplayName, s.TrackConfig);
-        }
-        if (!_loading.IsCompleted && p.IsPreview) _loading.Wait(TimeSpan.FromSeconds(3));
-        if (_loading.IsCompletedSuccessfully) _map = _loading.Result;
-        return _map;
+        public int Car;
+        public double Rel, Shift;
+        public float X, Y, HalfW, HalfH;
+        public Color Color;
+        public Color? Edge;
+        public string? Label;
     }
 
     public override void Draw(HudPainter p, HudView v)
@@ -60,9 +78,9 @@ internal sealed class MapWidget : HudWidget
         if (DrawWaiting(p, v, "Track map")) return;
         var f = v.Frame;
         var area = p.Header("Track map", f.Session.TrackDisplayName);
-        if (Map(p, f) is not { } map)
+        if (_maps.Get(p, f) is not { } map)
         {
-            if (_loading is { IsCompleted: false })
+            if (_maps.Loading)
             {
                 p.Text("Loading the map", p.Body, p.P.Muted, area, HAlign.Center, VAlign.Center);
                 return;
@@ -73,11 +91,17 @@ internal sealed class MapWidget : HudWidget
             p.Text("Drive one clean lap", p.Body, p.P.Muted, upper with { Y = upper.Bottom }, HAlign.Center, VAlign.Center);
             return;
         }
+        if (!ReferenceEquals(map, _angleFor))
+        {
+            _angleFor = map;
+            _angleSet = false;
+        }
         float d = p.Density;
         float side = Math.Min(area.Width, area.Height);
-        float dot = Math.Clamp(side / 60, 4, 8) * d;
+        float dot = Math.Clamp(side / 60, 4, 8) * d * (float)(v.Options.Number("dotSize") / 100);
         Build(map);
-        _view = View(p, v, map, area, dot + 2 * d);
+        float mine = (dot + 2 * d) * (float)(v.Options.Number("myDotSize") / 100);
+        _view = View(p, v, map, area, Math.Max(dot, mine) + 2 * d);
         var track = p.P.MapTrack ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.3);
         var edge = p.P.MapEdge ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.55);
         var pitColor = p.P.MapPit ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.18);
@@ -96,7 +120,8 @@ internal sealed class MapWidget : HudWidget
             p.Line(a.X, a.Y, b.X, b.Y, p.P.Heading, Math.Max(2, 3 * d));
         }
         if (v.Options.Bool("turns")) Turns(p, map, area);
-        Cars(p, v, map, dot);
+        if (v.Options.Value("dotStyle") is "pill" or "circle") Badges(p, v, map, dot, mine);
+        else Cars(p, v, map, dot, mine);
         g.ResetClip();
     }
 
@@ -189,15 +214,21 @@ internal sealed class MapWidget : HudWidget
         }
     }
 
-    private void Cars(HudPainter p, HudView v, TrackMap map, float dot)
+    private void Cars(HudPainter p, HudView v, TrackMap map, float dot, float myDot)
     {
         var f = v.Frame;
         var s = f.Session;
+        float d = p.Density;
         bool multiclass = s.NumCarClasses > 1;
-        bool numbers = v.Options.Bool("positions") && dot >= 7 * p.Density;
+        bool text = v.Options.Bool("positions") && dot >= 7 * d;
+        bool carNumbers = v.Options.Value("dotText") == "number";
         bool pit = v.Options.Bool("pit");
         int me = f.PlayerCarIdx;
+        bool lapColors = v.Options.Bool("lapColors") && f.SessionKind == SessionKind.Race && me >= 0 && me < TelemetryFrame.MaxCars && f.CarLapDistPct[me] >= 0;
+        double myPct = lapColors ? f.CarLapDistPct[me] : 0;
+        double myDist = lapColors ? FieldOrder.Distance(f, me) ?? 0 : 0;
         var others = p.P.MapCars ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.8);
+        int n = 0;
         for (int pass = 0; pass < 2; pass++)
             for (int car = 0; car < TelemetryFrame.MaxCars; car++)
             {
@@ -211,14 +242,242 @@ internal sealed class MapWidget : HudWidget
                 float x = at.X, y = at.Y;
                 var color = mine ? p.P.Player : multiclass ? p.ClassColor(s, driver.ClassId) : others;
                 if (onPit && !mine) color = HudPalette.Alpha(color, 110);
-                float r = mine ? dot + 2 * p.Density : dot;
-                p.Dot(x, y, r + (mine ? 2 : 1), mine ? p.P.Heading : p.P.Bg);
+                float r = mine ? myDot : dot;
+                int laps = lapColors && !mine ? LapDiff(f, car, pct, myPct, myDist) : 0;
+                if (laps != 0) p.Dot(x, y, r + 2 * d, laps > 0 ? p.P.Lapping : p.P.Lapped);
+                else p.Dot(x, y, r + (mine ? 2 : 1), mine ? p.P.Heading : p.P.Bg);
                 p.Dot(x, y, r, color);
-                if (numbers && !mine && f.CarClassPosition[car] > 0)
-                    p.Text(f.CarClassPosition[car].ToString(System.Globalization.CultureInfo.InvariantCulture), p.Font(Math.Max(8, r * 1.3f / p.Density), true),
-                        HudPalette.On(color), new RectangleF(x - r, y - r, r * 2, r * 2), HAlign.Center, VAlign.Center, false);
+                _dotX[n] = x;
+                _dotY[n] = y;
+                _dotR[n] = r;
+                _dotCar[n] = car;
+                _dotColor[n] = color;
+                n++;
             }
+        if (!text) return;
+        Covered(_dotX, _dotY, _dotR, n, _dotCovered);
+        for (int i = 0; i < n; i++)
+        {
+            int car = _dotCar[i];
+            if (car == me || _dotCovered[i] || !s.ByCar.TryGetValue(car, out var driver) || Label(f, driver, car, carNumbers) is not { Length: > 0 } label) continue;
+            DotLabels.Draw(p, label, _dotX[i], _dotY[i], _dotR[i], _dotColor[i]);
+        }
     }
+
+    private void Badges(HudPainter p, HudView v, TrackMap map, float dot, float myDot)
+    {
+        var f = v.Frame;
+        var s = f.Session;
+        float d = p.Density;
+        bool circle = v.Options.Value("dotStyle") == "circle";
+        bool multiclass = s.NumCarClasses > 1;
+        bool text = v.Options.Bool("positions") && dot >= 5 * d;
+        bool carNumbers = v.Options.Value("dotText") == "number";
+        bool pit = v.Options.Bool("pit");
+        int me = f.PlayerCarIdx;
+        bool hasMe = me >= 0 && me < TelemetryFrame.MaxCars && f.CarLapDistPct[me] >= 0;
+        double myPct = hasMe ? f.CarLapDistPct[me] : 0;
+        bool lapColors = v.Options.Bool("lapColors") && f.SessionKind == SessionKind.Race && hasMe;
+        double myDist = lapColors ? FieldOrder.Distance(f, me) ?? 0 : 0;
+        var others = p.P.MapCars ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.8);
+        var font = p.Font(Math.Max(8, dot * 1.15f / d), true);
+        float widest = 0;
+        int n = 0;
+        for (int car = 0; car < TelemetryFrame.MaxCars; car++)
+        {
+            if (car == me) continue;
+            double pct = f.CarLapDistPct[car];
+            if (pct < 0 || !s.ByCar.TryGetValue(car, out var driver) || !driver.Races || !v.ClassShown(car)) continue;
+            bool onPit = f.CarOnPitRoad[car];
+            if (onPit && !pit) continue;
+            var color = multiclass ? p.ClassColor(s, driver.ClassId) : others;
+            if (onPit) color = HudPalette.Alpha(color, 110);
+            int laps = lapColors ? LapDiff(f, car, pct, myPct, myDist) : 0;
+            string? label = text ? Label(f, driver, car, carNumbers) : null;
+            if (label is { Length: > 0 }) widest = Math.Max(widest, p.Measure(label, font));
+            double rel = pct - myPct;
+            rel -= Math.Round(rel);
+            _badges[n] = new Badge { Car = car, Rel = rel, Color = color, Edge = laps > 0 ? p.P.Lapping : laps < 0 ? p.P.Lapped : null, Label = label };
+            _orderKey[n] = FieldOrder.Distance(f, car) ?? pct;
+            _order[n] = n;
+            n++;
+        }
+        var size = BadgeSize(circle, dot * BadgeHeight, text ? widest : 0);
+        float edge = 1.5f * d;
+        for (int i = 0; i < n; i++)
+        {
+            _badges[i].HalfW = size.Width / 2 + edge;
+            _badges[i].HalfH = size.Height / 2 + edge;
+        }
+        float myHalf = myDot + 2 * d;
+        long now = Stopwatch.GetTimestamp();
+        double dt = _badgesAt == 0 ? 0 : Math.Min(0.5, Stopwatch.GetElapsedTime(_badgesAt, now).TotalSeconds);
+        _badgesAt = now;
+        bool spread = text && hasMe && v.Options.Bool("spread");
+        bool snap = p.IsPreview || dt <= 0;
+        double trackPx = Math.Max(1, map.Length * _view.Scale);
+        if (spread)
+        {
+            double maxShift = v.Options.Int("maxMove") / 100.0;
+            Chain(map, n, myPct, myHalf, edge, trackPx, maxShift, 1);
+            Chain(map, n, myPct, myHalf, edge, trackPx, maxShift, -1);
+        }
+        double most = SlidePixelsPerSecond * d * dt / trackPx;
+        double ease = 1 - Math.Exp(-dt / SlideSettleSeconds);
+        for (int i = 0; i < n; i++)
+        {
+            ref var b = ref _badges[i];
+            double want = spread ? b.Shift : 0;
+            double shown = snap || !_hasShown[b.Car] ? want : _shown[b.Car] + Math.Clamp((want - _shown[b.Car]) * ease, -most, most);
+            _shown[b.Car] = shown;
+            _hasShown[b.Car] = true;
+            var at = _view.ToScreen(map.At(myPct + b.Rel + shown));
+            b.X = at.X;
+            b.Y = at.Y;
+        }
+        Array.Sort(_orderKey, _order, 0, n);
+        var mineAt = hasMe ? _view.ToScreen(map.At(myPct)) : new PointF(float.NaN, float.NaN);
+        for (int k = 0; k < n; k++)
+        {
+            ref var b = ref _badges[_order[k]];
+            var box = new RectangleF(b.X - size.Width / 2, b.Y - size.Height / 2, size.Width, size.Height);
+            if (circle)
+            {
+                p.Dot(b.X, b.Y, size.Width / 2 + edge, b.Edge ?? p.P.Bg);
+                p.Dot(b.X, b.Y, size.Width / 2, b.Color);
+            }
+            else
+            {
+                p.Fill(RectangleF.Inflate(box, edge, edge), b.Edge ?? p.P.Bg, size.Height / 2 + edge);
+                p.Fill(box, b.Color, size.Height / 2);
+            }
+            if (b.Label is not { Length: > 0 } label) continue;
+            float tw = p.Measure(label, font) / 2 + d, th = p.LineHeight(font) * 0.45f;
+            bool covered = hasMe && TextCovered(b.X, b.Y, tw, th, mineAt.X, mineAt.Y, myHalf * 2, myHalf * 2, d);
+            for (int j = k + 1; j < n && !covered; j++)
+            {
+                ref var o = ref _badges[_order[j]];
+                covered = TextCovered(b.X, b.Y, tw, th, o.X, o.Y, size.Width, size.Height, d);
+            }
+            if (covered) _clearSince[b.Car] = 0;
+            else if (_clearSince[b.Car] == 0) _clearSince[b.Car] = now;
+            bool show = !covered && (snap || Stopwatch.GetElapsedTime(_clearSince[b.Car], now).TotalSeconds >= TextReturnSeconds);
+            if (show) p.Text(label, font, HudPalette.On(b.Color), box, HAlign.Center, VAlign.Center, false);
+        }
+        if (hasMe)
+        {
+            p.Dot(mineAt.X, mineAt.Y, myDot + 2, p.P.Heading);
+            p.Dot(mineAt.X, mineAt.Y, myDot, p.P.Player);
+        }
+    }
+
+    internal static SizeF BadgeSize(bool circle, float height, float textWidth)
+    {
+        if (circle)
+        {
+            float across = Math.Max(height, textWidth > 0 ? textWidth + height * 0.35f : 0);
+            return new SizeF(across, across);
+        }
+        return new SizeF(Math.Max(height, textWidth > 0 ? textWidth + height * 0.5f : 0), height);
+    }
+
+    internal static bool TextCovered(float x, float y, float halfW, float halfH, float ox, float oy, float w, float h, float density)
+    {
+        float r = h / 2 + 0.5f * density, half = Math.Max(0, (w - h) / 2);
+        for (int i = 0; i < TextSamples.Length; i += 2)
+        {
+            float px = x + TextSamples[i] * halfW, py = y + TextSamples[i + 1] * halfH;
+            float cx = Math.Clamp(px, ox - half, ox + half);
+            if ((px - cx) * (px - cx) + (py - oy) * (py - oy) < r * r) return true;
+        }
+        return false;
+    }
+
+    private static readonly float[] TextSamples = { 0, 0, -0.8f, 0, 0.8f, 0, -0.5f, -0.7f, 0.5f, -0.7f, -0.5f, 0.7f, 0.5f, 0.7f };
+
+    private void Chain(TrackMap map, int n, double myPct, float myHalf, float gap, double trackPx, double maxShift, int sign)
+    {
+        int m = 0;
+        for (int i = 0; i < n; i++)
+        {
+            double rel = _badges[i].Rel;
+            if (sign > 0 ? rel < 0 : rel >= 0) continue;
+            _chain[m] = i;
+            _chainKey[m] = Math.Abs(rel);
+            m++;
+        }
+        if (m == 0) return;
+        Array.Sort(_chainKey, _chain, 0, m);
+        double prevAbs = 0;
+        float prevW = myHalf, prevH = myHalf;
+        float cos = MathF.Cos(_view.Angle), sin = MathF.Sin(_view.Angle);
+        for (int k = 0; k < m; k++)
+        {
+            ref var b = ref _badges[_chain[k]];
+            double abs = Math.Abs(b.Rel);
+            var t = map.Heading(myPct + sign * (prevAbs + abs) / 2);
+            float ax = MathF.Abs(cos * t.X - sin * t.Y), ay = MathF.Abs(sin * t.X + cos * t.Y);
+            _real[k] = abs;
+            _need[k] = (ax * (prevW + b.HalfW) + ay * (prevH + b.HalfH) + gap) / trackPx;
+            prevAbs = abs;
+            prevW = b.HalfW;
+            prevH = b.HalfH;
+        }
+        PlaceChain(_real, _need, m, maxShift, _placed, _blockSum, _blockCount);
+        for (int k = 0; k < m; k++)
+        {
+            ref var b = ref _badges[_chain[k]];
+            b.Shift = sign * _placed[k] - b.Rel;
+        }
+    }
+
+    internal static void PlaceChain(double[] real, double[] need, int count, double maxShift, double[] placed, double[] blockSum, int[] blockCount)
+    {
+        int blocks = 0;
+        double total = 0;
+        for (int k = 0; k < count; k++)
+        {
+            total += need[k];
+            placed[k] = total;
+            blockSum[blocks] = real[k] - total;
+            blockCount[blocks] = 1;
+            blocks++;
+            while (blocks > 1 && blockSum[blocks - 2] / blockCount[blocks - 2] > blockSum[blocks - 1] / blockCount[blocks - 1])
+            {
+                blockSum[blocks - 2] += blockSum[blocks - 1];
+                blockCount[blocks - 2] += blockCount[blocks - 1];
+                blocks--;
+            }
+        }
+        int at = 0;
+        for (int bl = 0; bl < blocks; bl++)
+        {
+            double mean = Math.Max(0, blockSum[bl] / blockCount[bl]);
+            for (int c = 0; c < blockCount[bl]; c++, at++)
+                placed[at] = Math.Clamp(mean + placed[at], real[at] - maxShift, real[at] + maxShift);
+        }
+    }
+
+    internal static void Covered(float[] x, float[] y, float[] r, int count, bool[] covered)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            covered[i] = false;
+            for (int j = i + 1; j < count; j++)
+            {
+                float reach = r[i] * LabelReach + r[j];
+                float dx = x[j] - x[i], dy = y[j] - y[i];
+                if (dx * dx + dy * dy < reach * reach) { covered[i] = true; break; }
+            }
+        }
+    }
+
+    internal static string? Label(TelemetryFrame f, DriverEntry driver, int car, bool carNumbers) =>
+        carNumbers ? driver.CarNumber
+        : f.CarClassPosition[car] > 0 ? f.CarClassPosition[car].ToString(CultureInfo.InvariantCulture) : null;
+
+    internal static int LapDiff(TelemetryFrame f, int car, double pct, double myPct, double myDist) =>
+        FieldOrder.Distance(f, car) is { } dist ? (int)Math.Round(dist - myDist - FieldOrder.Wrap(pct, myPct)) : 0;
 
     private void Build(TrackMap map)
     {

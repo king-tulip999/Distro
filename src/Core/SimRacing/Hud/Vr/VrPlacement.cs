@@ -12,6 +12,35 @@ internal readonly record struct VrPose(double X, double Y, double Distance, doub
     public float Curvature => CurveRadius > 0 ? (float)Math.Min(1, Width / (2 * Math.PI * CurveRadius)) : 0;
 }
 
+internal readonly record struct VrAnchor(double X, double Y, double Z, double Yaw)
+{
+    public static readonly VrAnchor None = new(0, 0, 0, 0);
+
+    public static VrAnchor? FromHead(float[] head)
+    {
+        if (head.Length < 12 || head.Any(v => !float.IsFinite(v))) return null;
+        double forwardX = -head[2], forwardZ = -head[10];
+        double yaw = Math.Abs(forwardX) + Math.Abs(forwardZ) < 1e-6 ? 0 : Math.Atan2(-forwardX, -forwardZ) * 180 / Math.PI;
+        return new VrAnchor(head[3], head[7], head[11], yaw);
+    }
+
+    public float[] Apply(float[] m)
+    {
+        if (this == None) return m;
+        double r = Yaw * Math.PI / 180, c = Math.Cos(r), s = Math.Sin(r);
+        var a = new[] { c, 0, s, X, 0, 1, 0, Y, -s, 0, c, Z };
+        var o = new float[12];
+        for (int row = 0; row < 3; row++)
+            for (int col = 0; col < 4; col++)
+            {
+                double v = a[row * 4] * m[col] + a[row * 4 + 1] * m[4 + col] + a[row * 4 + 2] * m[8 + col];
+                if (col == 3) v += a[row * 4 + 3];
+                o[row * 4 + col] = (float)v;
+            }
+        return o;
+    }
+}
+
 internal enum VrAdjustSetting { Move, DistanceAndWidth, Angle }
 
 internal static class VrAdjust
@@ -65,6 +94,7 @@ internal static class VrPlacement
 {
     public const double ScreenWidth = 1.2, ScreenDistance = 1.0;
     public const float MaxScale = 2;
+    public const double BelowEyes = -0.12;
 
     public static VrSpot FromScreen(RectangleF widget, RectangleF monitor)
     {
@@ -92,12 +122,21 @@ internal static class VrPlacement
     // Velocita for SimHub has no monitor spots to copy: widgets start in a grid just below eye level, left to right, then lower rows.
     public static void PlaceInFront(HudWidgetConfig w, SizeF layout, int index)
     {
-        const double ColumnStep = 0.42, RowStep = 0.3, Top = -0.12;
+        const double ColumnStep = 0.42, RowStep = 0.3, Top = BelowEyes;
         int column = index % 3, row = index / 3 % 3;
         w.VrX = column == 0 ? 0 : column == 1 ? -ColumnStep : ColumnStep;
         w.VrY = Math.Clamp(Top - row * RowStep, -HudWidgetConfig.VrReach, HudWidgetConfig.VrReach);
         w.VrDistance = ScreenDistance;
         w.VrWidth = Math.Clamp(layout.Width / 1920.0 * ScreenWidth, HudWidgetConfig.MinVrWidth, HudWidgetConfig.MaxVrWidth);
+        (w.VrTurn, w.VrTilt) = FacingHead(w.VrX, w.VrY, w.VrDistance);
+    }
+
+    // Straight ahead, at eye level or just below it (as far down as the SimHub grid's top row, by angle), facing the head; size and distance stay as they are.
+    public static void Center(HudWidgetConfig w, bool belowEyes)
+    {
+        if (w.VrDistance <= 0) w.VrDistance = ScreenDistance;
+        w.VrX = 0;
+        w.VrY = belowEyes ? Math.Clamp(BelowEyes * w.VrDistance / ScreenDistance, -HudWidgetConfig.VrReach, HudWidgetConfig.VrReach) : 0;
         (w.VrTurn, w.VrTilt) = FacingHead(w.VrX, w.VrY, w.VrDistance);
     }
 

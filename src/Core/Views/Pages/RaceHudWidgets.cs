@@ -282,7 +282,7 @@ internal sealed partial class RaceHudWidgets
         if (def.HideWhenEmpty is { } hideByDefault)
             when.Add(SettingRows.Row("Only when needed", def.Kind == "alerts" ? "Hidden until an alert comes up." : "Hidden until a car of another class is near.", true,
                 Ui.Switch(w.OnlyWhenNeeded ?? hideByDefault, v => { w.OnlyWhenNeeded = v; Changed(); })));
-        when.Add(SettingRows.Row("Only while driving", "Hidden in the garage and while you're out of the car.", true, Ui.Switch(w.OnlyOnTrack, v => { w.OnlyOnTrack = v; Changed(); })));
+        when.Add(SettingRows.Row("Only in the car", "Hidden in the garage and while you're out of the car. Only matters when Show the widgets in Overlay settings isn't In the car.", true, Ui.Switch(w.OnlyOnTrack, v => { w.OnlyOnTrack = v; Changed(); })));
         when.Add(SettingRows.Row("Hide in replays", null, true, Ui.Switch(w.HideInReplay, v => { w.HideInReplay = v; Changed(); })));
         var sessions = SettingRows.Toggles(SessionKinds.Select(k => (k, SessionLabel(k), (string?)null)).ToList(),
             kind => w.Sessions.Contains(kind, StringComparer.OrdinalIgnoreCase),
@@ -292,7 +292,7 @@ internal sealed partial class RaceHudWidgets
                 if (on) w.Sessions.Add(kind);
                 Changed();
             });
-        when.Add(SettingRows.Row("Only in", "None ticked = every session.", true, sessions));
+        when.Add(SettingRows.Row("Show only in", "Inside any layout. Hidden in the sessions left unticked. None ticked = shown in every session.", true, sessions));
         if (Layout is { } owner && !AppIdentity.SimHub) when.Add(SettingRows.Row("Keybind", null, true, KeybindBox(owner, w)));
         return when;
     }
@@ -313,10 +313,10 @@ internal sealed partial class RaceHudWidgets
             Changed();
             if (_preview is not null) DrawPreview(w);
         });
-        look.Add(SettingRows.Row("Own background", "Off: uses the overlay's background.", true, own));
+        look.Add(SettingRows.Row("Own background", "Off: uses the background from Overlay settings.", true, own));
         look.Add(backgroundRow);
         var rates = new[] { 0, 1, 2, 5, 10, 15, 20, 30, 60 }.Select(r => new Choice(r.ToString(), r == 0 ? def.MovingHz > 0 ? $"Default ({def.DefaultHz} per second, {def.MovingHz} while it moves)" : $"Default ({def.DefaultHz} per second)" : $"{r} per second"));
-        look.Add(SettingRows.Row("Redraw", null, true, Ui.Combo(rates, w.UpdateHz.ToString(), c => { w.UpdateHz = int.Parse(c.Id!); Changed(); }, ComboWidth)));
+        look.Add(SettingRows.Row("Redraw rate", null, true, Ui.Combo(rates, w.UpdateHz.ToString(), c => { w.UpdateHz = int.Parse(c.Id!); Changed(); }, ComboWidth)));
         return look;
     }
 
@@ -375,10 +375,28 @@ internal sealed partial class RaceHudWidgets
         {
             w.Vr = Enum.Parse<HudVrPlacement>(c.Id!);
             if (w.Vr != HudVrPlacement.Off && w.VrWidth <= 0) PlaceInVr(w);
+            bool switchedOn = w.Vr != HudVrPlacement.Off && !S.VrOverlays;
+            if (switchedOn) S.VrOverlays = true;
             Changed();
+            if (switchedOn)
+            {
+                Host?.SyncVr();
+                _app.Hotkeys.RegisterAll();
+                _app.Notify("VR widgets turned on", AppIdentity.SimHub
+                    ? "They were off in Overlay settings. Keep them on in only one of Velocita and Velocita for SimHub."
+                    : "They were off in Overlay settings.", NoticeKind.Success);
+            }
             _list.Dispatcher.BeginInvoke(Fill, System.Windows.Threading.DispatcherPriority.Background);
         }, ComboWidth)));
         if (w.Vr == HudVrPlacement.Off) return rows;
+        if (!S.VrOverlays)
+        {
+            var off = Ui.LabeledButton("I.Settings", "Overlay settings", () => _section.ShowSettings(RaceHudSection.VrAnchor), "GhostButton");
+            off.HorizontalAlignment = HorizontalAlignment.Left;
+            off.Margin = new Thickness(0, 2, 0, 4);
+            rows.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Text = "VR widgets are off in Overlay settings, so this widget won't show in the headset.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 4) });
+            rows.Add(off);
+        }
         FrameworkElement Slider(string label, string? help, double min, double max, double metres, Action<double> set) =>
             SettingRows.Row(label, help, true, Ui.SliderWithValue(min, max, Math.Round(metres * 100), v => $"{v:0} {Units.Cm}", v => { set(v / 100); Changed(); }, ComboWidth - 42, 1));
         double reach = HudWidgetConfig.VrReach * 100;
@@ -390,16 +408,27 @@ internal sealed partial class RaceHudWidgets
             SettingRows.Row(label, help, true, Ui.SliderWithValue(-HudWidgetConfig.MaxVrAngle, HudWidgetConfig.MaxVrAngle, Math.Round(degrees), v => $"{v:0}°", v => { set(v); Changed(); }, ComboWidth - 42, 1));
         rows.Add(Angle("Turn", "Positive turns the face to the right.", w.VrTurn, v => w.VrTurn = v));
         rows.Add(Angle("Tilt", "Positive tilts the face up.", w.VrTilt, v => w.VrTilt = v));
-        var match = Ui.LabeledButton("I.Target", AppIdentity.SimHub ? "Put it back in front of me" : "Match the screen position", () =>
+        Button Center(string label, bool below, string tip)
         {
-            PlaceInVr(w);
-            Changed();
-            Fill();
-        }, "GhostButton");
-        match.ToolTip = AppIdentity.SimHub ? "Back to its starting spot, 1 m ahead and just below your eyes" : "Puts it where it sits on the monitor, as if the monitor were 1.2 m wide and 1 m ahead";
-        match.HorizontalAlignment = HorizontalAlignment.Left;
-        match.Margin = new Thickness(0, 4, 0, 4);
-        rows.Add(match);
+            var b = Ui.LabeledButton("I.Target", label, () =>
+            {
+                if (w.VrWidth <= 0) PlaceInVr(w);
+                SimRacing.Hud.Vr.VrPlacement.Center(w, below);
+                Changed();
+                Fill();
+            }, "GhostButton");
+            b.ToolTip = tip + " Its size and distance stay the same";
+            return b;
+        }
+        var placeButtons = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, -Ui.ButtonGap, 0) };
+        void AddPlaceButton(Button b)
+        {
+            b.Margin = new Thickness(0, 0, Ui.ButtonGap, Ui.ButtonGap);
+            b.HorizontalAlignment = HorizontalAlignment.Stretch;
+            placeButtons.Children.Add(b);
+        }
+        AddPlaceButton(Center("Center at eye level", false, "Straight ahead in your line of sight, facing you."));
+        AddPlaceButton(Center("Center below eye level", true, "Straight ahead, a little below your eyes so it sits over the dash, facing you."));
         var face = Ui.LabeledButton("I.Rotate", "Face my head", () =>
         {
             (w.VrTurn, w.VrTilt) = SimRacing.Hud.Vr.VrPlacement.FacingHead(w.VrX, w.VrY, w.VrDistance);
@@ -407,20 +436,18 @@ internal sealed partial class RaceHudWidgets
             Fill();
         }, "GhostButton");
         face.ToolTip = "Turns and tilts it to point straight at your head from where it sits";
-        face.HorizontalAlignment = HorizontalAlignment.Left;
-        face.Margin = new Thickness(0, 0, 0, 4);
-        rows.Add(face);
+        AddPlaceButton(face);
+        if (w.Vr == HudVrPlacement.Cockpit)
+        {
+            var recenter = Ui.LabeledButton("I.Target", "Recenter VR widgets", () => Host?.RecenterVr(), "GhostButton");
+            recenter.ToolTip = "Puts every cockpit widget back in front of where your head is now"
+                + (string.IsNullOrWhiteSpace(S.VrRecenterHotkey) || AppIdentity.SimHub ? "" : $" ({Core.Hotkeys.Hotkey.Display(S.VrRecenterHotkey)})");
+            AddPlaceButton(recenter);
+        }
+        rows.Add(placeButtons);
         rows.Add(SettingRows.Row("Curve around your head", "In OpenXR games only where the headset supports curved panels.", true, Ui.Switch(w.VrCurve, v => { w.VrCurve = v; Changed(); })));
         if (!AppIdentity.SimHub)
             rows.Add(SettingRows.Row("Hide on the monitor", "Only while the headset shows it. Still shown while arranging.", true, Ui.Switch(w.VrOnly, v => { w.VrOnly = v; Changed(); })));
-        if (!S.VrOverlays)
-        {
-            var off = Ui.LabeledButton("I.Settings", "Overlay settings", () => _section.ShowSettings(RaceHudSection.VrAnchor), "GhostButton");
-            off.HorizontalAlignment = HorizontalAlignment.Left;
-            off.Margin = new Thickness(0, 2, 0, 4);
-            rows.Add(new TextBlock { Text = "VR widgets are off.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 4) });
-            rows.Add(off);
-        }
         return rows;
     }
 
@@ -566,6 +593,17 @@ internal sealed partial class RaceHudWidgets
     }
 
     private const double WidgetPickWidth = 260;
+    private const int AddWidgetColumns = 2;
+
+    internal static List<T> DownColumns<T>(IReadOnlyList<T> items, int columns)
+    {
+        int rows = (items.Count + columns - 1) / columns;
+        var ordered = new List<T>(items.Count);
+        for (int row = 0; row < rows; row++)
+            for (int column = 0; column < columns; column++)
+                if (column * rows + row < items.Count) ordered.Add(items[column * rows + row]);
+        return ordered;
+    }
 
     private void WidgetMenu(Button anchor, List<HudWidgetConfig> widgets)
     {
@@ -604,9 +642,12 @@ internal sealed partial class RaceHudWidgets
             menu.Items.Add(item);
         }
         var add = new MenuItem { Header = "Add widget", Icon = new Icon { Data = Ui.Res<Geometry>("I.Plus"), Width = 12, Height = 12 } };
-        foreach (var def in HudCatalog.All.OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase))
+        var addable = HudCatalog.All.Where(d => !(AppIdentity.SimHub && Full(d.Kind))).OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        var columns = new FrameworkElementFactory(typeof(System.Windows.Controls.Primitives.UniformGrid));
+        columns.SetValue(System.Windows.Controls.Primitives.UniformGrid.ColumnsProperty, AddWidgetColumns);
+        add.ItemsPanel = new ItemsPanelTemplate(columns);
+        foreach (var def in DownColumns(addable, AddWidgetColumns))
         {
-            if (AppIdentity.SimHub && Full(def.Kind)) continue;
             var kind = def;
             var sub = new MenuItem { Header = def.Name, ToolTip = def.Description };
             sub.Click += (_, _) => Add(kind);

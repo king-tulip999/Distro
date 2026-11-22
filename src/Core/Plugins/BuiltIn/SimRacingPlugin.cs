@@ -18,7 +18,7 @@ internal sealed class SimRacingPlugin : Plugin
     public override string Reads =>
         "With the iRacing Overlay on: iRacing's live telemetry (its shared memory, read only) while iRacing runs, and whether iRacing is running. With a keybind set to a wheel or button box button: that controller's button presses. iRacing's settings files and setups folder, and recent setups in Downloads, while its page is open. With “Car pictures in your paint” on: your paint files in iRacing's paint folder and the driver details in your newest telemetry files. With “Launch when iRacing starts” on: whether iRacing is running.";
     public override string BackgroundWork =>
-        "With the iRacing Overlay switched on: waits for iRacing to start (process events), then reads its telemetry about 60 times a second and draws the widgets at their own rates; while iRacing is closed it only waits. Only with “Launch when iRacing starts” on for Trading Paints or Garage 61: watches for iRacing starting (process events, no polling). With “Car pictures in your paint” on: after iRacing opens or a session ends, asks iRacing to draw your car in each paint that changed (its own local service) and keeps the pictures in the Velocita folder. With a Bass shakers output picked: reads the same telemetry and, only while iRacing is connected or a test plays, writes a sound to the output you picked. While the Setup Manager is open on screen: file events for the setups folder and Downloads. Otherwise never.";
+        "With the iRacing Overlay switched on: waits for iRacing to start (process events), then reads its telemetry about 60 times a second and draws the widgets at their own rates; while iRacing is closed it only waits. Only with “Launch when iRacing starts” on for Trading Paints or Garage 61: watches for iRacing starting (process events, no polling). With “Car pictures in your paint” on: after iRacing opens or a session ends, asks iRacing to draw your car in each paint that changed (its own local service) and keeps the pictures in the Velocita folder. While the Setup Manager is open on screen: file events for the setups folder and Downloads. Otherwise never.";
     public override string Changes =>
         "The iRacing Overlay draws its own windows on top of the game; nothing is injected into iRacing or written to it. Only when you ask: iRacing's settings files when you save in iRacing Controller or write the FOV (backed up first), setup files and folders you import, rename, move, delete (to the Recycle Bin) or export in the Setup Manager, and starting or closing Trading Paints / Garage 61.";
 
@@ -53,6 +53,7 @@ internal sealed class SimRacingPlugin : Plugin
             const string vr = "iRacing Overlay in VR";
             bool Adjusting() => Hud?.VrAdjusting == true;
             yield return new PluginHotkey("hud.vr.adjust", "Edit VR widgets in the headset", () => h.VrAdjustHotkey, k => h.VrAdjustHotkey = k, () => Hud?.ToggleVrAdjust(), vr, Config.RaceHudSettings.VrAdjustDefault, OverlayPage);
+            yield return new PluginHotkey("hud.vr.recenter", "Recenter VR widgets", () => h.VrRecenterHotkey, k => h.VrRecenterHotkey = k, () => Hud?.RecenterVr(), vr, Config.RaceHudSettings.VrRecenterDefault, OverlayPage);
             yield return new PluginHotkey("hud.vr.next", "Next VR widget (while adjusting)", () => h.VrNextHotkey, k => h.VrNextHotkey = k, () => Hud?.VrNext(), vr, Config.RaceHudSettings.VrNextDefault, OverlayPage, Adjusting);
             yield return new PluginHotkey("hud.vr.setting", "Next VR setting (while adjusting)", () => h.VrSettingHotkey, k => h.VrSettingHotkey = k, () => Hud?.VrNextSetting(), vr, Config.RaceHudSettings.VrSettingDefault, OverlayPage, Adjusting);
             yield return new PluginHotkey("hud.vr.left", "Nudge left (while adjusting)", () => h.VrLeftHotkey, k => h.VrLeftHotkey = k, () => Hud?.VrNudge(-1, 0), vr, Config.RaceHudSettings.VrLeftDefault, OverlayPage, Adjusting);
@@ -94,8 +95,6 @@ internal sealed class SimRacingPlugin : Plugin
         items.Add(item);
     }
 
-    public SimRacing.Shakers.ShakerHost? Shakers { get; private set; }
-
     public CompanionApp? TradingPaints { get; private set; }
 
     public CompanionApp? Garage61 { get; private set; }
@@ -114,8 +113,6 @@ internal sealed class SimRacingPlugin : Plugin
         Liveries.SetActive(LiveryPictures.On(app));
         Hud = new HudHost(app);
         Hud.SetActive(true);
-        Shakers = new SimRacing.Shakers.ShakerHost(app);
-        Shakers.SetActive(true);
         TradingPaints = new CompanionApp(app, CompanionApp.TradingPaints, () => app.Config.SimRacing.TradingPaints);
         Garage61 = new CompanionApp(app, CompanionApp.Garage61, () => app.Config.SimRacing.Garage61);
         TradingPaints.Start();
@@ -126,8 +123,6 @@ internal sealed class SimRacingPlugin : Plugin
     {
         Hud?.Dispose();
         Hud = null;
-        Shakers?.Dispose();
-        Shakers = null;
         Liveries?.SetActive(false);
         Liveries = null;
         TradingPaints?.Stop();

@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Core.Config;
 using Core.Overlay;
+using Core.Processes;
 using Core.Services;
 
 namespace Core.SimRacing.Hud.Vr;
@@ -58,6 +59,8 @@ internal sealed class HudVr : IDisposable
 
     public bool OpenXrSeen => _share.ReaderAlive;
 
+    public VrShare.LayerReport? LayerReport => _share.ReadReport();
+
     public event Action? Changed;
 
     public void Sync(bool setting, bool active)
@@ -83,7 +86,8 @@ internal sealed class HudVr : IDisposable
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Problem ??= "VR widgets couldn't be shared with OpenXR games: " + ex.Message; }
             _app.Watcher.Started += OnStarted;
             _app.Watcher.Stopped += OnStopped;
-            _app.Watcher.Acquire(Consumer, new[] { SteamVrServer });
+            _app.Watcher.Acquire(Consumer, new[] { SteamVrServer, IracingFiles.IracingPaths.SimProcess });
+            CheckIracingAdmin();
             _beat.Start();
             if (_app.Watcher.IsRunning(SteamVrServer)) _steam.Connect();
         }
@@ -96,12 +100,24 @@ internal sealed class HudVr : IDisposable
             Clear();
             _steam.Disconnect();
             _share.Dispose();
+            IracingAsAdmin = false;
         }
+        Changed?.Invoke();
+    }
+
+    public bool IracingAsAdmin { get; private set; }
+
+    private void CheckIracingAdmin()
+    {
+        bool admin = ProcessElevation.AnyElevated(IracingFiles.IracingPaths.SimProcess);
+        if (admin == IracingAsAdmin) return;
+        IracingAsAdmin = admin;
         Changed?.Invoke();
     }
 
     private void OnStarted(string name)
     {
+        if (_on && string.Equals(name, IracingFiles.IracingPaths.SimProcess, StringComparison.OrdinalIgnoreCase)) CheckIracingAdmin();
         if (!_on || !string.Equals(name, SteamVrServer, StringComparison.OrdinalIgnoreCase)) return;
         _retry = 0;
         _steam.Connect();
@@ -110,6 +126,11 @@ internal sealed class HudVr : IDisposable
 
     private void OnStopped(string name)
     {
+        if (string.Equals(name, IracingFiles.IracingPaths.SimProcess, StringComparison.OrdinalIgnoreCase) && IracingAsAdmin)
+        {
+            IracingAsAdmin = false;
+            Changed?.Invoke();
+        }
         if (!string.Equals(name, SteamVrServer, StringComparison.OrdinalIgnoreCase)) return;
         foreach (var t in _targets.Values) t.Shown = false;
         _steam.Disconnect();
@@ -187,6 +208,27 @@ internal sealed class HudVr : IDisposable
             _share.Beat(SlotCount());
         }
         t.Shown = true;
+    }
+
+    public bool Recenter()
+    {
+        if (!_on) return false;
+        bool done = false;
+        try
+        {
+            if (_steam.HeadPose() is { } head && VrAnchor.FromHead(head) is { } anchor)
+            {
+                _steam.Anchor = anchor;
+                done = true;
+            }
+        }
+        catch (Exception ex) when (ex is SEHException or InvalidOperationException) { LogOnce("recenter", ex); }
+        if (_share.ReaderAlive)
+        {
+            _share.Recenter();
+            done = true;
+        }
+        return done;
     }
 
     public void PollPointer(string id, Action<int, float, float> pointed)

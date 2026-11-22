@@ -29,6 +29,7 @@ internal sealed class SteamVrOverlays : IDisposable
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int TextureFn(ulong handle, ref Texture texture);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] [return: MarshalAs(UnmanagedType.I1)] private delegate bool PollFn(byte[] buffer, uint size);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void QuitFn();
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void TrackingPoseFn(int origin, float predictedSeconds, byte[] poses, uint count);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int InputFn(ulong handle, int method);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int ScaleFn(ulong handle, float[] scale);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] [return: MarshalAs(UnmanagedType.I1)] private delegate bool OverlayPollFn(ulong handle, byte[] buffer, uint size);
@@ -62,6 +63,10 @@ internal sealed class SteamVrOverlays : IDisposable
     private TextureFn? _texture;
     private PollFn? _poll;
     private QuitFn? _quit;
+    private TrackingPoseFn? _trackingPose;
+    private const int PoseBytes = 80, PoseValidAt = 76;
+    private readonly byte[] _headPose = new byte[PoseBytes];
+    private VrAnchor _anchor = VrAnchor.None;
     private InputFn? _input;
     private ScaleFn? _mouseScale;
     private OverlayPollFn? _pollOverlay;
@@ -117,6 +122,7 @@ internal sealed class SteamVrOverlays : IDisposable
             {
                 _poll = Marshal.GetDelegateForFunctionPointer<PollFn>(Marshal.ReadIntPtr(system, 30 * IntPtr.Size));
                 _quit = Marshal.GetDelegateForFunctionPointer<QuitFn>(Marshal.ReadIntPtr(system, 47 * IntPtr.Size));
+                _trackingPose = Marshal.GetDelegateForFunctionPointer<TrackingPoseFn>(Marshal.ReadIntPtr(system, 12 * IntPtr.Size));
             }
             var result = D3D11.D3D11CreateDevice(IntPtr.Zero, DriverType.Hardware, DeviceCreationFlags.BgraSupport,
                 new[] { FeatureLevel.Level_11_0 }, out var device, out var context);
@@ -167,6 +173,28 @@ internal sealed class SteamVrOverlays : IDisposable
             }
     }
 
+    public VrAnchor Anchor
+    {
+        get => _anchor;
+        set
+        {
+            if (value == _anchor) return;
+            _anchor = value;
+            foreach (var o in _overlays.Values) o.Placed = default;
+        }
+    }
+
+    public float[]? HeadPose()
+    {
+        if (!Connected || _trackingPose is null) return null;
+        Array.Clear(_headPose);
+        _trackingPose(UniverseSeated, 0, _headPose, 1);
+        if (_headPose[PoseValidAt] == 0) return null;
+        var m = new float[12];
+        Buffer.BlockCopy(_headPose, 0, m, 0, 48);
+        return m;
+    }
+
     public void Show(string id, string name, HudVrPlacement mode, VrPose pose, int opacity, int width, int height, IntPtr pixels, bool pointer = false)
     {
         if (!Connected || _create is null || _device is null || _context is null) return;
@@ -204,7 +232,7 @@ internal sealed class SteamVrOverlays : IDisposable
             _alpha!(o.Handle, opacity / 100f);
             var m = pose.Matrix();
             if (mode == HudVrPlacement.Head) _relative!(o.Handle, HeadDevice, m);
-            else _absolute!(o.Handle, UniverseSeated, m);
+            else _absolute!(o.Handle, UniverseSeated, _anchor.Apply(m));
         }
         if (!o.Shown)
         {
@@ -267,6 +295,8 @@ internal sealed class SteamVrOverlays : IDisposable
         _pollOverlay = null;
         _poll = null;
         _quit = null;
+        _trackingPose = null;
+        _anchor = VrAnchor.None;
         Unload();
     }
 

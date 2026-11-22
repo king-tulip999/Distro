@@ -133,13 +133,14 @@ public sealed class RaceHudSettings
     public string? QuickEditHotkey { get; set; } = QuickEditDefault;
     public const string QuickEditDefault = "Ctrl+Alt+E";
     public string? VrAdjustHotkey { get; set; } = VrAdjustDefault;
+    public string? VrRecenterHotkey { get; set; } = VrRecenterDefault;
     public string? VrNextHotkey { get; set; } = VrNextDefault;
     public string? VrSettingHotkey { get; set; } = VrSettingDefault;
     public string? VrLeftHotkey { get; set; } = VrLeftDefault;
     public string? VrRightHotkey { get; set; } = VrRightDefault;
     public string? VrUpHotkey { get; set; } = VrUpDefault;
     public string? VrDownHotkey { get; set; } = VrDownDefault;
-    public const string VrAdjustDefault = "Ctrl+Alt+V", VrNextDefault = "Ctrl+Alt+N", VrSettingDefault = "Ctrl+Alt+M",
+    public const string VrAdjustDefault = "Ctrl+Alt+V", VrRecenterDefault = "Ctrl+Alt+C", VrNextDefault = "Ctrl+Alt+N", VrSettingDefault = "Ctrl+Alt+M",
         VrLeftDefault = "Ctrl+Alt+Left", VrRightDefault = "Ctrl+Alt+Right", VrUpDefault = "Ctrl+Alt+Up", VrDownDefault = "Ctrl+Alt+Down";
 
     public HudLayout? Layout(string? name) => Layouts.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -394,7 +395,7 @@ public sealed class HudLayout
 
 public sealed class HudWidgetConfig
 {
-    public const double MinSize = 40, MaxSize = 4000;
+    public const double MinSize = 30, MaxSize = 4000;
 
     public string Id { get; set; } = "";
 

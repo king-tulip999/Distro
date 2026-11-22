@@ -124,6 +124,15 @@ internal static class DiagnosticReport
         sb.AppendLine($"- Close in background {(c.Ui.CloseToTray ? "on" : "off")}, start in background {(c.Ui.StartMinimized ? "on" : "off")}, auto-install updates {(c.Updates.AutoInstall ? "on" : "off")}");
         sb.AppendLine();
 
+        if (!AppIdentity.IsTecnica)
+        {
+            sb.AppendLine("## VR");
+            var vr = app.Plugins.Find(Plugins.PluginIds.SimRacing) is Plugins.BuiltIn.SimRacingPlugin { Hud: { } hud } ? hud.Vr : null;
+            foreach (string line in SimRacing.Hud.Vr.OpenXrSetup.ReportLines(app.Demo ? null : vr, c.SimRacing.Hud.VrOverlays))
+                sb.AppendLine(line);
+            sb.AppendLine();
+        }
+
         sb.AppendLine("## Recent errors (end of error.log)");
         string tail = ErrorLogTail(60);
         sb.AppendLine(tail.Length == 0 ? "None logged." : "```\n" + tail.TrimEnd() + "\n```");

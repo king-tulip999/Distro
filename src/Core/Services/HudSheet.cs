@@ -496,6 +496,27 @@ internal static class HudSheet
             var dialSize = inputs.Natural!(new HudOptions(inputs, dialExtras));
             Save(inputs, dialSize.Width, dialSize.Height, Path.Combine(dir, "inputs-extras.png"), 1, ("extras", "position,lapNumber,fuelPct,last,best,air,bias,tc"));
             var timing = HudCatalog.Find("timing")!;
+            var map = HudCatalog.Find("map")!;
+            Save(map, map.W, map.H, Path.Combine(dir, "map-dots.png"), 1, ("dotSize", "200"), ("myDotSize", "150"), ("dotText", "number"), ("lapColors", "true"));
+            Save(map, map.W, map.H, Path.Combine(dir, "map-pill.png"), 1, ("dotStyle", "pill"), ("dotSize", "150"), ("dotText", "number"));
+            Save(map, map.W, map.H, Path.Combine(dir, "map-circle.png"), 1, ("dotStyle", "circle"), ("dotSize", "150"), ("dotText", "number"));
+            var flat = HudCatalog.Find("flatmap")!;
+            foreach (var (file, options) in new[]
+            {
+                ("flatmap-strip", new[] { ("style", "strip") }),
+                ("flatmap-strip-numbers", new[] { ("style", "strip"), ("dotText", "number") }),
+                ("flatmap-around", new[] { ("style", "around") }),
+                ("flatmap-around-eighth", new[] { ("style", "around"), ("range", "eighth") }),
+                ("flatmap-lanes", new[] { ("style", "lanes") }),
+                ("flatmap-profile", new[] { ("style", "profile") }),
+                ("flatmap-profile-tall", new[] { ("style", "profile"), ("bend", "200") }),
+                ("flatmap-bar", new[] { ("style", "bar") }),
+            })
+            {
+                var size = Asked(flat, options);
+                Save(flat, size.Width, size.Height, Path.Combine(dir, file + ".png"), 1, options);
+            }
+            Save(flat, 64, 250, Path.Combine(dir, "flatmap-upright.png"), 1, ("style", "bar"), ("upright", "true"));
             Save(timing, 200, 110, Path.Combine(dir, "timing-compact.png"), 1, ("look", "compact"), ("reference", "session"));
             var weather = HudCatalog.Find("weather")!;
             Save(weather, 340, 124, Path.Combine(dir, "weather-strip.png"), 1, ("look", "strip"));

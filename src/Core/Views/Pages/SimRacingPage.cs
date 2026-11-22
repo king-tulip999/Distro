@@ -9,7 +9,7 @@ namespace Core.Views.Pages;
 
 internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, IRevealAnchor, ISectionedPage, IPageHistory
 {
-    internal static readonly string[] DefaultPanelOrder = { "setups", "shakers", "iracing", "fov", "companions" };
+    internal static readonly string[] DefaultPanelOrder = { "setups", "iracing", "fov", "companions" };
 
     private const string PageKey = "simracing";
 
@@ -21,7 +21,6 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, IRe
     private CompanionAppSection? _tradingPaints, _garage61;
     private readonly System.Windows.Controls.Primitives.UniformGrid _companions = new() { Columns = 1, VerticalAlignment = VerticalAlignment.Top };
     private SetupManagerSection? _setups;
-    private ShakersSection? _shakers;
     private readonly ScrollViewer _scroll;
     private readonly SectionView _view;
     private bool _shown;
@@ -52,9 +51,6 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, IRe
         _view.Add(Def("setups", "Your car setups by car: find, rename, move, import and share them with league mates without File Explorer.",
             () => _setups = new SetupManagerSection(_app, _window), "simracing.setups",
             () => _setups?.OnShown(), () => _setups?.OnHidden(), () => _setups?.TitleTools));
-        _view.Add(Def("shakers", "Tactile transducers under your seat or pedals, driven by iRacing's telemetry or game audio through a sound output.",
-            () => _shakers = new ShakersSection(_app), "simracing.shakers",
-            () => _shakers?.OnShown(), () => _shakers?.OnHidden(), () => _shakers?.TitleTools));
         _view.Add(Def("companions", "",
             BuildCompanions, "simracing.companions",
             ShowCompanions, HideCompanions));
@@ -129,7 +125,6 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, IRe
     private static readonly PageSection[] Tools =
     {
         new("setups", "iRacing Setup Manager", "I.Folder"),
-        new("shakers", "Bass shakers", "I.Speaker"),
         new("fov", "FOV calculator", "I.Compass"),
         new("iracing", "iRacing Controller", "I.Keyboard"),
         new("companions", "Companion apps", "I.Rocket"),
@@ -328,7 +323,6 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, IRe
             yield return state;
         yield return ("setups-narrow", () => { _body.MaxWidth = 616; _body.HorizontalAlignment = HorizontalAlignment.Left; _scroll.ScrollToTop(); return Task.CompletedTask; });
         yield return ("setups-wide", () => { _body.ClearValue(MaxWidthProperty); _body.ClearValue(HorizontalAlignmentProperty); return Task.CompletedTask; });
-        yield return ("shakers", () => { Only("shakers"); return Task.CompletedTask; });
         yield return ("companions", () => { Only("companions"); return Task.CompletedTask; });
         yield return ("reordered", () =>
         {
