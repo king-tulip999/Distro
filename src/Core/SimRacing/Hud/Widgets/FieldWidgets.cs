@@ -46,7 +46,7 @@ internal sealed class ClassRuns
         {
             if (i < _rows.Count && _rows[i].Class == _rows[start].Class) continue;
             var first = _rows[start].Box;
-            HudTable.ClassOutline(p, RectangleF.FromLTRB(first.X, first.Y, first.Right, _rows[i - 1].Box.Bottom), _rows[start].Color);
+            HudTable.ClassOutline(p, RectangleF.FromLTRB(first.X, first.Y, first.Right, _rows[i - 1].Box.Bottom), _rows[start].Color, HudTable.ClassRadius(p));
             start = i;
         }
         _rows.Clear();
@@ -160,12 +160,21 @@ internal static class HudTable
     private static Font Bold(HudPainter p, Font font) => p.BoldOf(font);
 
     public static void ClassFill(HudPainter p, RectangleF row, Color classColor, bool dim) =>
-        p.Fill(row, p.Solid(HudPalette.Mix(p.P.Surface, classColor, dim ? 0.16 : 0.25), 235));
+        p.Fill(row, p.Solid(HudPalette.Deep(classColor, dim ? 0.16f : 0.24f), 235));
+
+    public static float ClassRadius(HudPainter p) => Math.Min(p.Look.Corner, 6);
 
     public static void ClassOutline(HudPainter p, RectangleF box, Color classColor, float radius = 0)
     {
-        float w = Math.Max(2, 2.5f * p.Density), apart = Math.Max(1, p.Density);
-        p.Outline(RectangleF.FromLTRB(box.X + w / 2, box.Y + w / 2 + apart, box.Right - w / 2, box.Bottom - w / 2 - apart), classColor, w, radius);
+        float w = Math.Max(1.5f, 2 * p.Density);
+        p.Outline(RectangleF.FromLTRB(box.X + w / 2, box.Y + w / 2, box.Right - w / 2, box.Bottom - w / 2), classColor, w, Math.Max(0, radius - w / 2));
+    }
+
+    public static RectangleF ClassGap(HudPainter p, RectangleF row, bool top, bool bottom)
+    {
+        float gap = Math.Max(1, p.Density);
+        float y0 = top ? row.Y + gap : row.Y, y1 = bottom ? row.Bottom - gap : row.Bottom;
+        return RectangleF.FromLTRB(row.X, y0, row.Right, y1);
     }
 
     public static void Header(HudPainter p, List<(Column Col, float Width)> cols, RectangleF row)
@@ -190,22 +199,23 @@ internal static class HudTable
         }
     }
 
-    public static void Row(HudPainter p, List<(Column Col, float Width)> cols, RectangleF row, int car, Color classColor, int emphasis, bool dim, Font font, Color? tint = null, bool alternate = false, RowStyle style = default, bool lifted = false)
+    public static void Row(HudPainter p, List<(Column Col, float Width)> cols, RectangleF row, int car, Color classColor, int emphasis, bool dim, Font font, Color? tint = null, bool alternate = false, RowStyle style = default, bool lifted = false, bool classStripe = true)
     {
         var pal = p.P;
         if (emphasis == 1)
         {
-            p.Fill(row, p.Solid(HudPalette.Mix(pal.Surface, pal.RowTint, 0.3), 240));
-            if (pal.HighlightEdge is { } edge) p.Outline(row, edge);
+            p.Fill(row, p.Solid(HudPalette.Deep(pal.RowTint, 0.25f, 0.8f), 240));
+            if (pal.HighlightEdge is { } edge && classStripe) p.Outline(row, edge);
         }
         else if (alternate) p.Fill(row, HudPalette.Alpha(pal.Heading, 7));
-        p.Fill(new RectangleF(row.X, row.Y, ClassEdge + 1, row.Height), dim ? HudPalette.Alpha(classColor, 150) : classColor);
+        if (classStripe) p.Fill(new RectangleF(row.X, row.Y, ClassEdge + 1, row.Height), dim ? HudPalette.Alpha(classColor, 150) : classColor);
         Color? over = emphasis == 1 ? pal.PlayerText : tint;
         Color Shade(Color c)
         {
-            if (over is { } o && (c == pal.Heading || c == pal.Text || c == pal.Muted)) c = o;
-            else if (lifted) c = c == pal.Text ? pal.Heading : c == pal.Muted ? pal.Text : c == pal.Faint || c == pal.Slate ? pal.Muted : c;
-            return dim ? HudPalette.Alpha(c, 150) : c;
+            if (over is { } o && (c == pal.Heading || c == pal.Text || c == pal.Muted)) c = lifted && emphasis != 1 ? HudPalette.Mix(o, Color.White, 0.55) : o;
+            else if (lifted) c = c == pal.Text ? pal.Heading : c == pal.Muted ? pal.Text : c == pal.Faint || c == pal.Slate ? pal.Muted
+                : c == pal.Lapping || c == pal.Lapped || c == pal.DangerText || c == pal.WarnText ? HudPalette.Mix(c, Color.White, 0.55) : c;
+            return dim ? HudPalette.Alpha(c, lifted ? 205 : 150) : c;
         }
         var bold = Bold(p, font);
         float x = row.X;
@@ -830,11 +840,16 @@ internal sealed class RelativeWidget : HudWidget
             int emphasis = row.IsPlayer && highlight ? 1 : row.CarIdx == v.Race.SelectedCar ? 2 : 0;
             bool dim = f.CarOnPitRoad[row.CarIdx] && !row.IsPlayer;
             int classId = FieldOrder.ClassOf(f, row.CarIdx);
+            bool runTop = classBorder && (i == 0 || FieldOrder.ClassOf(f, rows[i - 1].CarIdx) != classId);
+            bool runBottom = classBorder && (i == rows.Count - 1 || FieldOrder.ClassOf(f, rows[i + 1].CarIdx) != classId);
+            if (classBorder) box = HudTable.ClassGap(p, box, runTop && i > 0, runBottom && i < rows.Count - 1);
+            var clip = p.ClipEnds(box, HudTable.ClassRadius(p), runTop, runBottom);
             var cls = p.ClassColor(f.Session, classId);
             Color? tint = lapColors && row.LapDiff != 0 && !row.IsPlayer
                 ? (row.LapDiff > 0 ? p.P.Lapping : p.P.Lapped) : null;
             if (classRows) HudTable.ClassFill(p, box, cls, dim);
-            HudTable.Row(p, fitted, box, row.CarIdx, cls, emphasis, dim, font, tint, stripes && i % 2 == 1, style, classRows);
+            HudTable.Row(p, fitted, box, row.CarIdx, cls, emphasis, dim, font, tint, stripes && i % 2 == 1, style, classRows, !classBorder);
+            p.Unclip(clip);
             if (classBorder) _runs.Add(classId, cls, box);
             if (row.IsPlayer) p.Region("myrow", box);
             _hits.Add((row.CarIdx, box));
@@ -1164,7 +1179,8 @@ internal sealed class StandingsWidget : HudWidget
             for (int i = 0; i < shown[b].Count; i++)
             {
                 var (row, index) = shown[b][i];
-                if (last >= 0 && index > last + 1 && o.Choice("divider") is var divider && divider != "none")
+                bool classBreak = classBorder && !group && i > 0 && FieldOrder.ClassOf(f, shown[b][i - 1].Row.CarIdx) != FieldOrder.ClassOf(f, row.CarIdx);
+                if (last >= 0 && index > last + 1 && !classBreak && o.Choice("divider") is var divider && divider != "none")
                 {
                     float room = BreakRoom(p);
                     if (y + room + rowH > area.Bottom + 1) break;
@@ -1186,8 +1202,14 @@ internal sealed class StandingsWidget : HudWidget
                     tint = row.LapsDown < mine.LapsDown ? p.P.Lapping : row.LapsDown > mine.LapsDown ? p.P.Lapped : null;
                 int classId = FieldOrder.ClassOf(f, car);
                 var cls = p.ClassColor(f.Session, classId);
+                bool outlined = classBorder && !group;
+                bool runTop = outlined && (i == 0 || FieldOrder.ClassOf(f, shown[b][i - 1].Row.CarIdx) != classId);
+                bool runBottom = outlined && (i == shown[b].Count - 1 || FieldOrder.ClassOf(f, shown[b][i + 1].Row.CarIdx) != classId);
+                if (outlined) rowBox = HudTable.ClassGap(p, rowBox, runTop && i > 0, runBottom && i < shown[b].Count - 1);
+                var clip = p.ClipEnds(rowBox, HudTable.ClassRadius(p), runTop, runBottom);
                 if (classRows) HudTable.ClassFill(p, rowBox, cls, dim);
-                HudTable.Row(p, fitted, rowBox, car, cls, emphasis, dim, font, tint, stripes && drawn++ % 2 == 1, style, classRows);
+                HudTable.Row(p, fitted, rowBox, car, cls, emphasis, dim, font, tint, stripes && drawn++ % 2 == 1, style, classRows, !outlined);
+                p.Unclip(clip);
                 if (classBorder && !group) _runs.Add(classId, cls, rowBox);
                 if (car == me) p.Region("myrow", rowBox);
                 _hits.Add((car, rowBox));

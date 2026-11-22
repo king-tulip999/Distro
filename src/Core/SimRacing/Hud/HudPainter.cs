@@ -63,6 +63,18 @@ internal sealed class HudPalette
 
     public static Color Alpha(Color c, int alpha) => Color.FromArgb(Math.Clamp(alpha, 0, 255), c.R, c.G, c.B);
 
+    public static Color Deep(Color c, float lightness, float saturation = 0.9f)
+    {
+        float h = c.GetHue() / 360f, sat = c.GetSaturation() > 0.05f ? saturation : 0, q = lightness < 0.5f ? lightness * (1 + sat) : lightness + sat - lightness * sat, pp = 2 * lightness - q;
+        static float Channel(float p, float q, float t)
+        {
+            t = t < 0 ? t + 1 : t > 1 ? t - 1 : t;
+            return t < 1 / 6f ? p + (q - p) * 6 * t : t < 0.5f ? q : t < 2 / 3f ? p + (q - p) * (2 / 3f - t) * 6 : p;
+        }
+        static int Byte(float v) => (int)Math.Round(Math.Clamp(v, 0, 1) * 255);
+        return Color.FromArgb(c.A, Byte(Channel(pp, q, h + 1 / 3f)), Byte(Channel(pp, q, h)), Byte(Channel(pp, q, h - 1 / 3f)));
+    }
+
     public static Color On(Color bg) => 0.2126 * Lin(bg.R) + 0.7152 * Lin(bg.G) + 0.0722 * Lin(bg.B) > 0.22 ? Color.FromArgb(0x12, 0x12, 0x12) : Color.White;
 
     private static double Lin(int v) { double c = v / 255.0; return c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4); }
@@ -586,6 +598,36 @@ internal sealed class HudPainter : IDisposable
         return _shapes[key] = Rounded(new RectangleF(0, 0, key.Item1, key.Item2), Math.Min(key.Item3, Math.Min(key.Item1, key.Item2) / 2));
     }
 
+    private readonly Dictionary<(float, float, float, bool, bool), GraphicsPath> _ends = new();
+
+    public GraphicsState? ClipEnds(RectangleF r, float radius, bool top, bool bottom)
+    {
+        if (radius <= 0.5f || !top && !bottom || r.Width <= 0 || r.Height <= 0) return null;
+        var key = (MathF.Round(r.Width, 1), MathF.Round(r.Height, 1), MathF.Round(Math.Min(radius, Math.Min(r.Width, r.Height) / 2), 1), top, bottom);
+        if (!_ends.TryGetValue(key, out var path))
+        {
+            if (_ends.Count >= MaxCached) { foreach (var e in _ends.Values) e.Dispose(); _ends.Clear(); }
+            float w = key.Item1, h = key.Item2, d = key.Item3 * 2;
+            path = new GraphicsPath();
+            if (top) { path.AddArc(0, 0, d, d, 180, 90); path.AddArc(w - d, 0, d, d, 270, 90); }
+            else { path.AddLine(0, 0, w, 0); }
+            if (bottom) { path.AddArc(w - d, h - d, d, d, 0, 90); path.AddArc(0, h - d, d, d, 90, 90); }
+            else { path.AddLine(w, h, 0, h); }
+            path.CloseFigure();
+            _ends[key] = path;
+        }
+        var state = _g.Save();
+        _g.TranslateTransform(r.X, r.Y);
+        _g.SetClip(path, CombineMode.Intersect);
+        _g.TranslateTransform(-r.X, -r.Y);
+        return state;
+    }
+
+    public void Unclip(GraphicsState? state)
+    {
+        if (state is not null) _g.Restore(state);
+    }
+
     public void Line(float x1, float y1, float x2, float y2, Color c, float width = 1)
     {
         if (y1 == y2) y1 = y2 = SnapLine(y1, width);
@@ -1060,6 +1102,7 @@ internal sealed class HudPainter : IDisposable
         foreach (var p in _flatPens.Values) p.Dispose();
         foreach (var f in _formats) f?.Dispose();
         foreach (var s in _shapes.Values) s.Dispose();
+        foreach (var e in _ends.Values) e.Dispose();
         foreach (var g in _gradients.Values) g.Dispose();
         foreach (var g in _panelBrushes.Values) g.Dispose();
         foreach (var g in _sweepBrushes.Values) g.Dispose();

@@ -519,6 +519,7 @@ internal static class HudSheet
             Save(standings, standings.W, standings.H, Path.Combine(dir, "standings-classes.png"), 1, classColors);
             Save(standings, standings.W, standings.H, Path.Combine(dir, "standings-classes-list.png"), 1, classColors.Append(("group", "false")).ToArray());
             Save(relative, relative.W, relative.H, Path.Combine(dir, "relative-classes.png"), 1, classColors);
+            Save(relative, relative.W, relative.H, Path.Combine(dir, "relative-outlines.png"), 1, ("classBorder", "true"));
             Save(relative, 640, relative.H, Path.Combine(dir, "relative-logos.png"), 1, ("columns", "cpos,num,logo,badge,name,flag,out,last,gap"));
             Save(standings, standings.W, standings.H, Path.Combine(dir, "standings-logos.png"), 1, ("columns", "cpos,logo,badge,num,name,pit,change,last,int,gap"));
             var standingsThree = Asked(standings, threeLaps);
@@ -578,6 +579,21 @@ internal static class HudSheet
 
             foreach (var kind in new[] { "radar" })
                 Save(HudCatalog.Find(kind)!, HudCatalog.Find(kind)!.W, HudCatalog.Find(kind)!.H, Path.Combine(dir, kind + "@250.png"), 2.5f);
+
+            var mixRelative = HudCatalog.Find("relative")!;
+            double mixAt = 0.25;
+            foreach (double until in new[] { 40.0, 80, 120, 160, 200, 240 })
+            {
+                for (; mixAt < until; mixAt += 0.25)
+                {
+                    demo.Fill(frame, mixAt);
+                    frame.Sequence = ++seq;
+                    race.Update(frame);
+                }
+                string at = ((int)until).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                Save(mixRelative, mixRelative.W, mixRelative.H, Path.Combine(dir, $"mix-{at}-both.png"), 1, ("classRows", "true"), ("classBorder", "true"));
+                Save(mixRelative, mixRelative.W, mixRelative.H, Path.Combine(dir, $"mix-{at}-outlines.png"), 1, ("classBorder", "true"));
+            }
 
             void Save(HudWidgetDef def, double w, double h, string path, float scale = 1, params (string Key, string Value)[] options)
             {
