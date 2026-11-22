@@ -176,7 +176,7 @@ internal static class FieldOrder
 
     public static (double? Gap, int Laps) Behind(TelemetryFrame f, int car, int ahead, bool race)
     {
-        if (car == ahead) return (0, 0);
+        if (car == ahead) return (race || f.CarBestLap[car] > 0 ? 0 : null, 0);
         if (!race)
             return (f.CarBestLap[car] > 0 && f.CarBestLap[ahead] > 0 ? f.CarBestLap[car] - f.CarBestLap[ahead] : null, 0);
         int laps = 0;

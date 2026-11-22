@@ -31,6 +31,7 @@ internal static class SimHubEmbed
         });
         source.AddHook(Hook);
         _panel ??= new SimHubPanel(app);
+        _panel.Embedded = true;
         source.RootVisual = _panel;
         _source = source;
         _panel.Show();

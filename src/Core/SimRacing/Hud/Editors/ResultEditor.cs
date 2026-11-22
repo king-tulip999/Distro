@@ -13,7 +13,7 @@ internal static class ResultEditor
                 O("awardChips") with { ShowIf = o => o.Choice("look") == Widgets.ResultWidget.Card }),
             new("show", "Shows", HudTab.Content, true, new PickerSetting("show", new HudCategory[]
             {
-                new("Top", "checker", "gain", "class", "car", "ribbon"),
+                new("Top", "gain", "class", "car", "ribbon"),
                 new("Driver", "name", "carname", "track"),
                 new("Chips", "rating", "incidents", "awards"),
                 new("Stats", "best", "average", "consistency", "laps", "time", "strip"),

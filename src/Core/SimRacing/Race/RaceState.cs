@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using Core.Config;
-using Units = Core.Services.CapsUnits;
+using Units = Core.Services.Units;
 using Core.SimRacing.FuelEngine;
 using Core.SimRacing.Telemetry;
 
@@ -34,7 +34,7 @@ internal sealed class RaceState
     private double _lastChecks = double.NegativeInfinity;
     private int _lastIncidents = -1, _lastClassPos, _lastWetness = -1;
     private RaceFlags _lastFlags;
-    private bool _wasOnPitRoad, _wasStall, _wasConnected, _lapsPbKnown;
+    private bool _wasOnPitRoad, _wasStall, _wasOnTrack, _wasConnected, _lapsPbKnown;
     private double _pitEnteredAt = -1, _stallAt = -1, _stallTime;
     private double? _pitEnteredPct;
     private int _lastPosition;
@@ -434,6 +434,7 @@ internal sealed class RaceState
         _lastFlags = f.Flags;
         _wasOnPitRoad = f.OnPitRoad;
         _wasStall = f.InPitStall;
+        _wasOnTrack = f.IsOnTrack;
         _pitEnteredAt = -1;
         _bestLap = null;
         _lapsPbKnown = false;
@@ -449,7 +450,7 @@ internal sealed class RaceState
     private void TrackPit(TelemetryFrame f)
     {
         double t = f.SessionTime ?? 0;
-        if (f.OnPitRoad && !_wasOnPitRoad)
+        if (f.OnPitRoad && !_wasOnPitRoad && _wasOnTrack && !f.InPitStall)
         {
             _pitEnteredAt = t;
             _pitEnteredPct = f.LapDistPct is >= 0 and <= 1 ? f.LapDistPct : null;
@@ -473,6 +474,7 @@ internal sealed class RaceState
         }
         _wasOnPitRoad = f.OnPitRoad;
         _wasStall = f.InPitStall;
+        _wasOnTrack = f.IsOnTrack;
     }
 
     private void TrackIncidents(TelemetryFrame f)
@@ -666,11 +668,11 @@ internal sealed class RaceState
                 bool closing = Gaps.Trend(i) is < -0.01;
                 bool fasterBehind = isFaster && gap is < 0 and var g1 && -g1 < faster && closing;
                 Alerts.Set("traffic.faster", fasterBehind, now,
-                    fasterBehind ? $"Faster car behind · {f.Session.ByCar.GetValueOrDefault(i)?.ClassName}" : null,
+                    fasterBehind ? $"Faster car behind · {f.Session.ByCar.GetValueOrDefault(i)?.ClassLabel}" : null,
                     fasterBehind ? $"{Name(f, i)} · {-(gap ?? 0):0.0} {Units.S}" : null, FasterKeys[i]);
                 bool slowerAhead = !isFaster && lap is { } l2 && myLap is { } m2 && l2 > m2 * 1.02 && gap is > 0 && gap < slower && closing;
                 Alerts.Set("traffic.slower", slowerAhead, now,
-                    slowerAhead ? $"Slower car ahead · {f.Session.ByCar.GetValueOrDefault(i)?.ClassName}" : null,
+                    slowerAhead ? $"Slower car ahead · {f.Session.ByCar.GetValueOrDefault(i)?.ClassLabel}" : null,
                     slowerAhead ? $"{Name(f, i)} · {gap:0.0} {Units.S}" : null, SlowerKeys[i]);
             }
         }

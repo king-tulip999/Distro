@@ -53,7 +53,7 @@ internal sealed class SessionWidget : HudWidget
                 case "lap": cells.Add(("LAP", f.Lap is { } l ? (session?.Laps is > 0 and var total ? PooledText.Number("", l, " / ", total) : l.ToString()) : RaceFormat.Missing)); break;
                 case "pos": cells.Add(("POSITION", (uint)me < TelemetryFrame.MaxCars && f.CarPosition[me] > 0 ? RaceFormat.Pos(f.CarPosition[me]) : RaceFormat.Missing)); break;
                 case "cpos":
-                    cells.Add((PooledText.Concat("In ", f.Session.Player?.ClassName is { Length: > 0 } cn ? cn : "class"),
+                    cells.Add((PooledText.Concat("In ", f.Session.Player?.ClassLabel is { Length: > 0 } cn ? cn : "class"),
                         v.Race.StandingOf(me)?.ClassPosition is > 0 and var cp ? RaceFormat.Pos(cp) : RaceFormat.Missing));
                     break;
                 case "phase": cells.Add(("PHASE", RaceControl.SessionPhaseLabel(f.Phase) is { Length: > 0 } ph ? ph : RaceFormat.Missing)); break;
@@ -262,8 +262,15 @@ internal sealed class TyresWidget : HudWidget
             inner = new RectangleF(inner.X, inner.Y + Math.Max(0, (inner.Height - used) / 2), inner.Width, used);
             var head = inner.Top(headH, out inner);
             p.Text(names[i], p.SmallBold, p.P.AccentText, head, HAlign.Left);
-            if (pressure) p.Text(RaceFormat.Pressure(f.TyreColdPressure[i], v.Units), p.Small, p.P.Text, head, HAlign.Right);
-            if (hasWear && !showWear) p.Number(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{wear!.Value * 100:0}%"), p.SmallBold, WearColor(p, wear.Value), head, HAlign.Center, VAlign.Center);
+            string? pressureText = pressure ? RaceFormat.Pressure(f.TyreColdPressure[i], v.Units) : null;
+            if (pressureText is not null) p.Text(pressureText, p.Small, p.P.Text, head, HAlign.Right);
+            if (hasWear && !showWear)
+            {
+                string wearText = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{wear!.Value * 100:0}%");
+                float spacing = 8 * p.Density, left = p.Measure(names[i], p.SmallBold) + spacing, right = pressureText is null ? 0 : p.Measure(pressureText, p.Small) + spacing;
+                var slot = new RectangleF(head.X + left, head.Y, head.Width - left - right, head.Height);
+                if (p.Measure(wearText, p.SmallBold) + 2 <= slot.Width) p.Number(wearText, p.SmallBold, WearColor(p, wear.Value), slot, HAlign.Center, VAlign.Center);
+            }
             if (showTemps)
             {
                 double?[] t = i % 2 == 0 ? new[] { f.TyreTempOuter[i], f.TyreTempMiddle[i], f.TyreTempInner[i] } : new[] { f.TyreTempInner[i], f.TyreTempMiddle[i], f.TyreTempOuter[i] };

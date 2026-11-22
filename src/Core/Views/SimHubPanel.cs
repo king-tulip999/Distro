@@ -6,6 +6,9 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Core.Controls;
 using Core.Services;
+using Core.SimRacing.Hud;
+using Core.SimRacing.Hud.Web;
+using Core.SimRacing.Race;
 using Core.Views.Pages;
 
 namespace Core.Views;
@@ -16,6 +19,9 @@ internal sealed class SimHubPanel : Grid, IModalHost
     private readonly Grid _modal = new() { Visibility = Visibility.Collapsed };
     private readonly TextBlock _version = TextFit.TipWhenTrimmed(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 12, 0) });
     private readonly Button _check = new() { Content = "Check for updates", VerticalAlignment = VerticalAlignment.Center };
+    private readonly CheckBox _run = new() { Content = "Run Velocita", IsChecked = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0), Visibility = Visibility.Collapsed };
+    private readonly ContentControl _overlayNote = new() { Focusable = false, Margin = new Thickness(0, 0, 0, 14), Visibility = Visibility.Collapsed };
+    private readonly StackPanel _content = new() { Margin = new Thickness(23, 16, 23, 23) };
     private TaskCompletionSource<bool>? _confirm;
     private bool _shown;
 
@@ -33,12 +39,6 @@ internal sealed class SimHubPanel : Grid, IModalHost
         SetResourceReference(BackgroundProperty, "Bg");
 
         Section = new RaceHudSection(app, this);
-        var heading = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
-        var title = new TextBlock { Text = "iRacing Overlay", Style = Ui.Res<Style>("H1"), VerticalAlignment = VerticalAlignment.Center };
-        DockPanel.SetDock(Section.TitleTools, Dock.Right);
-        heading.Children.Add(Section.TitleTools);
-        heading.Children.Add(title);
-
         var note = new TextBlock
         {
             Text = "Show or move the widgets in SimHub: Dash Studio → Overlays, each one listed as “Velocita - <widget>”. Changes here show on them right away.",
@@ -46,13 +46,22 @@ internal sealed class SimHubPanel : Grid, IModalHost
         };
         _version.Style = Ui.Res<Style>("Caption");
         _check.Click += (_, _) => SimHubEngine.Updater?.CheckNow();
-        var info = new TrimRow { Margin = new Thickness(0, 0, 0, 14), Children = { note, _version, _check } };
+        _run.Style = Ui.Res<Style>("Switch");
+        _run.Unchecked += (_, _) => SimHubEngine.TurnOff();
+        Section.TitleTools.Margin = new Thickness(0, 0, 16, 0);
+        Section.TitleTools.VerticalAlignment = VerticalAlignment.Center;
+        var updates = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { Section.TitleTools, _version, _check, _run } };
+        DockPanel.SetDock(updates, Dock.Right);
+        var info = new DockPanel { Margin = new Thickness(0, 0, 0, 14), Children = { updates, note } };
         if (SimHubEngine.Updater is null) _check.Visibility = Visibility.Collapsed;
 
+        _content.Children.Add(info);
+        _content.Children.Add(_overlayNote);
+        _content.Children.Add(Section);
         var page = new ScrollViewer
         {
             Style = Ui.Res<Style>("PageScroll"), Focusable = false,
-            Content = Ui.PageFrame(new StackPanel { Margin = new Thickness(23, 16, 23, 23), Children = { heading, info, Section } }),
+            Content = Ui.PageFrame(_content),
         };
         Ui.ChainWheel(page);
         var body = new Grid { Children = { page } };
@@ -71,12 +80,23 @@ internal sealed class SimHubPanel : Grid, IModalHost
         ShowUpdate();
     }
 
+    public bool Embedded
+    {
+        set
+        {
+            _run.IsChecked = true;
+            _run.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
     public void Show()
     {
         if (_shown) return;
         _shown = true;
         if (SimHubEngine.Updater is { } updater) updater.Changed += ShowUpdate;
+        if (SimHubEngine.OverlayLayouts is { } layouts) layouts.Changed += ShowOverlayNote;
         ShowUpdate();
+        ShowOverlayNote();
         Section.OnShown();
     }
 
@@ -85,9 +105,47 @@ internal sealed class SimHubPanel : Grid, IModalHost
         if (!_shown) return;
         _shown = false;
         if (SimHubEngine.Updater is { } updater) updater.Changed -= ShowUpdate;
+        if (SimHubEngine.OverlayLayouts is { } layouts) layouts.Changed -= ShowOverlayNote;
         CloseModal(false);
         Section.OnHidden();
         _app.FlushPendingSave();
+    }
+
+    private void ShowOverlayNote()
+    {
+        var repeated = SimHubEngine.OverlayLayouts?.Repeated ?? Array.Empty<RepeatedOverlay>();
+        if (repeated.Count == 0)
+        {
+            _overlayNote.Content = null;
+            _overlayNote.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var first = repeated[0];
+        string title = repeated.Count == 1
+            ? $"“{first.Overlay}” is in the SimHub overlay layout “{first.Layout}” {Times(first.Count)}"
+            : "Some Velocita overlays are in a SimHub overlay layout more than once";
+        string detail = "Copies of one overlay all show the same widget. " + Advice(first);
+        if (repeated.Count > 1)
+            detail = string.Join(Environment.NewLine, repeated.Select(r => $"“{r.Overlay}” in “{r.Layout}”: {Times(r.Count)}").Append(detail));
+        _overlayNote.Content = Ui.Notice("Warn", "I.Alert", title, detail);
+        _overlayNote.Visibility = Visibility.Visible;
+    }
+
+    private static string Times(int count) => count == 2 ? "twice" : RaceFormat.Count(count, "time");
+
+    private string Advice(RepeatedOverlay repeated)
+    {
+        var def = HudCatalog.All.FirstOrDefault(d => string.Equals(SimHubDashboards.Name(d), repeated.Overlay, StringComparison.OrdinalIgnoreCase));
+        const string Duplicate = "For another one, click Duplicate on that widget here, then put the numbered overlay it adds in the SimHub layout instead.";
+        if (def is null) return Duplicate;
+        var hud = _app.Config.SimRacing.Hud;
+        int count = hud.Layout(hud.ActiveLayout)?.Widgets.Count(w => string.Equals(w.Kind, def.Kind, StringComparison.OrdinalIgnoreCase)) ?? 1;
+        for (int slot = 2; slot <= Math.Min(count, HudWebServer.MaxSlot); slot++)
+        {
+            string name = SimHubDashboards.Name(def, slot);
+            if (!repeated.IsPlaced(name)) return $"Put “{name}” in the SimHub layout in place of the extra copy: it shows {def.Name} {slot} from here.";
+        }
+        return $"For another one, click Duplicate on that widget here, then put the overlay it adds (“{SimHubDashboards.Name(def, Math.Max(2, count + 1))}”) in the SimHub layout instead.";
     }
 
     private void ShowUpdate()

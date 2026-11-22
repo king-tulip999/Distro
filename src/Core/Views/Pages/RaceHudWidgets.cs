@@ -68,6 +68,21 @@ internal sealed partial class RaceHudWidgets
 
     private HudLayout? Layout => S.Layout(_section.ShownLayout) ?? S.Layouts.FirstOrDefault();
 
+    private bool Full(string kind) => Layout?.Widgets.Count(x => x.Kind == kind) >= SimRacing.Hud.Web.HudWebServer.MaxSlot;
+
+    private int SlotOf(HudWidgetConfig w)
+    {
+        if (Layout?.Widgets is not { } all) return 1;
+        int slot = 0;
+        foreach (var other in all)
+        {
+            if (other.Kind != w.Kind) continue;
+            slot++;
+            if (ReferenceEquals(other, w)) return slot;
+        }
+        return 1;
+    }
+
     private string NameOf(HudWidgetConfig w)
     {
         string name = HudCatalog.Find(w.Kind)?.Name ?? w.Kind;
@@ -410,7 +425,7 @@ internal sealed partial class RaceHudWidgets
         var copy = Ui.LabeledButton("I.Copy", "Copy URL", () =>
         {
             if (Host?.WebPort is not { } live) return;
-            string link = SimRacing.Hud.Web.HudWebServer.Url(live, w.Kind);
+            string link = SimRacing.Hud.Web.HudWebServer.Url(live, w.Kind, SlotOf(w));
             try
             {
                 Clipboard.SetText(link);
@@ -422,7 +437,7 @@ internal sealed partial class RaceHudWidgets
         DockPanel.SetDock(copy, Dock.Right);
         var urlRow = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 4, 0, 4), Children = { copy, url } };
         bool running = Host?.WebPort is not null;
-        url.Text = SimRacing.Hud.Web.HudWebServer.Url(Host?.WebPort ?? S.WebPort, w.Kind);
+        url.Text = SimRacing.Hud.Web.HudWebServer.Url(Host?.WebPort ?? S.WebPort, w.Kind, SlotOf(w));
         url.SetResourceReference(TextBlock.ForegroundProperty, running ? "Heading" : "TextFaint");
         copy.IsEnabled = running;
         copy.ToolTip = running ? "This widget as a web page on this PC only, for a wheel screen or streaming software. It follows these options and stays blank outside a session."
@@ -472,7 +487,13 @@ internal sealed partial class RaceHudWidgets
             Fill();
         });
         dup.Margin = Ui.AfterButton;
-        if (!AppIdentity.SimHub) actions.Children.Add(dup);
+        if (AppIdentity.SimHub && Full(w.Kind))
+        {
+            dup.IsEnabled = false;
+            dup.ToolTip = $"SimHub takes up to {SimRacing.Hud.Web.HudWebServer.MaxSlot} of each widget";
+            ToolTipService.SetShowOnDisabled(dup, true);
+        }
+        actions.Children.Add(dup);
         var reset = Ui.LabeledButton("I.Undo", "Default options", () =>
         {
             var before = new Dictionary<string, string>(w.Options, StringComparer.OrdinalIgnoreCase);
@@ -580,7 +601,7 @@ internal sealed partial class RaceHudWidgets
         var add = new MenuItem { Header = "Add widget", Icon = new Icon { Data = Ui.Res<Geometry>("I.Plus"), Width = 12, Height = 12 } };
         foreach (var def in HudCatalog.All.OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase))
         {
-            if (AppIdentity.SimHub && widgets.Any(x => string.Equals(x.Kind, def.Kind, StringComparison.OrdinalIgnoreCase))) continue;
+            if (AppIdentity.SimHub && Full(def.Kind)) continue;
             var kind = def;
             var sub = new MenuItem { Header = def.Name, ToolTip = def.Description };
             sub.Click += (_, _) => Add(kind);

@@ -18,13 +18,15 @@ internal sealed class HudWebClient
     private string? _message;
     private readonly SemaphoreSlim _wake = new(0, 1);
 
-    public HudWebClient(string kind, bool sample)
+    public HudWebClient(string kind, bool sample, int slot = 1)
     {
         Kind = kind;
         Sample = sample;
+        Slot = slot;
     }
 
     public string Kind { get; }
+    public int Slot { get; }
     public bool Sample { get; }
     public volatile int Width, Height;
     internal byte[]? Offered;
@@ -61,13 +63,13 @@ internal sealed class HudWebServer : IDisposable
 {
     private const string SocketGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
     private const int MaxRequest = 16 * 1024;
-    internal const int MaxClients = 32;
+    internal const int MaxClients = 64;
+    internal const int MaxSlot = 20;
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
 
     private readonly object _gate = new();
     private readonly List<HudWebClient> _clients = new();
     private readonly IReadOnlyList<HudWebOverlay> _overlays;
-    private readonly HashSet<string> _kinds;
     private TcpListener? _listener;
     private CancellationTokenSource? _stop;
     private volatile string _themeCss = "";
@@ -76,7 +78,6 @@ internal sealed class HudWebServer : IDisposable
     public HudWebServer(IReadOnlyList<HudWebOverlay> overlays)
     {
         _overlays = overlays;
-        _kinds = overlays.Select(o => o.Kind).ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     public int Port { get; private set; }
@@ -89,7 +90,18 @@ internal sealed class HudWebServer : IDisposable
 
     public IReadOnlyList<HudWebClient> Clients => Volatile.Read(ref _snapshot);
 
-    public static string Url(int port, string? kind = null) => $"http://127.0.0.1:{port}/" + (kind is null ? "" : "overlay/" + kind);
+    public static string Url(int port, string? kind = null, int slot = 1) => $"http://127.0.0.1:{port}/" + (kind is null ? "" : "overlay/" + Address(kind, slot));
+
+    public static string Address(string kind, int slot) => slot > 1 ? kind + "/" + slot.ToString(System.Globalization.CultureInfo.InvariantCulture) : kind;
+
+    internal static (HudWebOverlay Overlay, int Slot)? Find(IReadOnlyList<HudWebOverlay> overlays, string address)
+    {
+        int slash = address.IndexOf('/');
+        string kind = slash < 0 ? address : address[..slash];
+        int slot = 1;
+        if (slash >= 0 && !(int.TryParse(address[(slash + 1)..], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out slot) && slot is >= 2 and <= MaxSlot)) return null;
+        return overlays.FirstOrDefault(o => o.Kind.Equals(kind, StringComparison.OrdinalIgnoreCase)) is { } overlay ? (overlay, slot) : null;
+    }
 
     public string ThemeCss
     {
@@ -178,7 +190,7 @@ internal sealed class HudWebServer : IDisposable
                     return;
                 }
                 if (path.StartsWith("/ws/", StringComparison.Ordinal) && headers.TryGetValue("upgrade", out var up) && up.Equals("websocket", StringComparison.OrdinalIgnoreCase)
-                    && headers.TryGetValue("sec-websocket-key", out var key) && _kinds.Contains(path[4..]))
+                    && headers.TryGetValue("sec-websocket-key", out var key) && Find(_overlays, path[4..]) is { } wanted)
                 {
                     if (!LocalOrigin(headers.GetValueOrDefault("origin"), Port) && !(Remote && SameOrigin(headers.GetValueOrDefault("origin"), host)))
                     {
@@ -190,7 +202,7 @@ internal sealed class HudWebServer : IDisposable
                         await Respond(stream, "503 Service Unavailable", "text/plain", "Too many overlays open"u8.ToArray(), token).ConfigureAwait(false);
                         return;
                     }
-                    await Socket(stream, _overlays.First(o => o.Kind.Equals(path[4..], StringComparison.OrdinalIgnoreCase)).Kind, query == "sample", key, token).ConfigureAwait(false);
+                    await Socket(stream, wanted.Overlay.Kind, wanted.Slot, query == "sample", key, token).ConfigureAwait(false);
                     return;
                 }
                 var (status, type, body) = Page(path);
@@ -277,8 +289,12 @@ internal sealed class HudWebServer : IDisposable
             case "/theme.css":
                 return ("200 OK", "text/css; charset=utf-8", Encoding.UTF8.GetBytes(_themeCss));
         }
-        if (path.StartsWith("/overlay/", StringComparison.Ordinal) && _overlays.FirstOrDefault(o => o.Kind.Equals(path[9..], StringComparison.OrdinalIgnoreCase)) is { } overlay)
-            return ("200 OK", Html, Encoding.UTF8.GetBytes(Asset("overlay.html").Replace("{{kind}}", overlay.Kind, StringComparison.Ordinal).Replace("{{name}}", WebUtility.HtmlEncode(overlay.Name), StringComparison.Ordinal)));
+        if (path.StartsWith("/overlay/", StringComparison.Ordinal) && Find(_overlays, path[9..]) is { } found)
+        {
+            var (overlay, slot) = found;
+            string name = slot > 1 ? overlay.Name + " " + slot.ToString(System.Globalization.CultureInfo.InvariantCulture) : overlay.Name;
+            return ("200 OK", Html, Encoding.UTF8.GetBytes(Asset("overlay.html").Replace("{{kind}}", Address(overlay.Kind, slot), StringComparison.Ordinal).Replace("{{name}}", WebUtility.HtmlEncode(name), StringComparison.Ordinal)));
+        }
         return ("404 Not Found", "text/plain", "Not found"u8.ToArray());
     }
 
@@ -295,12 +311,12 @@ internal sealed class HudWebServer : IDisposable
         }
     }
 
-    private async Task Socket(NetworkStream stream, string kind, bool sample, string key, CancellationToken token)
+    private async Task Socket(NetworkStream stream, string kind, int slot, bool sample, string key, CancellationToken token)
     {
         string accept = Convert.ToBase64String(SHA1.HashData(Encoding.ASCII.GetBytes(key + SocketGuid)));
         await stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n"), token).ConfigureAwait(false);
         using var socket = WebSocket.CreateFromStream(stream, new WebSocketCreationOptions { IsServer = true, KeepAliveInterval = TimeSpan.FromSeconds(20) });
-        var client = new HudWebClient(kind, sample);
+        var client = new HudWebClient(kind, sample, slot);
         using var done = CancellationTokenSource.CreateLinkedTokenSource(token);
         Add(client);
         try

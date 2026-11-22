@@ -28,11 +28,15 @@ internal static class SimHubEngine
 
     public static SimHubUpdater? Updater => _updater;
 
+    public static SimHubOverlayLayouts? OverlayLayouts { get; private set; }
+
     public const string EmbedFile = "embed.txt";
+    public const string OffFile = "off.txt";
 
     private static string EmbedEventName => $@"Local\{AppIdentity.DataName}.Embed";
     private static string DetachEventName => $@"Local\{AppIdentity.DataName}.Detach";
     private static string ClosingEventName => $@"Local\{AppIdentity.DataName}.Closing";
+    private static string ResumedEventName => $@"Local\{AppIdentity.DataName}.Resumed";
     private static readonly TimeSpan ParentExitGrace = TimeSpan.FromSeconds(10);
     private static bool _watchingParent;
     private static bool _parentHandled;
@@ -93,12 +97,14 @@ internal static class SimHubEngine
                 _updater = new SimHubUpdater(folder);
                 _updater.Start();
             }
+            OverlayLayouts = new SimHubOverlayLayouts(folder);
         }
 
         SingleInstance.Listen(() => app.Dispatcher.BeginInvoke(new Action(ShowSettings)));
         ListenForEmbed(app);
         Listen(app, DetachEventName, "SimHub detach", SimHubEmbed.Detach);
         Listen(app, ClosingEventName, "SimHub closing", SimHubClosing);
+        Listen(app, ResumedEventName, "SimHub resumed", StopParentGrace);
         SingleInstance.ListenForQuit(() => app.Dispatcher.BeginInvoke(new Action(App.Quit)));
         if (int.TryParse(Arg(args, ParentArg), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parent)) WatchParent(app, parent);
         if (args.Contains(SettingsArg, StringComparer.OrdinalIgnoreCase)) ShowSettings();
@@ -115,6 +121,23 @@ internal static class SimHubEngine
         hud.WebPort = Port;
         hud.VrOverlays = false;
         hud.Interactive = false;
+        hud.AutoSwitch = false;
+    }
+
+    public static void TurnOff()
+    {
+        try
+        {
+            Directory.CreateDirectory(ConfigStore.Folder);
+            File.WriteAllText(Path.Combine(ConfigStore.Folder, OffFile), "");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            App.LogError(ex);
+            return;
+        }
+        SimHubEmbed.Detach();
+        App.Quit();
     }
 
     private static void ShowSettings()
@@ -161,12 +184,16 @@ internal static class SimHubEngine
 
     private static void OnParentGraceOver(object? sender, EventArgs e)
     {
-        if (_parentGrace is { } grace)
-        {
-            grace.Stop();
-            grace.Tick -= OnParentGraceOver;
-        }
+        StopParentGrace();
         ParentClosed();
+    }
+
+    private static void StopParentGrace()
+    {
+        if (_parentGrace is not { } grace) return;
+        grace.Stop();
+        grace.Tick -= OnParentGraceOver;
+        _parentGrace = null;
     }
 
     private static IntPtr? ReadEmbedParent()

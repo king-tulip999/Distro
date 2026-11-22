@@ -456,13 +456,17 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         _rules.View.Margin = new Thickness(0, 6, 0, 0);
         rules.Children.Add(_rules.View);
         RefreshRuleCount();
-        root.Children.Add(_rulesCard = new Tile
+        _rulesCard = new Tile
         {
             Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Padding = new Thickness(13, 10, 13, 10), Child = rules,
             Visibility = S.AutoSwitch ? Visibility.Visible : Visibility.Collapsed,
-        });
+        };
         Ui.Anchor(row, LayoutsAnchor);
-        _layoutSlot.Content = row;
+        if (!AppIdentity.SimHub)
+        {
+            root.Children.Add(_rulesCard);
+            _layoutSlot.Content = row;
+        }
 
         _widgets = new RaceHudWidgets(_app, this);
         root.Children.Add(_widgets.Root);

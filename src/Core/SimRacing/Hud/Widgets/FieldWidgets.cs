@@ -1165,7 +1165,7 @@ internal sealed class StandingsWidget : HudWidget
                 var hr = new RectangleF(area.X, y + 2, area.Width, classHead - 4);
                 p.Region("classhead", hr);
                 float radius = p.CornerRadius(2);
-                string className = d?.ClassName is { Length: > 0 } cn ? cn : "Class";
+                string className = d?.ClassLabel is { Length: > 0 } cn ? cn : "Class";
                 string tier = ProAm.IsPro(f.Session, first.CarIdx) ? "PRO" : "AM";
                 string name = p.LabelText(!proAm ? className : multi ? PooledText.Concat(className, " ", tier) : tier);
                 var tag = new RectangleF(hr.X, hr.Y, Math.Min(hr.Width * 0.6f, p.Measure(name, p.SmallBold) + 16), hr.Height);
@@ -1427,7 +1427,7 @@ internal static class Strips
                 case "lapsleft": items.Add(("LAPS LEFT", LapsLeft(v) ?? missing, null)); break;
                 case "pos": items.Add(("POS", mine && f.CarPosition[me] > 0 ? RaceFormat.Pos(f.CarPosition[me]) : missing, null)); break;
                 case "cpos":
-                    items.Add((p.LabelText(f.Session.Player?.ClassName is { Length: > 0 } cn ? cn : "CLASS"),
+                    items.Add((p.LabelText(f.Session.Player?.ClassLabel is { Length: > 0 } cn ? cn : "CLASS"),
                         mine && v.Race.StandingOf(me) is { ClassPosition: > 0 } s ? PooledText.Number("P", s.ClassPosition) : missing, null));
                     break;
                 case "leader":
@@ -1455,7 +1455,7 @@ internal static class Strips
                     items.Add(FieldColumns.Fastest(f, null) is { } fl ? ("FL", PooledText.Concat(RaceFormat.LapTime(fl.Time), " ", Short(f, fl.Car)), p.P.Fastest) : ("FL", missing, p.P.Faint));
                     break;
                 case "classFastest":
-                    string classFl = f.Session.Player?.ClassName is { Length: > 0 } pcn ? PooledText.Concat(p.LabelText(pcn), " FL") : "CLASS FL";
+                    string classFl = f.Session.Player?.ClassLabel is { Length: > 0 } pcn ? PooledText.Concat(p.LabelText(pcn), " FL") : "CLASS FL";
                     items.Add(f.Session.Player is { } pl && FieldColumns.Fastest(f, pl.ClassId) is { } cfl ? (classFl, RaceFormat.LapTime(cfl.Time), p.P.Fastest) : (classFl, missing, p.P.Faint));
                     break;
                 case "fuel": items.Add(("FUEL", v.Race.Fuel is { } plan ? PooledText.Number("", plan.LapsOfFuel, "0.0", CultureInfo.InvariantCulture, " LAPS") : missing, null)); break;
@@ -1469,7 +1469,7 @@ internal static class Strips
                     break;
                 case "sof": items.Add(("SOF", RaceFormat.IRating(StrengthOfFieldCached(f.Session, null)), null)); break;
                 case "csof":
-                    items.Add((f.Session.Player?.ClassName is { Length: > 0 } scn ? PooledText.Concat(p.LabelText(scn), " SOF") : "SOF",
+                    items.Add((f.Session.Player?.ClassLabel is { Length: > 0 } scn ? PooledText.Concat(p.LabelText(scn), " SOF") : "SOF",
                         f.Session.Player is { } sp ? RaceFormat.IRating(StrengthOfFieldCached(f.Session, sp.ClassId)) : missing, null));
                     break;
                 case "cars":

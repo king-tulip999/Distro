@@ -90,7 +90,7 @@ internal sealed class TimingWidget : HudWidget
                 "best" => ("BEST", RaceFormat.LapTime(f.LapBest), null),
                 "predicted" => ("PREDICTED", d is { } dd && refLap is { } rl ? RaceFormat.LapTime(rl + dd) : RaceFormat.Missing, (Color?)null),
                 "sessionBest" => ("SESSION", RaceFormat.LapTime(FieldColumns.Fastest(f, null)?.Time), p.P.Fastest),
-                "classBest" => (p.LabelText(f.Session.Player?.ClassName ?? "CLASS"), RaceFormat.LapTime(FieldColumns.Fastest(f, f.Session.Player?.ClassId)?.Time), p.P.Fastest),
+                "classBest" => (p.LabelText(f.Session.Player?.ClassLabel is { Length: > 0 } pl ? pl : "CLASS"), RaceFormat.LapTime(FieldColumns.Fastest(f, f.Session.Player?.ClassId)?.Time), p.P.Fastest),
                 "theoretical" => ("OPTIMAL", RaceFormat.LapTime(LapMath.Theoretical(LapMath.BestSectors(v.Race.Laps.Laps, v.Race.Laps.SectorCount))), (Color?)null),
                 "consistency" => ("CONSISTENCY", RaceFormat.Spread(LapMath.Stats(v.Race.Laps.Laps, 5) is { Count: >= 3 } cs ? cs.Spread : null), (Color?)null),
                 _ => ("", "", null),
@@ -523,7 +523,7 @@ internal sealed class FuelWidget : HudWidget
         string lasts = plan is not null ? PooledText.Number(" · ", plan.LapsOfFuel, "0.00", System.Globalization.CultureInfo.InvariantCulture, " laps") : "";
         float leftW = tankW + amountW + (lasts.Length > 0 ? p.Measure(lasts, p.Small) : 0);
         string needText = plan?.ToFinish is { } tf && tf > 0 ? PooledText.Concat("NEED ", FuelNumber(tf, u)) : "";
-        string capText = r.Tank is { } cap ? PooledText.Concat("CAP ", PooledText.Number("", RaceFormat.FuelValue(cap, u), "0", System.Globalization.CultureInfo.InvariantCulture)) : "";
+        string capText = r.Tank is { } cap ? PooledText.Concat("CAP ", PooledText.Number("", RaceFormat.FuelValue(cap, u), "0", System.Globalization.CultureInfo.InvariantCulture, u == Config.HudUnits.Imperial ? " " + Core.Services.CapsUnits.Gal : " " + Core.Services.CapsUnits.L)) : "";
         string rightText = needText.Length > 0 && capText.Length > 0 ? PooledText.Concat(needText, " · ", capText) : needText.Length > 0 ? needText : capText;
         float rightW = rightText.Length > 0 ? p.Measure(rightText, p.Label) : 0;
         if (lasts.Length > 0 && leftW + rightW + 12 * p.Density <= line.Width)
@@ -672,7 +672,8 @@ internal sealed class FuelWidget : HudWidget
         NeedColumn(p, widest);
         float width = Math.Max(1, p.Bounds.Width - 14 * p.Density);
         int columns = Math.Clamp((int)(width / Math.Max(widest, 150 * p.Density)), 1, Math.Min(MostFigureColumns, _top.Count));
-        return (columns, (_top.Count + columns - 1) / columns);
+        int rows = (_top.Count + columns - 1) / columns;
+        return ((_top.Count + rows - 1) / rows, rows);
     }
 
     private void Figures_(HudPainter p, HudView v, RectangleF box, FuelPlan? plan, double lowLaps)

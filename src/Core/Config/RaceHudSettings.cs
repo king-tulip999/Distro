@@ -102,6 +102,8 @@ public sealed class RaceHudSettings
     public List<string> KnownClasses { get; set; } = new();
     public List<string> KnownCars { get; set; } = new();
     public List<string> KnownTracks { get; set; } = new();
+    public Dictionary<int, string> ClassNames { get; set; } = new();
+    public bool ClassNamesRead { get; set; }
 
     public const int MaxKnown = 200;
 
@@ -278,6 +280,7 @@ public sealed class RaceHudSettings
         KnownClasses = Clean(KnownClasses);
         KnownCars = Clean(KnownCars);
         KnownTracks = Clean(KnownTracks);
+        ClassNames = (ClassNames ?? new()).Where(c => c.Key > 0 && !string.IsNullOrWhiteSpace(c.Value)).ToDictionary(c => c.Key, c => c.Value.Trim());
         var noteIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         Notes = (Notes ?? new()).Where(n => n is not null && !string.IsNullOrWhiteSpace(n.Track) && !string.IsNullOrWhiteSpace(n.Text)).Take(MaxNotes).ToList();
         foreach (var n in Notes)

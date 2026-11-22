@@ -87,6 +87,40 @@ internal sealed class HudHost : IDisposable
         SystemEvents.DisplaySettingsChanged += OnDisplaysChanged;
         Theme.ThemeManager.Changed += OnThemeChanged;
         TakeThemeAccent();
+        ClassNames.Load(Settings.ClassNames);
+        _classNamesSaved = ClassNames.Version;
+        if (!app.Demo && !Settings.ClassNamesRead) ReadClassNames();
+    }
+
+    private int _classNamesSaved;
+    private readonly CancellationTokenSource _stopReading = new();
+
+    private void ReadClassNames()
+    {
+        if (SessionStats.SessionStatsService.TelemetryFolder() is not { } folder) return;
+        var stop = _stopReading.Token;
+        var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+        var thread = new Thread(() =>
+        {
+            ClassNames.ReadTelemetryFiles(folder, stop);
+            if (stop.IsCancellationRequested) return;
+            dispatcher.BeginInvoke(new Action(() =>
+            {
+                Settings.ClassNamesRead = true;
+                SaveClassNames(force: true);
+            }));
+        })
+        { IsBackground = true, Priority = ThreadPriority.Lowest, Name = "Class names" };
+        thread.Start();
+    }
+
+    private void SaveClassNames(bool force = false)
+    {
+        int version = ClassNames.Version;
+        if (!force && version == _classNamesSaved) return;
+        _classNamesSaved = version;
+        Settings.ClassNames = ClassNames.Snapshot();
+        Save();
     }
 
     private readonly TrackMaps.TrackMapLearner _mapLearner = new();
@@ -203,6 +237,7 @@ internal sealed class HudHost : IDisposable
         _webDirty = true;
         if (_web is { Running: true } web) web.ThemeCss = HudWebRenderer.ThemeCss(CurrentPalette());
         if (save) Save();
+        if (AppIdentity.SimHub) SimHubDashboards.Sync(this);
         foreach (var s in _slots.Values) s.Dirty = true;
         SyncVr();
         Refresh();
@@ -309,6 +344,7 @@ internal sealed class HudHost : IDisposable
         var player = f.Session.Player;
         bool connected = f.Status == SimStatus.Connected;
         var key = (connected, connected ? f.SessionKind : SessionKind.Other, player?.CarPath, f.Session.TrackId, f.SessionNum);
+        if (!f.Simulated) SaveClassNames();
         if (!force && key == _sessionKey) return;
         string session = connected ? f.SessionKind.ToString() : "";
         if (key != _sessionKey)
@@ -1365,6 +1401,7 @@ internal sealed class HudHost : IDisposable
 
     public void Dispose()
     {
+        _stopReading.Cancel();
         try { SetActive(false); }
         catch (Exception ex) { App.LogError(ex); }
         _app.Telemetry.Simulated = _app.Demo;

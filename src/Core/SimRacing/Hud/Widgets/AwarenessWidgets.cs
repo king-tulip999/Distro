@@ -28,14 +28,21 @@ internal sealed class TrafficWidget : HudWidget
         double window = v.Options.Number("window");
         bool same = v.Options.Bool("sameClass");
         int myClass = FieldOrder.ClassOf(f, me);
+        double? myLap = FieldOrder.LapTimeOf(f, me);
         for (int i = 0; i < TelemetryFrame.MaxCars; i++)
         {
             if (i == me || !f.CarActive(i) || f.CarOnPitRoad[i] || !same && FieldOrder.ClassOf(f, i) == myClass) continue;
-            if (FieldOrder.GapSeconds(f, me, i, v.Race.Profile) is { } g && Math.Abs(g) <= window) _cars.Add((i, g));
+            if (FieldOrder.GapSeconds(f, me, i, v.Race.Profile) is not { } g || Math.Abs(g) > window) continue;
+            if (PullingAway(g, v.Race.Gaps.Trend(i), Faster(FieldOrder.LapTimeOf(f, i), myLap))) continue;
+            _cars.Add((i, g));
         }
         _cars.Sort((a, b) => Math.Abs(a.Gap).CompareTo(Math.Abs(b.Gap)));
         return _cars.Count;
     }
+
+    internal static bool Faster(double? lap, double? mine) => lap is { } l && mine is { } m && l < m * 0.98;
+
+    internal static bool PullingAway(double gap, double? trend, bool faster) => faster && gap > 0 && trend is > 0.01;
 
     public override void Draw(HudPainter p, HudView v)
     {
@@ -60,16 +67,16 @@ internal sealed class TrafficWidget : HudWidget
             if (y + rowH > area.Bottom + 1) break;
             var d = f.Session.ByCar.GetValueOrDefault(car);
             var row = new RectangleF(area.X, y, area.Width, rowH - 1);
-            bool faster = FieldOrder.LapTimeOf(f, car) is { } lap && myLap is { } mine && lap < mine * 0.98;
+            bool faster = Faster(FieldOrder.LapTimeOf(f, car), myLap);
             double? trend = v.Race.Gaps.Trend(car);
             bool closing = trend is < -0.01;
             if (faster && gap < 0 && closing) p.Fill(row, HudPalette.Alpha(p.P.Warn, 50), 3);
             var cls = row.Left(46, out var rest);
-            p.Pill(new RectangleF(cls.X, cls.Y + rowH * 0.16f, cls.Width - 6, rowH * 0.66f), d?.ClassName ?? "", p.ClassColor(f.Session, d?.ClassId ?? 0), p.SmallBold);
+            p.Pill(new RectangleF(cls.X, cls.Y + rowH * 0.16f, cls.Width - 6, rowH * 0.66f), d?.ClassLabel ?? "", p.ClassColor(f.Session, d?.ClassId ?? 0), p.SmallBold);
             var gapBox = rest.Right(64, out rest);
             p.Text((gap > 0 ? "▲ " : "▼ ") + RaceFormat.Abs(gap), p.Bold, gap > 0 ? p.P.Text : faster ? p.P.WarnText : p.P.Text, gapBox, HAlign.Right);
             var info = rest.Right(80, out rest);
-            string meet = closing && v.Race.Gaps.TimeToCatch(car, gap) is { } t && t < 120 ? RaceFormat.About($"{t:0} {Units.S}") : trend is > 0.01 ? "opening" : "";
+            string meet = closing && v.Race.Gaps.TimeToCatch(car, gap) is { } t && t < 120 ? RaceFormat.About($"{t:0} {Core.Services.Units.S}") : trend is > 0.01 ? "opening" : "";
             p.Text(meet, p.Small, p.P.Muted, info, HAlign.Right);
             p.Text(d?.Name ?? $"Car {car}", p.Body, p.P.Text, rest.Inflated(-4, 0), HAlign.Left);
             y += rowH;

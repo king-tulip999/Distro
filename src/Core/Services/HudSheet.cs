@@ -170,6 +170,10 @@ internal static class HudSheet
         }
         shots.Add(new SiteShot("ledboard", "Checkered, wave", O(("show", "flag"), ("flagCheckered", "wave")), RaceFlags.Checkered));
         shots.Add(new SiteShot("map", "Whole track, no panel", O(("titleRow", "false")), Bg: 0));
+        shots.Add(new SiteShot("relative", "Car logos and flags", O(("columns", "cpos,num,logo,badge,name,flag,out,last,gap")), W: 520, H: 300));
+        shots.Add(new SiteShot("relative", "Class-colored rows and outlines", O(("classRows", "true"), ("classBorder", "true"))));
+        shots.Add(new SiteShot("standings", "Car logos and class outlines", O(("columns", "cpos,logo,badge,num,name,pit,change,last,int,gap"), ("classBorder", "true")), W: 540, H: 520));
+        shots.Add(new SiteShot("standings", "Class-colored rows, one list", O(("group", "false"), ("classRows", "true"), ("classBorder", "true")), H: 330));
 
         var json = new System.Text.StringBuilder("[");
         var races = new Dictionary<double, SiteRace>();

@@ -20,6 +20,8 @@ internal sealed record DriverEntry
     public string NumberDesign { get; init; } = "";
     public int ClassId { get; init; }
     public string ClassName { get; init; } = "";
+    public string UnnamedClassLabel { get; init; } = "";
+    public string ClassLabel => ClassName.Length > 0 ? ClassName : UnnamedClassLabel;
     public int ClassColor { get; init; }
     public double? ClassEstLapTime { get; init; }
     public int? IRating { get; init; }
@@ -134,6 +136,22 @@ internal sealed class SessionInfo
     internal static bool Unreadable(string name) =>
         name.Contains('?') && name.All(c => c == '?' || char.IsWhiteSpace(c));
 
+    internal static List<DriverEntry> LabelUnnamedClasses(List<DriverEntry> drivers, Func<int, string?> known)
+    {
+        var racing = drivers.Where(d => d.Races).ToList();
+        if (racing.All(d => d.ClassName.Length > 0)) return drivers;
+        var carsByClass = racing.GroupBy(d => d.ClassId).ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(d => d.CarName.Length > 0 ? d.CarName : d.CarShortName).Where(n => n.Length > 0).ToList());
+        var labels = new Dictionary<int, string>();
+        foreach (var group in racing.Where(d => d.ClassName.Length == 0).GroupBy(d => d.ClassId))
+        {
+            var cars = group.Select(d => d.CarShortName).Where(n => n.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            labels[group.Key] = known(group.Key)
+                ?? ClassNames.SharedWord(carsByClass[group.Key], carsByClass.Where(c => c.Key != group.Key).Select(c => c.Value))
+                ?? (cars.Count == 1 ? cars[0] : "");
+        }
+        return drivers.Select(d => d.Races && d.ClassName.Length == 0 && labels.TryGetValue(d.ClassId, out var label) ? d with { UnnamedClassLabel = label } : d).ToList();
+    }
+
     internal static DriverEntry NameOrCarNumber(DriverEntry d)
     {
         if (!Unreadable(d.Name) || d.CarNumber.Length == 0) return d;
@@ -180,7 +198,7 @@ internal sealed class SessionInfo
             ClassName = SessionYaml.Str(d, "CarClassShortName") ?? "",
             ClassColor = SessionYaml.Int(d, "CarClassColor") ?? 0,
             ClassEstLapTime = SessionYaml.Num(d, "CarClassEstLapTime") is > 0 and var est ? est : null,
-            IRating = SessionYaml.Int(d, "IRating") is > 0 and var ir ? ir : null,
+            IRating = SessionYaml.Int(d, "IRating") is > Core.SessionStats.RaceResult.PlaceholderIRating and var ir ? ir : null,
             License = SessionYaml.Str(d, "LicString") ?? "",
             IsSpectator = SessionYaml.Int(d, "IsSpectator") == 1,
             IsPaceCar = SessionYaml.Int(d, "CarIsPaceCar") == 1,
@@ -188,6 +206,8 @@ internal sealed class SessionInfo
             Incidents = SessionYaml.Int(d, "CurDriverIncidentCount"),
             TeamIncidents = SessionYaml.Int(d, "TeamIncidentCount"),
         }).Where(d => d.CarIdx >= 0).Select(NameOrCarNumber).ToList();
+        ClassNames.Learn(drivers);
+        drivers = LabelUnnamedClasses(drivers, ClassNames.Of);
         var byCar = new Dictionary<int, DriverEntry>();
         foreach (var d in drivers) byCar[d.CarIdx] = d;
 

@@ -9,8 +9,9 @@ namespace VelocitaSimHubPlugin;
 
 internal sealed class SettingsView : UserControl
 {
-    private readonly CheckBox _on = new() { Content = "Run Velocita", Margin = new Thickness(24, 12, 24, 4), HorizontalAlignment = HorizontalAlignment.Left };
-    private readonly TextBlock _status = new() { Margin = new Thickness(24), TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Button _turnOn = new() { Content = "Turn on", Padding = new Thickness(14, 4, 14, 4), Margin = new Thickness(16, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+    private readonly StackPanel _message = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(24), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
     private readonly PanelHost _host = new() { Visibility = Visibility.Hidden };
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private DateTime _asked = DateTime.MinValue;
@@ -18,16 +19,10 @@ internal sealed class SettingsView : UserControl
     public SettingsView()
     {
         MinHeight = 560;
-        var body = new Grid { Children = { _status, _host } };
-        Grid.SetRow(body, 1);
-        Content = new Grid
-        {
-            RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition() },
-            Children = { _on, body },
-        };
-        _on.IsChecked = Engine.On;
-        _on.Checked += (_, _) => { Engine.SetOn(true); Refresh(); };
-        _on.Unchecked += (_, _) => { Engine.SetOn(false); Refresh(); };
+        _message.Children.Add(_status);
+        _message.Children.Add(_turnOn);
+        Content = new Grid { Children = { _message, _host } };
+        _turnOn.Click += (_, _) => { Engine.SetOn(true); Refresh(); };
         _timer.Tick += (_, _) => Refresh();
         Loaded += (_, _) => { Refresh(); _timer.Start(); };
         Unloaded += (_, _) => _timer.Stop();
@@ -35,10 +30,10 @@ internal sealed class SettingsView : UserControl
 
     private void Refresh()
     {
-        if (_on.IsChecked != Engine.On) _on.IsChecked = Engine.On;
         bool shown = Engine.On && _host.HasPanel;
         _host.Visibility = shown ? Visibility.Visible : Visibility.Hidden;
-        _status.Visibility = shown ? Visibility.Collapsed : Visibility.Visible;
+        _message.Visibility = shown ? Visibility.Collapsed : Visibility.Visible;
+        _turnOn.Visibility = Engine.On ? Visibility.Collapsed : Visibility.Visible;
         if (shown)
         {
             _host.FitPanel();

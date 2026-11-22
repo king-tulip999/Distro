@@ -23,6 +23,7 @@ public class VelocitaPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
 
     public void Init(PluginManager pluginManager)
     {
+        Engine.Open();
         this.AttachDelegate("Running", () => Engine.Running);
         this.AttachDelegate("On", () => Engine.On);
         this.AddAction("Toggle", (_, _) => Engine.Toggle());

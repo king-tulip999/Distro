@@ -147,9 +147,10 @@ internal sealed class HudWebRenderer : IDisposable
     }
 
     private static readonly byte[] Empty = Array.Empty<byte>();
-    private readonly Dictionary<(string Kind, int W, int H, bool Sample), Target> _targets = new();
-    private readonly Dictionary<(string Kind, int W, int H, bool Sample), List<HudWebClient>> _groups = new();
-    private readonly List<(string Kind, int W, int H, bool Sample)> _stale = new();
+    private const string MissingPrefix = "web-missing-";
+    private readonly Dictionary<(string Kind, int Slot, int W, int H, bool Sample), Target> _targets = new();
+    private readonly Dictionary<(string Kind, int Slot, int W, int H, bool Sample), List<HudWebClient>> _groups = new();
+    private readonly List<(string Kind, int Slot, int W, int H, bool Sample)> _stale = new();
     private readonly Dictionary<string, HudWidgetConfig> _fallbacks = new(StringComparer.OrdinalIgnoreCase);
     private readonly HudPng _png = new();
     private readonly TelemetryFrame _sampleFrame = new();
@@ -177,7 +178,7 @@ internal sealed class HudWebRenderer : IDisposable
         foreach (var group in _groups.Values) group.Clear();
         foreach (var client in clients)
         {
-            var key = (client.Kind, client.Width, client.Height, sampled && (client.Sample || idle));
+            var key = (client.Kind, client.Slot, client.Width, client.Height, sampled && (client.Sample || idle));
             if (!_groups.TryGetValue(key, out var group)) _groups[key] = group = new List<HudWebClient>();
             group.Add(client);
         }
@@ -196,7 +197,7 @@ internal sealed class HudWebRenderer : IDisposable
             if (HudCatalog.Find(key.Kind) is not { } def) continue;
             if (!_targets.TryGetValue(key, out var t)) _targets[key] = t = new Target { Def = def };
             bool redraw = dirty || t.Last is null;
-            var config = ConfigFor(def, layout);
+            var config = ConfigFor(def, layout, key.Slot);
             if (!ReferenceEquals(config, t.Config))
             {
                 t.Config = config;
@@ -254,29 +255,44 @@ internal sealed class HudWebRenderer : IDisposable
         return true;
     }
 
-    private HudWidgetConfig ConfigFor(HudWidgetDef def, HudLayout? layout)
+    internal HudWidgetConfig ConfigFor(HudWidgetDef def, HudLayout? layout, int slot = 1)
     {
         if (layout is not null)
         {
             HudWidgetConfig? any = null;
+            int seen = 0;
             foreach (var w in layout.Widgets)
             {
                 if (!string.Equals(w.Kind, def.Kind, StringComparison.OrdinalIgnoreCase)) continue;
+                if (slot > 1)
+                {
+                    if (++seen == slot) return w;
+                    continue;
+                }
                 if (w.Enabled || OnlyLayout) return w;
                 any ??= w;
             }
             if (any is not null) return any;
         }
+        if (slot > 1) return Missing(def);
         if (!_fallbacks.TryGetValue(def.Kind, out var fallback))
             _fallbacks[def.Kind] = fallback = new HudWidgetConfig { Id = "web-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H, Background = def.Background, Enabled = !OnlyLayout };
         return fallback;
+    }
+
+    private HudWidgetConfig Missing(HudWidgetDef def)
+    {
+        string id = MissingPrefix + def.Kind;
+        if (!_fallbacks.TryGetValue(id, out var missing))
+            _fallbacks[id] = missing = new HudWidgetConfig { Id = id, Kind = def.Kind, W = def.W, H = def.H, Background = def.Background, Enabled = false };
+        return missing;
     }
 
     private byte[] Draw(Target t, TelemetryFrame frame, RaceState race, RaceHudSettings settings, HudPalette palette, (int W, int H) pixels)
     {
         var config = t.Config!;
         if (frame.Status != SimStatus.Connected || pixels.W < 8 || pixels.H < 8 || config.W <= 0 || config.H <= 0) return Empty;
-        if (OnlyLayout && !config.Enabled || Shows?.Invoke(config, frame) == false) return Empty;
+        if (OnlyLayout && !config.Enabled || config.Id.StartsWith(MissingPrefix, StringComparison.Ordinal) || Shows?.Invoke(config, frame) == false) return Empty;
         var view = new HudView { Frame = frame, Race = race, Settings = settings, Config = config, Options = t.Options!, Def = t.Def };
         if ((config.OnlyWhenNeeded ?? t.Def.HideWhenEmpty) == true && !t.Widget!.HasContent(view)) return Empty;
         var layout = SizeOf?.Invoke(config, race) ?? new SizeF((float)config.W, (float)config.H);

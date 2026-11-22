@@ -61,6 +61,9 @@ internal sealed class LapTracker
     private bool _pendingPit, _pendingCaution;
     private int _pendingIncidents;
     private long _pendingSince;
+    private double? _pendingMeasured;
+    private const double OfficialMatchSeconds = 0.05;
+    private const long OfficialWaitMs = 3000;
 
     public IReadOnlyList<LapRecord> Laps => _laps;
 
@@ -113,6 +116,7 @@ internal sealed class LapTracker
             _pendingIncidents = Math.Max(0, (incidents ?? 0) - _incidentsAtStart);
             _pendingFuel = _fuelAtStart is { } f0 && fuel is { } f1 && f0 > f1 ? f0 - f1 : null;
             _pendingSince = (long)(now * 1000);
+            _pendingMeasured = _prevT > 0 ? _prevT : null;
             Begin(lap, incidents ?? 0, fuel);
         }
         else
@@ -131,25 +135,29 @@ internal sealed class LapTracker
         }
         _prevPct = p;
         _prevT = t;
-        if (_pendingLap >= 0 && lastLap is { } ll && ll > 0 && (Math.Abs(ll - _lastLapTime) > 1e-6 || now * 1000 - _pendingSince > 3000))
+        if (_pendingLap >= 0 && lastLap is { } ll && ll > 0)
         {
-            if (Math.Abs(ll - _lastLapTime) > 1e-6 && !_pendingPartial)
+            bool official = Math.Abs(ll - _lastLapTime) > 1e-6 && (_pendingMeasured is not { } measured || Math.Abs(ll - measured) <= OfficialMatchSeconds);
+            if (official || now * 1000 - _pendingSince > OfficialWaitMs)
             {
-                var sectors = _pendingSectors;
-                int last = sectors.Length - 1;
-                if (sectors[last] is null && sectors.Take(last).All(s => s is not null))
+                if ((official ? ll : _pendingMeasured) is { } lapSeconds && !_pendingPartial)
                 {
-                    double rest = ll - sectors.Take(last).Sum(s => s!.Value);
-                    if (rest > 0) sectors[last] = rest;
+                    var sectors = _pendingSectors;
+                    int last = sectors.Length - 1;
+                    if (sectors[last] is null && sectors.Take(last).All(s => s is not null))
+                    {
+                        double rest = lapSeconds - sectors.Take(last).Sum(s => s!.Value);
+                        if (rest > 0) sectors[last] = rest;
+                    }
+                    var record = new LapRecord(_pendingLap, lapSeconds, _pendingIncidents == 0 && !_pendingPit, _pendingPit, _pendingCaution, _pendingIncidents, _pendingFuel, sectors);
+                    _laps.Add(record);
+                    if (_laps.Count > MaxLaps) _laps.RemoveAt(0);
+                    LapCompleted?.Invoke(record);
                 }
-                var record = new LapRecord(_pendingLap, ll, _pendingIncidents == 0 && !_pendingPit, _pendingPit, _pendingCaution, _pendingIncidents, _pendingFuel, sectors);
-                _laps.Add(record);
-                if (_laps.Count > MaxLaps) _laps.RemoveAt(0);
-                LapCompleted?.Invoke(record);
+                _pendingLap = -1;
             }
-            _lastLapTime = ll;
-            _pendingLap = -1;
         }
+        if (lastLap is { } seen && seen > 0) _lastLapTime = seen;
     }
 
     private bool _partial, _pendingPartial;

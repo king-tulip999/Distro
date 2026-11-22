@@ -18,16 +18,15 @@ internal static class Engine
     private const string DetachName = @"Local\Velocita SimHub.Detach";
     private const string ClosingName = @"Local\Velocita SimHub.Closing";
     private const string QuitName = @"Local\Velocita SimHub.Quit";
+    private const string ResumedName = @"Local\Velocita SimHub.Resumed";
     private const string OffFile = "off.txt";
     private const uint GwChild = 5, PmNoRemove = 0;
     private static readonly TimeSpan ReleaseTimeout = TimeSpan.FromSeconds(2);
     private static readonly HashSet<IntPtr> Hosts = new();
 
-    private static bool? _on;
-
     public static bool Closing { get; private set; }
 
-    public static bool On => _on ??= !File.Exists(Path.Combine(DataFolder, OffFile));
+    public static bool On => !File.Exists(Path.Combine(DataFolder, OffFile));
 
     public static string Folder => Path.GetDirectoryName(typeof(Engine).Assembly.Location) ?? AppDomain.CurrentDomain.BaseDirectory;
 
@@ -111,8 +110,8 @@ internal static class Engine
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             SimHub.Logging.Current.Error("Velocita: couldn't save the on / off choice", ex);
+            return;
         }
-        _on = on;
         if (on)
         {
             if (!Running) Start();
@@ -133,6 +132,13 @@ internal static class Engine
     {
         lock (Hosts) Hosts.Remove(host);
         if (HasPanel(host) && Signal(DetachName)) WaitForRelease(new[] { host });
+    }
+
+    public static void Open()
+    {
+        if (!Closing) return;
+        Closing = false;
+        Signal(ResumedName);
     }
 
     public static void Close()
