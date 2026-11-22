@@ -266,9 +266,8 @@ internal static class StatsSessionView
         var local = s.StartUtc.ToLocalTime();
 
         var top = new Grid { MinHeight = BannerHeight, ClipToBounds = true };
-        top.Children.Add(new Slant(place + "Wash", 0, 0, 0.7, 0, 0.52, 1, 0, 1));
-        top.Children.Add(new Slant(place + "Faint", 0.7, 0, 0.76, 0, 0.58, 1, 0.52, 1));
-        var carZone = RaceParts.CarOnStripe(s.Car, place, BannerHeight, 110, 320, carArea: CarArea);
+        top.Children.Add(new SoftPanels(PanelSpread.Banner, place, 0.6));
+        var carZone = RaceParts.CarSpot(s.Car, BannerHeight, 110, 320, carArea: CarArea);
         top.Children.Add(carZone);
         var outline = new Border
         {
@@ -304,7 +303,6 @@ internal static class StatsSessionView
         meta.Children.Add(chips);
         row.Children.Add(meta);
         top.Children.Add(row);
-        carZone.KeepClearOf(row);
         top.SizeChanged += (_, e) =>
         {
             var shown = e.NewSize.Width - row.ActualWidth >= CarRoom ? Visibility.Visible : Visibility.Collapsed;
@@ -378,7 +376,7 @@ internal static class StatsSessionView
         {
             var cell = new DockPanel { Margin = new Thickness(11.5, 5, 11.5, 5), MinWidth = 97, ToolTip = tip };
             var glyph = new Icon { Data = Ui.Res<Geometry>(icon), Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
-            glyph.SetResourceReference(Control.ForegroundProperty, "AccentText");
+            glyph.SetResourceReference(Control.ForegroundProperty, "TextMuted");
             cell.Children.Add(glyph);
             var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             var reading = new TextBlock { Text = value, Style = Ui.Res<Style>("Body"), FontSize = 12, FontWeight = FontWeights.SemiBold };

@@ -1,33 +1,23 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Threading;
-using SimHub.Plugins.Styles;
 
 namespace VelocitaSimHubPlugin;
 
 internal sealed class SettingsView : UserControl
 {
-    private readonly TextBlock _status = new() { Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap };
-    private readonly TextBlock _update = new() { Margin = new Thickness(0, 0, 0, 10), TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold, Visibility = Visibility.Collapsed };
-    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly TextBlock _status = new() { Margin = new Thickness(24), TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+    private readonly PanelHost _host = new() { Visibility = Visibility.Hidden };
+    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    private DateTime _asked = DateTime.MinValue;
 
     public SettingsView()
     {
-        var open = new SHButtonPrimary { Content = "Open overlay settings", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 14) };
-        open.Click += (_, _) => Engine.OpenSettings();
-        var how = new TextBlock
-        {
-            Text = "Every widget is in Dash Studio → Overlays, named “Velocita - …”. Turn one on and place or resize it like any SimHub overlay. While iRacing is closed they show a sample race to place them by.",
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8),
-        };
-        var settings = new TextBlock
-        {
-            Text = "What each widget shows, its colors and when it shows are set in Velocita's overlay settings.",
-            TextWrapping = TextWrapping.Wrap,
-        };
-        var body = new StackPanel { Margin = new Thickness(0, 4, 0, 0), Children = { _status, _update, open, how, settings } };
-        Content = new ScrollViewer { Content = new SHSection { Title = "VELOCITA", ShowSeparator = true, Content = body } };
+        MinHeight = 560;
+        Content = new Grid { Children = { _status, _host } };
         _timer.Tick += (_, _) => Refresh();
         Loaded += (_, _) => { Refresh(); _timer.Start(); };
         Unloaded += (_, _) => _timer.Stop();
@@ -35,12 +25,81 @@ internal sealed class SettingsView : UserControl
 
     private void Refresh()
     {
+        bool shown = _host.HasPanel;
+        _host.Visibility = shown ? Visibility.Visible : Visibility.Hidden;
+        _status.Visibility = shown ? Visibility.Collapsed : Visibility.Visible;
+        if (shown)
+        {
+            _host.FitPanel();
+            return;
+        }
         _status.Text = !Engine.Installed ? Engine.ExeName + " is missing from the SimHub folder: copy it next to Velocita.SimHub.Plugin.dll and restart SimHub."
-            : Engine.Running ? "Running."
-            : Engine.Problem is { } problem ? "Not running: " + problem
-            : "Starting…";
-        string note = Engine.UpdateNote ?? "";
-        _update.Text = note;
-        _update.Visibility = note.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            : Engine.Problem is { } problem && !Engine.Running ? "Velocita isn't running: " + problem
+            : "Loading Velocita…";
+        if (!Engine.Installed || _host.Handle == IntPtr.Zero) return;
+        if (!Engine.Running)
+        {
+            if (DateTime.UtcNow - _asked < TimeSpan.FromSeconds(5)) return;
+            _asked = DateTime.UtcNow;
+            Engine.Start();
+            return;
+        }
+        if (DateTime.UtcNow - _asked < TimeSpan.FromSeconds(1)) return;
+        _asked = DateTime.UtcNow;
+        Engine.Embed(_host.Handle);
+    }
+
+    private sealed class PanelHost : HwndHost
+    {
+        private const int WsChild = 0x40000000, WsVisible = 0x10000000, WsClipChildren = 0x02000000;
+        private const uint GwChild = 5, SwpNoZOrder = 0x0004, SwpNoActivate = 0x0010;
+
+        public bool HasPanel => Handle != IntPtr.Zero && GetWindow(Handle, GwChild) != IntPtr.Zero;
+
+        public void FitPanel()
+        {
+            if (Handle == IntPtr.Zero || !GetClientRect(Handle, out var room)) return;
+            var child = GetWindow(Handle, GwChild);
+            if (child == IntPtr.Zero) return;
+            SetWindowPos(child, IntPtr.Zero, 0, 0, room.Right - room.Left, room.Bottom - room.Top, SwpNoZOrder | SwpNoActivate);
+        }
+
+        protected override HandleRef BuildWindowCore(HandleRef hwndParent)
+        {
+            var handle = CreateWindowEx(0, "static", "", WsChild | WsVisible | WsClipChildren, 0, 0, 1, 1, hwndParent.Handle, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+            return new HandleRef(this, handle);
+        }
+
+        protected override void DestroyWindowCore(HandleRef hwnd) => DestroyWindow(hwnd.Handle);
+
+        protected override void OnWindowPositionChanged(Rect rcBoundingBox)
+        {
+            base.OnWindowPositionChanged(rcBoundingBox);
+            FitPanel();
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeRect
+        {
+            public int Left, Top, Right, Bottom;
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr CreateWindowEx(int exStyle, string className, string windowName, int style, int x, int y, int width, int height, IntPtr parent, IntPtr menu, IntPtr instance, IntPtr param);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DestroyWindow(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetWindow(IntPtr hwnd, uint command);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetClientRect(IntPtr hwnd, out NativeRect rect);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int width, int height, uint flags);
     }
 }

@@ -196,6 +196,7 @@ public partial class App : Application
         if (AppIdentity.IsTecnica || !Theme.Themes.Exists(config.Ui.Theme))
             config.Ui.Theme = AppTheme.Glow;
         Theme.Themes.SetOledCustom(config.Ui.OledCustom);
+        Theme.Themes.SetAccent(config.Ui.Accent);
         foreach (var themeSet in Theme.ThemeSets.All)
             Theme.Themes.SetPick(themeSet, themeSet.Get(config.Ui));
         ThemeManager.Apply(config.Ui.Theme);

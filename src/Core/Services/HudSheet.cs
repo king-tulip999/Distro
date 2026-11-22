@@ -29,7 +29,7 @@ internal static class HudSheet
         app.Shutdown();
     }
 
-    private sealed record SiteShot(string Kind, string Label, (string Key, string Value)[] Options, RaceFlags? Flags = null, double? WindFrom = null, double At = 0, bool Fit = false, float H = 0, float W = 0, double Speed = 0);
+    private sealed record SiteShot(string Kind, string Label, (string Key, string Value)[] Options, RaceFlags? Flags = null, double? WindFrom = null, double At = 0, bool Fit = false, float H = 0, float W = 0, double Speed = 0, int? Bg = null);
 
     private sealed class SiteRace
     {
@@ -168,6 +168,8 @@ internal static class HudSheet
             for (int i = 0; i < moments.Count; i++)
                 shots.Add(new SiteShot(kind, moments.Count > 1 ? $"{name}, moment {i + 1}" : name, options, At: moments[i]));
         }
+        shots.Add(new SiteShot("ledboard", "Checkered, wave", O(("show", "flag"), ("flagCheckered", "wave")), RaceFlags.Checkered));
+        shots.Add(new SiteShot("map", "Whole track, no panel", O(("titleRow", "false")), Bg: 0));
 
         var json = new System.Text.StringBuilder("[");
         var races = new Dictionary<double, SiteRace>();
@@ -183,7 +185,7 @@ internal static class HudSheet
                 races[shot.At] = site;
             }
             var def = HudCatalog.Find(shot.Kind)!;
-            var config = new HudWidgetConfig { Id = "site-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
+            var config = new HudWidgetConfig { Id = "site-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H, Background = shot.Bg };
             foreach (var (key, value) in shot.Options) config.Options[key] = value;
             var frame = site.Race.Frame;
             var restore = Override(shot, frame, clip: null);
@@ -202,7 +204,8 @@ internal static class HudSheet
                 painter.Simulated = true;
                 painter.IsPreview = true;
                 painter.Begin(g, SiteScale, size, HudPalette.Of(site.Settings.Appearance), site.Settings.Appearance);
-                def.Create().Draw(painter, new HudView { Frame = frame, Race = site.Race, Settings = site.Settings, Config = config, Options = view, Def = def });
+                painter.Background = config.Background;
+                def.Create().Paint(painter, new HudView { Frame = frame, Race = site.Race, Settings = site.Settings, Config = config, Options = view, Def = def });
                 painter.FinishPanels();
                 painter.End(surface.Dc, surface.Size);
                 surface.Bitmap!.Save(Path.Combine(folder, file));
@@ -264,7 +267,8 @@ internal static class HudSheet
                 painter.IsPreview = true;
                 painter.PlaysEntrances = true;
                 painter.Begin(g, SiteScale, size, palette, site.Settings.Appearance);
-                widget.Draw(painter, new HudView { Frame = frame, Race = site.Race, Settings = site.Settings, Config = config, Options = view, Def = def });
+                painter.Background = config.Background;
+                widget.Paint(painter, new HudView { Frame = frame, Race = site.Race, Settings = site.Settings, Config = config, Options = view, Def = def });
                 painter.FinishPanels();
                 painter.End(surface.Dc, surface.Size);
                 restore();
@@ -298,7 +302,7 @@ internal static class HudSheet
                 painter.Simulated = true;
                 painter.IsPreview = true;
                 painter.Begin(g, 1, size, palette, site.Settings.Appearance);
-                widget.Draw(painter, new HudView { Frame = frame, Race = site.Race, Settings = site.Settings, Config = config, Options = view, Def = def });
+                widget.Paint(painter, new HudView { Frame = frame, Race = site.Race, Settings = site.Settings, Config = config, Options = view, Def = def });
                 painter.FinishPanels();
                 painter.End(surface.Dc, surface.Size);
                 restore();
@@ -375,7 +379,7 @@ internal static class HudSheet
                 painter.Simulated = true;
                 painter.IsPreview = true;
                 painter.Begin(g, 1, new SizeF(size.Width, size.Height), palette, site.Settings.Appearance);
-                def.Create().Draw(painter, new HudView { Frame = site.Race.Frame, Race = site.Race, Settings = site.Settings, Config = config, Options = new HudOptions(def, config), Def = def });
+                def.Create().Paint(painter, new HudView { Frame = site.Race.Frame, Race = site.Race, Settings = site.Settings, Config = config, Options = new HudOptions(def, config), Def = def });
                 painter.FinishPanels();
                 painter.End(surface.Dc, surface.Size);
                 var data = surface.Bitmap!.LockBits(new Rectangle(Point.Empty, size), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
@@ -511,6 +515,12 @@ internal static class HudSheet
             var threeLaps = new[] { ("lastLaps", "3") };
             var standings = HudCatalog.Find("standings")!;
             Save(standings, 400, standings.H, Path.Combine(dir, "standings-narrow.png"));
+            var classColors = new[] { ("classRows", "true"), ("classBorder", "true") };
+            Save(standings, standings.W, standings.H, Path.Combine(dir, "standings-classes.png"), 1, classColors);
+            Save(standings, standings.W, standings.H, Path.Combine(dir, "standings-classes-list.png"), 1, classColors.Append(("group", "false")).ToArray());
+            Save(relative, relative.W, relative.H, Path.Combine(dir, "relative-classes.png"), 1, classColors);
+            Save(relative, 640, relative.H, Path.Combine(dir, "relative-logos.png"), 1, ("columns", "cpos,num,logo,badge,name,flag,out,last,gap"));
+            Save(standings, standings.W, standings.H, Path.Combine(dir, "standings-logos.png"), 1, ("columns", "cpos,logo,badge,num,name,pit,change,last,int,gap"));
             var standingsThree = Asked(standings, threeLaps);
             Save(standings, standingsThree.Width, standingsThree.Height, Path.Combine(dir, "standings-last3.png"), 1, threeLaps);
             var threeLapsSize = Asked(relative, threeLaps);
@@ -626,7 +636,7 @@ internal static class HudSheet
                 var g = surface.Ensure(size);
                 painter.Simulated = true;
                 painter.Begin(g, 1, new SizeF((float)def.W, (float)def.H), palette, settings.Appearance);
-                widget.Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
+                widget.Paint(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
                 painter.FinishPanels();
                 painter.End(surface.Dc, surface.Size);
                 double drawn = clock.Elapsed.TotalMilliseconds - updated;
@@ -695,7 +705,7 @@ internal static class HudSheet
                 var g = surface.Ensure(size);
                 painter.Simulated = true;
                 painter.Begin(g, (float)FrameScale, new SizeF((float)def.W, (float)def.H), palette, settings.Appearance);
-                widget.Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
+                widget.Paint(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
                 painter.FinishPanels();
                 painter.End(surface.Dc, surface.Size);
                 if (i % every != 0) continue;
@@ -741,7 +751,7 @@ internal static class HudSheet
             var g = surface.Ensure(size);
             painter.Simulated = true;
             painter.Begin(g, 1, new SizeF((float)def.W, (float)def.H), palette, settings.Appearance);
-            widget.Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
+            widget.Paint(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
             painter.FinishPanels();
             painter.End(surface.Dc, surface.Size);
             var bitmap = surface.Bitmap!;

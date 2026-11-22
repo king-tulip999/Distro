@@ -19,6 +19,7 @@ internal abstract record HudSetting(string Id)
 internal sealed record OptionSetting(string Key) : HudSetting(Key)
 {
     public override IReadOnlyList<string> Keys => new[] { Key };
+    public Func<string, string>? Sample { get; init; }
 }
 
 internal sealed record PickerSetting(string Key, IReadOnlyList<HudCategory> Categories) : HudSetting(Key)
@@ -72,7 +73,10 @@ internal sealed record MergedSetting(string Id, string Title, IReadOnlyList<stri
     }
 }
 
-internal sealed record HudGroup(string Id, string? Title, HudTab Tab, bool Open, params HudSetting[] Settings);
+internal sealed record HudGroup(string Id, string? Title, HudTab Tab, bool Open, params HudSetting[] Settings)
+{
+    public string? Page { get; init; }
+}
 
 internal sealed class HudEditorDef
 {
@@ -81,6 +85,12 @@ internal sealed class HudEditorDef
     public string ContentTitle { get; init; } = "Columns and info";
 
     public IEnumerable<HudSetting> Settings => Groups.SelectMany(g => g.Settings);
+
+    public string PageOf(HudGroup g) => g.Page ?? (g.Tab == HudTab.Content ? ContentTitle : "Display");
+
+    public IReadOnlyList<string> Pages =>
+        Groups.Select((g, i) => (Page: PageOf(g), Rank: g.Page is null && g.Tab == HudTab.Content ? -1 : i))
+            .GroupBy(x => x.Page).OrderBy(x => x.Min(y => y.Rank)).Select(x => x.Key).ToList();
 
     public HudSetting? Setting(string id) => Settings.FirstOrDefault(s => string.Equals(s.Id, id, StringComparison.OrdinalIgnoreCase));
 

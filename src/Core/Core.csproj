@@ -63,6 +63,7 @@
     <Resource Include="Assets\Fonts\**" />
     <Resource Include="Assets\GrrLogo.png" />
     <Resource Include="Assets\Cars\*.png" />
+    <Resource Include="Assets\Logos\*.png" />
   </ItemGroup>
 
   <ItemGroup>

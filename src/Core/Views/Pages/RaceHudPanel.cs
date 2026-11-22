@@ -6,7 +6,6 @@ using Core.Config;
 using Core.Controls;
 using Core.SimRacing.Hud;
 using Core.SimRacing.Hud.Editors;
-using Core.SimRacing.Race;
 using Core.Theme;
 using Core.Views.HudSettings;
 
@@ -14,31 +13,42 @@ namespace Core.Views.Pages;
 
 internal sealed partial class RaceHudWidgets
 {
-    private const double PanelNarrow = 400, PanelWide = 860, PanelWideMin = 560, WideSlack = 24, WellPad = 13, PanelGap = 12;
-    private const double TwoColumnMin = PanelNarrow * 2 + 18;
-    private const double WellMinHeight = 120, CategoryWidth = 96;
+    private const double WellPad = 16, WellMinHeight = 160, PreviewShare = 0.85, SettingsMin = 380, TileGap = 6, TileHeight = 32;
 
-    internal readonly record struct PanelTarget(string? SettingId, string? Key, string? Id)
-    {
-        public bool All => SettingId is null;
-    }
+    internal readonly record struct PanelTarget(string? SettingId, string? Key, string? Id, string? Tab = null);
+
+    private sealed record EditorGroup(string Title, Func<List<FrameworkElement>> Rows, IReadOnlyList<string> Settings);
+
+    private sealed record EditorTab(string Title, IReadOnlyList<EditorGroup> Groups);
 
     private Grid? _well;
-    private Canvas? _panelLayer;
-    private Border? _panel;
-    private ScrollViewer? _panelScroll;
-    private PanelTarget? _openPanel;
-    private bool _panelWide;
-    private double _panelWidth = PanelNarrow;
-    private (string? Setting, (string Key, string Id)? Item) _pin;
-    private readonly List<(FrameworkElement Head, List<FrameworkElement> Rows)> _groupHeads = new();
-    private readonly HashSet<string> _addsOpen = new(StringComparer.OrdinalIgnoreCase);
-    private double _laidWidth, _laidHeight;
     private Grid? _previewHost;
     private ScrollViewer? _pageScroll;
     private readonly TranslateTransform _previewFollow = new();
+    private double _laidWidth, _laidHeight;
+    private string? _tab;
+    private StackPanel? _tabBody;
+    private Border? _settings;
+    private Border? _tabStrip;
+    private List<EditorTab> _tabs = new();
+    private (string? Setting, (string Key, string Id)? Item) _pin;
+    private readonly List<(FrameworkElement Head, List<FrameworkElement> Rows)> _groupHeads = new();
 
-    private FrameworkElement PreviewArea(HudWidgetConfig w, HudWidgetDef def)
+    private FrameworkElement Editor(HudWidgetConfig w, HudWidgetDef def)
+    {
+        var preview = PreviewCard(w, def);
+        var settings = SettingsColumn(w, def);
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = SettingsMin });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Ui.PanelSpacing) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(PreviewShare, GridUnitType.Star) });
+        Grid.SetColumn(preview, 2);
+        grid.Children.Add(settings);
+        grid.Children.Add(preview);
+        return grid;
+    }
+
+    private FrameworkElement PreviewCard(HudWidgetConfig w, HudWidgetDef def)
     {
         _context = new HudSettingContext
         {
@@ -51,46 +61,108 @@ internal sealed partial class RaceHudWidgets
         _previewHighlight = new Canvas { IsHitTestVisible = false };
         var previewHost = new Grid
         {
-            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(WellPad),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(WellPad),
             Background = Brushes.Transparent, Children = { _preview, _previewHighlight, _previewMarks },
-            RenderTransform = _previewFollow,
         };
         _previewHost = previewHost;
         HookPreviewDrag(previewHost, w);
-        _panelLayer = new Canvas();
-        _well = new Grid { ClipToBounds = true, MinHeight = WellMinHeight, Background = Brushes.Transparent, Children = { previewHost, _panelLayer } };
+        var scroll = new ScrollViewer
+        {
+            Content = previewHost, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalAlignment = VerticalAlignment.Top, Focusable = false, RenderTransform = _previewFollow,
+        };
+        _well = new Grid { ClipToBounds = true, MinHeight = WellMinHeight, Children = { scroll } };
         _well.MouseLeftButtonDown += (_, e) => { if (!e.Handled) ClosePanel(); };
         _well.SizeChanged += (_, e) =>
         {
             if (Math.Abs(e.NewSize.Width - e.PreviousSize.Width) > 1) DrawPreview(w);
-            PlacePanel();
             FollowScroll();
         };
         _well.Loaded += (_, _) => HookPageScroll();
         _well.Unloaded += (_, _) => UnhookPageScroll();
-        _previewWell = Hairline.Frame(new Tile { Child = _well });
-        _previewWell.SetResourceReference(Border.BackgroundProperty, "Bg");
-        _previewWell.SetResourceReference(Border.BorderBrushProperty, "Line");
+        _well.SetResourceReference(Panel.BackgroundProperty, "Bg");
 
-        var hint = new TextBlock { Text = "Click a part of the widget to change it; drag items to reorder", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
-        var all = Ui.LabeledButton("I.Sliders", "All settings", () =>
-        {
-            if (_openPanel is { SettingId: null }) ClosePanel(); else OpenPanel(new PanelTarget(null, null, null));
-        });
-        all.ToolTip = "Every setting of this widget in one panel";
-        _allButton = all;
-        var head = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
-        DockPanel.SetDock(all, Dock.Right);
-        all.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
-        head.Children.Add(all);
-        head.Children.Add(hint);
-
-        _previewNote = new TextBlock { Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 6, 0, 0) };
+        var title = new TextBlock { Text = "Preview", Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        _previewNote = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
         _previewHidden = Ui.IconText("I.EyeOff", new TextBlock { Text = "Hidden in game", Style = Ui.Res<Style>("Caption") }, "TextMuted");
-        _previewHidden.Margin = new Thickness(2, 8, 0, 0);
+        _previewHidden.VerticalAlignment = VerticalAlignment.Center;
+        _previewHidden.Margin = new Thickness(0, 0, 10, 0);
         _previewHidden.Visibility = w.Enabled ? Visibility.Collapsed : Visibility.Visible;
-        return new StackPanel { Children = { head, _previewWell, _previewHidden, _previewNote } };
+        var head = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(title, Dock.Left);
+        DockPanel.SetDock(_previewHidden, Dock.Left);
+        head.Children.Add(title);
+        head.Children.Add(_previewHidden);
+        head.Children.Add(_previewNote);
+        var headBar = Hairline.Frame(new Border { Padding = new Thickness(14, 10, 10, 10), Child = head }, Sides.Bottom);
+        headBar.SetResourceReference(Border.BorderBrushProperty, "Line");
+
+        var body = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(headBar, Dock.Top);
+        body.Children.Add(headBar);
+        body.Children.Add(_well);
+        var card = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0), ClipToBounds = true, Child = body };
+        _previewWell = card;
+        return card;
     }
+
+    private FrameworkElement SettingsColumn(HudWidgetConfig w, HudWidgetDef def)
+    {
+        _tabs = Tabs(w, def);
+        int index = Math.Max(0, _tabs.FindIndex(t => t.Title == _tab));
+        _tab = _tabs[index].Title;
+        _tabBody = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
+        _tabStrip = Ui.PageTabs(_tabs.Select(t => t.Title).ToList(), index, i =>
+        {
+            _tab = _tabs[i].Title;
+            ShowTab();
+            if (Motion.Flourish && _tabBody is { } shown) Motion.FadeIn(shown);
+        }, "hudtab");
+        _settings = new Border { Child = new StackPanel { Children = { _tabStrip, _tabBody } } };
+        ShowTab();
+        return _settings;
+    }
+
+    private void ShowTab()
+    {
+        if (_tabBody is null || _tabs.Count == 0) return;
+        _rows.Clear();
+        _groupHeads.Clear();
+        _tabBody.Children.Clear();
+        var tab = _tabs.FirstOrDefault(t => t.Title == _tab) ?? _tabs[0];
+        foreach (var group in tab.Groups)
+        {
+            var rows = group.Rows();
+            var box = new SettingGroup(group.Title, true, null, foldable: false);
+            foreach (var r in rows) box.Add(r);
+            var tile = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(10, 2, 12, 8), Margin = new Thickness(0, 0, 0, 12), Child = box };
+            _groupHeads.Add((tile, rows));
+            _tabBody.Children.Add(tile);
+        }
+        if (_tabBody.Children.Count > 0 && _tabBody.Children[^1] is FrameworkElement last) last.Margin = new Thickness(0);
+        RefreshVisibility();
+    }
+
+    private void RebuildTab() => _tabBody?.Dispatcher.BeginInvoke(ShowTab, System.Windows.Threading.DispatcherPriority.Background);
+
+    private List<EditorTab> Tabs(HudWidgetConfig w, HudWidgetDef def)
+    {
+        var editor = def.EditorDef;
+        var common = CommonGroups(w, def);
+        List<EditorGroup> WidgetGroups(string page) => editor.Groups.Where(g => editor.PageOf(g) == page)
+            .Select(g => new EditorGroup(g.Title ?? page, () => g.Settings.Select(s => IsList(def, s) ? ListRow(def, w, s) : Row(s)).ToList(), g.Settings.Select(s => s.Id).ToList()))
+            .ToList();
+        var commonTabs = common.Select(c => c.Tab).Distinct().ToList();
+        var tabs = new List<EditorTab>();
+        foreach (var page in editor.Pages.Where(p => !commonTabs.Contains(p)))
+            tabs.Add(new EditorTab(page, WidgetGroups(page)));
+        foreach (var tab in commonTabs)
+            tabs.Add(new EditorTab(tab, common.Where(c => c.Tab == tab).Select(c => new EditorGroup(c.Title, c.Rows, Array.Empty<string>())).Concat(WidgetGroups(tab)).ToList()));
+        return tabs;
+    }
+
+    private string? TabOf(string settingId) =>
+        _tabs.FirstOrDefault(t => t.Groups.Any(g => g.Settings.Contains(settingId, StringComparer.OrdinalIgnoreCase)))?.Title;
 
     private void HookPageScroll()
     {
@@ -112,7 +184,7 @@ internal sealed partial class RaceHudWidgets
 
     private void FollowScroll()
     {
-        if (_well is null || _previewHost is null) return;
+        if (_well is null) return;
         double shift = 0;
         if (_pageScroll is not null && _well.IsVisible && _pageScroll.IsAncestorOf(_well))
         {
@@ -125,148 +197,35 @@ internal sealed partial class RaceHudWidgets
 
     private double WellHeight() => Math.Max(WellMinHeight, Math.Ceiling(_laidHeight * _previewScale + WellPad * 2));
 
-    private bool WideFor(double room, bool settled) => room >= PanelWideMin + (settled && !_panelWide ? WideSlack : 0);
-
-    private double RoomRight() => _well is null ? 0 : _well.ActualWidth - (WellPad + _laidWidth * _previewScale + PanelGap) - 6;
-
     private void ClosePanel()
     {
-        _openPanel = null;
-        _panel = null;
-        _panelScroll = null;
-        _panelLayer?.Children.Clear();
-        if (_well is not null) _well.Height = WellHeight();
         _pin = (null, null);
         Highlight(null);
-        ShowAllOpen();
     }
 
-    private Button? _allButton;
-
-    private void ShowAllOpen()
-    {
-        if (_allButton is null) return;
-        bool open = _openPanel is { SettingId: null };
-        _allButton.Content = open ? Ui.IconLabel("I.Tick", "Done") : Ui.IconLabel("I.Sliders", "All settings");
-        Ui.SetToggled(_allButton, open);
-    }
-
-    private void RebuildPanel()
-    {
-        if (_openPanel is { } target) OpenPanel(target);
-    }
+    private void RebuildPanel() => RebuildTab();
 
     private void OpenPanel(PanelTarget target)
     {
-        if (Selected() is not { } w || HudCatalog.Find(w.Kind) is not { } def || _panelLayer is null || _well is null || _context is null) return;
-        bool again = _openPanel == target && _panelScroll is not null;
-        double keep = again ? _panelScroll!.VerticalOffset : 0;
-        _openPanel = target;
-        _rows.Clear();
-        _groupHeads.Clear();
-        double room = RoomRight();
-        _panelWide = WideFor(room, again);
-        _panelWidth = _panelWide ? Math.Floor(Math.Min(room, PanelWide)) : Math.Min(PanelNarrow, Math.Max(280, _well.ActualWidth - WellPad * 2));
-        var editor = def.EditorDef;
-        var setting = target.SettingId is { } sid ? editor.Setting(sid) : null;
-        FrameworkElement content;
-        string title;
-        if (setting is null)
+        string? tab = target.Tab ?? (target.SettingId is { } sid ? TabOf(sid) : _tabs.FirstOrDefault()?.Title);
+        if (tab is not null && tab != _tab)
         {
-            title = "All settings";
-            content = AllSettings(def, w, editor);
+            int index = _tabs.FindIndex(t => t.Title == tab);
+            if (index >= 0 && _tabStrip is not null) Ui.SetSegment(_tabStrip, index);
+            if (_tab != tab)
+            {
+                _tab = tab;
+                ShowTab();
+            }
         }
-        else
-        {
-            title = SettingTitle(def, setting);
-            content = IsList(def, setting) ? PartPanel(def, w, setting, target, _panelWide) : OptionPanel(editor, setting);
-        }
-        RefreshVisibility();
-        ShowAllOpen();
-
-        var close = Ui.IconButton("I.X", "Close", ClosePanel, "QuietIconButton");
-        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
-        var header = Hairline.Frame(new Border { Padding = new Thickness(12, 8, 6, 8), Child = new DockPanel { Children = { close, name } } }, Sides.Bottom);
-        DockPanel.SetDock(close, Dock.Right);
-        header.SetResourceReference(Border.BorderBrushProperty, "Line");
-        _panelScroll = new ScrollViewer
-        {
-            Content = new Border { Padding = new Thickness(12, 4, 12, 12), Child = content },
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false,
-        };
-        var dock = new DockPanel();
-        DockPanel.SetDock(header, Dock.Top);
-        dock.Children.Add(header);
-        dock.Children.Add(_panelScroll);
-        _panel = Hairline.Frame(new Border
-        {
-            Width = _panelWidth,
-            CornerRadius = ThemeManager.CardCorner,
-            Child = dock,
-        });
-        _panel.SetResourceReference(Border.BackgroundProperty, "Panel");
-        _panel.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
-        _panel.MouseLeftButtonDown += (_, e) => e.Handled = true;
-        _panel.SizeChanged += (_, e) => { if (e.HeightChanged) PlacePanel(); };
-        _panel.PreviewKeyDown += (_, e) =>
-        {
-            if (e.Key != Key.Escape || Keyboard.FocusedElement is HotkeyBox) return;
-            e.Handled = true;
-            ClosePanel();
-        };
-        _panelLayer.Children.Clear();
-        _panelLayer.Children.Add(_panel);
-        PlacePanel();
-        _panelScroll.ScrollToVerticalOffset(keep);
         _pin = (target.SettingId, target.Key is { } k && target.Id is { } id ? (k, id) : null);
         Highlight(_pin.Setting, _pin.Item);
-    }
-
-    private void PlacePanel()
-    {
-        if (_panel is null || _panelScroll is null || _well is null || _openPanel is null) return;
-        double room = RoomRight();
-        if (_well.ActualWidth <= 0) return;
-        if (_panelWide != WideFor(room, true))
-        {
-            _well.Dispatcher.BeginInvoke(RebuildPanel, System.Windows.Threading.DispatcherPriority.Background);
-            return;
-        }
-        if (_panelWide) _panel.Width = Math.Floor(Math.Min(room, PanelWide));
-        double height;
-        double left, top;
-        _panelScroll.MaxHeight = double.PositiveInfinity;
-        _panel.Measure(new Size(_panel.Width, double.PositiveInfinity));
-        double natural = _panel.DesiredSize.Height;
-        if (room >= _panel.Width - 1)
-        {
-            height = Math.Max(WellHeight(), Math.Ceiling(natural + WellPad + 6));
-            left = WellPad + _laidWidth * _previewScale + PanelGap;
-            top = WellPad;
-        }
-        else
-        {
-            left = Math.Max(6, Math.Min(_well.ActualWidth - _panel.Width - 6, WellPad));
-            top = WellPad + _laidHeight * _previewScale + PanelGap;
-            height = Math.Ceiling(top + natural + 12);
-        }
-        if (Math.Abs(_well.Height - height) > 0.5 || double.IsNaN(_well.Height)) _well.Height = height;
-        Canvas.SetLeft(_panel, Math.Round(left));
-        Canvas.SetTop(_panel, Math.Round(top));
-        FollowScroll();
+        if (target.SettingId is { } setting && _rows.FirstOrDefault(r => string.Equals(r.Setting.Id, setting, StringComparison.OrdinalIgnoreCase)).Row is { } row)
+            row.Dispatcher.BeginInvoke(() => row.BringIntoView(), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private static bool IsList(HudWidgetDef def, HudSetting s) =>
         s is PickerSetting or LanesSetting || s is OptionSetting o && def.Option(o.Key) is { Kind: HudOptionKind.Columns };
-
-    private static string SettingTitle(HudWidgetDef def, HudSetting s) => s switch
-    {
-        LanesSetting l => l.Label ?? l.Title,
-        MergedSetting m => m.Label ?? m.Title,
-        TogglesSetting t => t.Label ?? t.Title,
-        ClassFilterSetting => "Which cars",
-        _ => s.Label ?? def.Option(s.Keys[0])?.Label ?? s.Id,
-    };
 
     private FrameworkElement Row(HudSetting setting)
     {
@@ -275,100 +234,14 @@ internal sealed partial class RaceHudWidgets
         return row;
     }
 
-    private FrameworkElement OptionPanel(HudEditorDef editor, HudSetting setting)
+    private FrameworkElement ListRow(HudWidgetDef def, HudWidgetConfig w, HudSetting setting)
     {
-        var stack = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
-        var group = editor.GroupOf(setting.Id);
-        stack.Children.Add(Row(setting));
-        var rest = group?.Settings.Where(s => s.Id != setting.Id && !IsList(_context!.Def, s)).ToList() ?? new();
-        if (rest.Count == 0) return stack;
-        var head = string.Equals(group!.Title, SettingTitle(_context!.Def, setting), StringComparison.OrdinalIgnoreCase) ? new Border { Height = 8 } : (FrameworkElement)Ui.SubHeader(group.Title ?? "More");
-        stack.Children.Add(head);
-        var rows = new List<FrameworkElement>();
-        foreach (var s in rest)
-        {
-            var row = Row(s);
-            rows.Add(row);
-            stack.Children.Add(row);
-        }
-        _groupHeads.Add((head, rows));
-        return stack;
+        var row = Linked(setting, PickerGrid(def, w, setting));
+        _rows.Add((setting, row));
+        return row;
     }
 
-    private FrameworkElement AllSettings(HudWidgetDef def, HudWidgetConfig w, HudEditorDef editor)
-    {
-        FrameworkElement Group(HudGroup g, bool first)
-        {
-            var stack = new StackPanel();
-            var head = Ui.SubHeader(g.Title ?? "Look", first);
-            stack.Children.Add(head);
-            var rows = new List<FrameworkElement>();
-            foreach (var s in g.Settings)
-            {
-                var row = IsList(def, s) ? PartPanel(def, w, s, new PanelTarget(s.Id, null, null), false) : Row(s);
-                rows.Add(row);
-                stack.Children.Add(row);
-            }
-            _groupHeads.Add((head, rows));
-            return stack;
-        }
-        var groups = editor.Groups.ToList();
-        if (!_panelWide || groups.Count < 2 || _panelWidth < TwoColumnMin) return Stack(groups.Select((g, i) => Group(g, i == 0)));
-        var lists = groups.Where(g => g.Settings.Any(s => IsList(def, s))).ToList();
-        var plain = groups.Except(lists).ToList();
-        List<HudGroup> left, right;
-        if (lists.Count > 0 && plain.Count > 0) (left, right) = (plain, lists);
-        else
-        {
-            left = new();
-            right = new();
-            int a = 0, b = 0;
-            foreach (var g in groups)
-            {
-                if (a <= b) { left.Add(g); a += g.Settings.Length; }
-                else { right.Add(g); b += g.Settings.Length; }
-            }
-        }
-        return TwoColumns(Stack(left.Select((g, i) => Group(g, i == 0))), Stack(right.Select((g, i) => Group(g, i == 0))), 1, 1);
-    }
-
-    private static StackPanel Stack(IEnumerable<FrameworkElement> children)
-    {
-        var stack = new StackPanel();
-        foreach (var c in children) stack.Children.Add(c);
-        return stack;
-    }
-
-    private static Grid TwoColumns(FrameworkElement a, FrameworkElement b, double left, double right)
-    {
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(left, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(right, GridUnitType.Star) });
-        Grid.SetColumn(b, 2);
-        grid.Children.Add(a);
-        grid.Children.Add(b);
-        return grid;
-    }
-
-    private IReadOnlyList<HudSetting> ItemSettings(HudWidgetDef def, HudWidgetConfig w, string key, string id)
-    {
-        var editor = def.EditorDef;
-        var current = new HudOptions(def, w).Columns(key);
-        var without = w.Copy();
-        var with = w.Copy();
-        without.Options[key] = string.Join(",", current.Where(x => x != id));
-        with.Options[key] = string.Join(",", current.Where(x => x != id).Append(id));
-        var a = new HudOptions(def, without);
-        var b = new HudOptions(def, with);
-        var found = editor.Settings.Where(s => !IsList(def, s) && !s.Visible(a) && s.Visible(b)).ToList();
-        if (FieldSettings.ItemSettings.TryGetValue(key + ":" + id, out var named))
-            foreach (var settingId in named)
-                if (editor.Setting(settingId) is { } s && !found.Contains(s)) found.Add(s);
-        return found;
-    }
-
-    private FrameworkElement PartPanel(HudWidgetDef def, HudWidgetConfig w, HudSetting setting, PanelTarget target, bool wide)
+    private FrameworkElement PickerGrid(HudWidgetDef def, HudWidgetConfig w, HudSetting setting)
     {
         var picker = setting switch
         {
@@ -383,316 +256,171 @@ internal sealed partial class RaceHudWidgets
         var choices = option.Choices.Where(c => offered(c.Id)).ToList();
         var sourceCategories = setting is LanesSetting lc ? lc.Categories : picker!.Categories;
         var known = choices.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
-        var categories = sourceCategories.Select(c => (c.Title, Ids: c.Ids.Where(known.Contains).ToArray())).Where(c => c.Ids.Length > 0).ToList();
-        var listed = categories.SelectMany(c => c.Ids).ToHashSet(StringComparer.Ordinal);
-        if (categories.Count > 0 && choices.Any(c => !listed.Contains(c.Id))) categories.Add(("Other", choices.Where(c => !listed.Contains(c.Id)).Select(c => c.Id).ToArray()));
-        if (categories.Count == 0) categories.Add((null!, choices.Select(c => c.Id).ToArray()));
+        var order = sourceCategories.SelectMany(c => c.Ids).Where(known.Contains).Distinct().ToList();
+        order.AddRange(choices.Select(c => c.Id).Where(id => !order.Contains(id)));
         var model = new ItemPickerModel(choices, lanes.Select(l => ItemPickerModel.Split(options.Value(l.Key))));
-        int targetLane = Math.Max(0, lanes.FindIndex(l => l.Key == target.Key));
         var hidden = (_painter.Overflow ?? new()).ToHashSet();
+        var before = lanes.Select(l => options.Value(l.Key)).ToList();
 
-        void Save()
+        void Apply()
         {
             var values = model.Values;
             var change = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < lanes.Count; i++)
                 change[lanes[i].Key] = picker?.Offers is null ? values[i] : ItemPickerModel.KeepUnoffered(values[i], options.Value(lanes[i].Key), offered);
             _context!.Set(change);
-            _well?.Dispatcher.BeginInvoke(RebuildPanel, System.Windows.Threading.DispatcherPriority.Background);
-        }
-
-        var root = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
-        if (target.Id is { } focusId && target.Key is { } focusKey && choices.FirstOrDefault(c => c.Id == focusId) is { } focus && model.IsAdded(focusId))
-            root.Children.Add(FocusBlock(def, w, focusKey, focus, () =>
-            {
-                for (int i = 0; i < lanes.Count; i++) model.Remove(i, focusId);
-                _openPanel = target with { Id = null };
-                Save();
-            }));
-
-        var laneViews = new List<FrameworkElement>();
-        var laneRows = new List<StackPanel>();
-        var before = lanes.Select(l => options.Value(l.Key)).ToList();
-        void Apply(bool done)
-        {
-            var change = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < lanes.Count; i++)
-            {
-                string value = string.Join(",", laneRows[i].Children.OfType<FrameworkElement>().Select(c => c.Tag).OfType<string>());
-                change[lanes[i].Key] = picker?.Offers is null ? value : ItemPickerModel.KeepUnoffered(value, options.Value(lanes[i].Key), offered);
-            }
-            _context!.Set(change);
-            if (done) _well?.Dispatcher.BeginInvoke(RebuildPanel, System.Windows.Threading.DispatcherPriority.Background);
         }
         void Cancel()
         {
             var change = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < lanes.Count; i++) change[lanes[i].Key] = before[i];
             _context!.Set(change);
-            _well?.Dispatcher.BeginInvoke(RebuildPanel, System.Windows.Threading.DispatcherPriority.Background);
+            RebuildTab();
         }
+
+        var root = new StackPanel { Margin = new Thickness(0, 4, 0, 2) };
         for (int i = 0; i < lanes.Count; i++)
         {
             int lane = i;
-            var list = model.Lanes[lane];
-            var box = new StackPanel();
-            var head = new DockPanel { Margin = new Thickness(0, 10, 0, 4) };
-            var count = new TextBlock { Text = list.Count == 0 ? "" : RaceFormat.Count(list.Count, "item"), Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
-            DockPanel.SetDock(count, Dock.Right);
-            head.Children.Add(count);
-            head.Children.Add(new TextBlock { Text = lanes[lane].Lane is { } laneName ? laneName + (lanes.Count > 1 ? " bar" : "") : "Shown", Style = Ui.Res<Style>("Eyebrow"), VerticalAlignment = VerticalAlignment.Center });
-            box.Children.Add(head);
-            var rows = new StackPanel { Background = Brushes.Transparent, MinHeight = 28 };
-            laneRows.Add(rows);
-            foreach (var id in list)
+            if (lanes.Count > 1)
+                root.Children.Add(new TextBlock { Text = (lanes[lane].Lane ?? "") + " bar", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, lane == 0 ? 2 : 12, 0, 6) });
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(TileGap) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            var tiles = new List<(Border Tile, string Id)>();
+            var ids = model.Lanes[lane].ToList();
+            ids.AddRange(order.Where(id => !model.IsAdded(id)));
+            foreach (var id in ids)
             {
                 var choice = model.Choice(id);
-                bool isPicked = target.Key == lanes[lane].Key && target.Id == id;
-                var (row, x) = ShownRow(choice, isPicked, hidden.Contains((lanes[lane].Key, id)), () =>
+                bool on = model.Lanes[lane].Contains(id);
+                var tile = PickTile(choice, on, hidden.Contains((lanes[lane].Key, id)), now =>
                 {
-                    model.Remove(lane, id);
-                    Save();
+                    if (now) model.Add(id, lane); else model.Remove(lane, id);
+                    Apply();
+                    RebuildTab();
                 });
-                HookRowDrag(row, x, isPicked, laneRows, Apply, Cancel);
-                rows.Children.Add(row);
+                if (on) HookTileDrag(tile, id, lane, grid, tiles, model, Apply, Cancel);
+                tiles.Add((tile, id));
+                grid.Children.Add(tile);
             }
-            rows.Children.Add(new TextBlock { Text = "Nothing here: add from the list.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 6, 0, 6), Visibility = list.Count == 0 ? Visibility.Visible : Visibility.Collapsed });
-            box.Children.Add(rows);
-            laneViews.Add(box);
-        }
-
-        var add = AddChips(model, categories, choices, targetLane, Save);
-        string addLabel = lanes.Count > 1 ? $"Add to the {(lanes[targetLane].Lane ?? "").ToLowerInvariant()} bar" : "Add";
-        if (wide)
-        {
-            var addBox = new StackPanel { Children = { new TextBlock { Text = addLabel, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 10, 0, 4) }, add } };
-            if (lanes.Count > 1)
-            {
-                root.Children.Add(TwoColumns(laneViews[0], laneViews[1], 1, 1));
-                root.Children.Add(addBox);
-            }
-            else root.Children.Add(TwoColumns(laneViews[0], addBox, 1, 1.15));
-            return root;
-        }
-        for (int i = 0; i < laneViews.Count; i++)
-        {
-            root.Children.Add(laneViews[i]);
-            var laneAdd = i == targetLane ? add : AddChips(model, categories, choices, i, Save);
-            string openKey = lanes.Count > 1 ? setting.Id + ":" + lanes[i].Key : setting.Id;
-            bool nothingLeft = !categories.Any(c => c.Ids.Any(id => !model.IsAdded(id) && choices.Any(ch => ch.Id == id)));
-            bool open = !nothingLeft && (_addsOpen.Contains(openKey) || (i == 0 && model.Lanes.All(l => l.Count == 0)));
-            laneAdd.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
-            laneAdd.Margin = new Thickness(0, 8, 0, 0);
-            string label = lanes.Count > 1 ? $"Add to the {(lanes[i].Lane ?? "").ToLowerInvariant()} bar" : "Add more";
-            var toggle = Ui.LabeledButton("I.Plus", label, () => { });
-            toggle.HorizontalAlignment = HorizontalAlignment.Stretch;
-            toggle.Margin = new Thickness(0, 8, 0, 0);
-            if (nothingLeft)
-            {
-                toggle.IsEnabled = false;
-                toggle.ToolTip = "Everything is shown";
-                ToolTipService.SetShowOnDisabled(toggle, true);
-            }
-            void ShowOpen(bool isOpen)
-            {
-                toggle.Content = isOpen ? Ui.IconLabel("I.Tick", "Done adding") : Ui.IconLabel("I.Plus", label);
-                Ui.SetToggled(toggle, isOpen);
-            }
-            if (open) ShowOpen(true);
-            toggle.Click += (_, _) =>
-            {
-                bool now = laneAdd.Visibility != Visibility.Visible;
-                laneAdd.Visibility = now ? Visibility.Visible : Visibility.Collapsed;
-                ShowOpen(now);
-                if (now) _addsOpen.Add(openKey); else _addsOpen.Remove(openKey);
-                _well?.Dispatcher.BeginInvoke(PlacePanel, System.Windows.Threading.DispatcherPriority.Loaded);
-            };
-            root.Children.Add(toggle);
-            root.Children.Add(laneAdd);
+            PlaceTiles(grid, tiles.Select(t => t.Tile).ToList());
+            root.Children.Add(grid);
         }
         return root;
     }
 
-    private FrameworkElement FocusBlock(HudWidgetDef def, HudWidgetConfig w, string key, HudChoice choice, Action remove)
+    private static void PlaceTiles(Grid grid, IReadOnlyList<Border> tiles)
     {
-        var stack = new StackPanel();
-        var removeButton = Ui.LabeledButton("I.Trash", "Remove", remove);
-        removeButton.ToolTip = "Take it out of the widget";
-        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = choice.Label, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
-        var head = new DockPanel { Children = { removeButton, name } };
-        DockPanel.SetDock(removeButton, Dock.Right);
-        stack.Children.Add(head);
-        if (choice.Help is { Length: > 0 } help)
-            stack.Children.Add(new TextBlock { Text = help, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) });
-        foreach (var s in ItemSettings(def, w, key, choice.Id)) stack.Children.Add(Row(s));
-        var block = new Border { Padding = new Thickness(10, 8, 10, 8), Margin = new Thickness(0, 4, 0, 2), BorderThickness = new Thickness(3, 0, 0, 0), Child = stack };
-        block.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
-        block.SetResourceReference(Border.BorderBrushProperty, "Accent");
-        return block;
+        int rows = (tiles.Count + 1) / 2;
+        while (grid.RowDefinitions.Count < rows) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        while (grid.RowDefinitions.Count > rows) grid.RowDefinitions.RemoveAt(grid.RowDefinitions.Count - 1);
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            Grid.SetRow(tiles[i], i / 2);
+            Grid.SetColumn(tiles[i], i % 2 * 2);
+        }
     }
 
-    private static (Border Row, Button Remove) ShownRow(HudChoice choice, bool picked, bool doesntFit, Action remove)
+    private static Border PickTile(HudChoice choice, bool on, bool doesntFit, Action<bool> toggle)
     {
-        var grip = new Icon { Data = Ui.Res<Geometry>("I.Move"), Width = 11, Height = 11, Margin = new Thickness(8, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+        var grip = new Icon { Data = Ui.Res<Geometry>("I.Move"), Width = 11, Height = 11, Margin = new Thickness(8, 0, 7, 0), VerticalAlignment = VerticalAlignment.Center, Visibility = on ? Visibility.Visible : Visibility.Hidden };
         grip.SetResourceReference(Control.ForegroundProperty, "TextFaint");
-        var x = Ui.IconButton("I.X", "Remove " + choice.Label, remove, "QuietIconButton");
-        x.VerticalAlignment = VerticalAlignment.Center;
         var name = TextFit.TipWhenTrimmed(new TextBlock { Text = choice.Label, Style = Ui.Res<Style>("Body"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
-        var dock = new DockPanel();
+        if (!on) name.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        var tick = ToggleCards.Row(Ui.Switch(on, toggle), name, null);
+        tick.VerticalAlignment = VerticalAlignment.Center;
+        System.Windows.Automation.AutomationProperties.SetName(tick, choice.Label);
+        var dock = new DockPanel { LastChildFill = true };
         DockPanel.SetDock(grip, Dock.Left);
-        DockPanel.SetDock(x, Dock.Right);
         dock.Children.Add(grip);
-        dock.Children.Add(x);
         if (doesntFit)
         {
-            var tag = new TextBlock { Text = "Doesn't fit", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 4, 0), ToolTip = "No room for it in the widget, so it isn't drawn" };
+            var tag = new TextBlock { Text = "Doesn't fit", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 8, 0), ToolTip = "No room for it in the widget, so it isn't drawn" };
             DockPanel.SetDock(tag, Dock.Right);
             dock.Children.Add(tag);
         }
-        dock.Children.Add(name);
-        var row = Hairline.Frame(new Border { Height = 28, Margin = new Thickness(0, 0, 0, 2), Child = dock, Tag = choice.Id, Cursor = Cursors.SizeAll, ToolTip = choice.Help ?? "Drag to reorder" });
-        Look(row, picked, false);
-        return (row, x);
+        dock.Children.Add(tick);
+        var tile = Hairline.Frame(new Border
+        {
+            Height = TileHeight, Margin = new Thickness(0, 0, 0, TileGap), CornerRadius = ThemeManager.Round(8), Child = dock, Tag = choice.Id,
+            Cursor = on ? Cursors.SizeAll : null, ToolTip = choice.Help ?? (on ? "Drag to reorder" : null),
+        });
+        TileLook(tile, false);
+        return tile;
     }
 
-    private static void Look(Border row, bool picked, bool lifted)
+    private static void TileLook(Border tile, bool lifted)
     {
-        row.SetResourceReference(Border.BackgroundProperty, lifted ? "Selected" : picked ? "AccentSoft" : "Surface");
-        row.SetResourceReference(Border.BorderBrushProperty, lifted || picked ? "Accent" : "Line");
-        Panel.SetZIndex(row, lifted ? 1 : 0);
+        tile.SetResourceReference(Border.BackgroundProperty, lifted ? "AccentSoft" : "TileRaised");
+        tile.SetResourceReference(Border.BorderBrushProperty, lifted ? "Accent" : "Line");
+        Panel.SetZIndex(tile, lifted ? 1 : 0);
     }
 
-    private static void HookRowDrag(Border row, Button remove, bool picked, List<StackPanel> lanes, Action<bool> apply, Action cancel)
+    private static void HookTileDrag(Border tile, string id, int lane, Grid grid, List<(Border Tile, string Id)> tiles, ItemPickerModel model, Action apply, Action cancel)
     {
         Point? down = null;
         bool dragging = false, moved = false;
-        void Place(MouseEventArgs e)
+        tile.PreviewMouseLeftButtonDown += (_, e) =>
         {
-            foreach (var lane in lanes)
-            {
-                var at = e.GetPosition(lane);
-                if (at.X < -24 || at.X > lane.ActualWidth + 24 || at.Y < -16 || at.Y > lane.ActualHeight + 16) continue;
-                int index = 0;
-                foreach (var child in lane.Children.OfType<FrameworkElement>())
-                    if (!ReferenceEquals(child, row) && child.Tag is string && e.GetPosition(child).Y > child.ActualHeight / 2) index++;
-                var parent = (Panel)row.Parent;
-                int now = ReferenceEquals(parent, lane) ? parent.Children.OfType<FrameworkElement>().TakeWhile(c => !ReferenceEquals(c, row)).Count(c => c.Tag is string) : -1;
-                if (now == index) return;
-                parent.Children.Remove(row);
-                int slot = lane.Children.Count, seen = 0;
-                for (int k = 0; k < lane.Children.Count; k++)
-                {
-                    if (lane.Children[k] is not FrameworkElement { Tag: string }) continue;
-                    if (seen == index) { slot = k; break; }
-                    seen++;
-                }
-                lane.Children.Insert(slot, row);
-                foreach (var l in lanes)
-                    foreach (var hint in l.Children.OfType<TextBlock>())
-                        hint.Visibility = l.Children.OfType<FrameworkElement>().Any(c => c.Tag is string) ? Visibility.Collapsed : Visibility.Visible;
-                moved = true;
-                apply(false);
-                return;
-            }
-        }
-        row.PreviewMouseLeftButtonDown += (_, e) =>
-        {
-            if (e.OriginalSource is Visual v && remove.IsAncestorOf(v)) return;
-            down = e.GetPosition(row);
+            if (e.OriginalSource is DependencyObject source && FindAncestor<CheckBox>(source) is not null) return;
+            down = e.GetPosition(tile);
         };
-        row.MouseMove += (_, e) =>
+        tile.MouseMove += (_, e) =>
         {
             if (down is not { } from || e.LeftButton != MouseButtonState.Pressed) return;
             if (!dragging)
             {
-                if ((e.GetPosition(row) - from).Length < 4) return;
+                if ((e.GetPosition(tile) - from).Length < 4) return;
                 dragging = true;
                 moved = false;
-                row.CaptureMouse();
-                Look(row, picked, true);
+                tile.CaptureMouse();
+                TileLook(tile, true);
             }
-            Place(e);
+            var at = e.GetPosition(grid);
+            foreach (var (other, otherId) in tiles)
+            {
+                if (ReferenceEquals(other, tile) || !model.Lanes[lane].Contains(otherId)) continue;
+                var p = other.TranslatePoint(new Point(0, 0), grid);
+                if (at.X < p.X || at.X > p.X + other.ActualWidth || at.Y < p.Y || at.Y > p.Y + other.ActualHeight) continue;
+                var list = model.Lanes[lane];
+                int now = list.IndexOf(id), target = list.IndexOf(otherId);
+                if (model.Move(lane, id, lane, target + (now < target ? 1 : 0)))
+                {
+                    var sorted = list.Select(x => tiles.First(t => t.Id == x)).Concat(tiles.Where(t => !list.Contains(t.Id))).ToList();
+                    tiles.Clear();
+                    tiles.AddRange(sorted);
+                    PlaceTiles(grid, tiles.Select(t => t.Tile).ToList());
+                    moved = true;
+                    apply();
+                }
+                break;
+            }
         };
-        row.MouseLeftButtonUp += (_, _) =>
+        tile.MouseLeftButtonUp += (_, _) =>
         {
             down = null;
             if (!dragging) return;
             dragging = false;
-            row.ReleaseMouseCapture();
-            Look(row, picked, false);
-            if (moved) apply(true);
+            tile.ReleaseMouseCapture();
+            TileLook(tile, false);
         };
-        row.LostMouseCapture += (_, _) =>
+        tile.LostMouseCapture += (_, _) =>
         {
             if (!dragging) return;
             dragging = false;
             down = null;
-            Look(row, picked, false);
+            TileLook(tile, false);
             if (moved) cancel();
         };
     }
 
-    private static FrameworkElement AddChips(ItemPickerModel model, List<(string Title, string[] Ids)> categories, List<HudChoice> choices, int lane, Action save)
+    private static T? FindAncestor<T>(DependencyObject node) where T : DependencyObject
     {
-        var root = new StackPanel();
-        var search = Ui.Search(new TextBox { Margin = new Thickness(0, 0, 0, 6) });
-        System.Windows.Automation.AutomationProperties.SetName(search, "Search items to add");
-        root.Children.Add(search);
-        var rows = new List<(FrameworkElement Row, List<(Button Chip, string Name)> Chips)>();
-        foreach (var (title, ids) in categories)
-        {
-            var left = ids.Where(id => !model.IsAdded(id)).Select(id => choices.FirstOrDefault(c => c.Id == id)).OfType<HudChoice>().ToList();
-            if (left.Count == 0) continue;
-            var wrap = new WrapPanel();
-            var chips = new List<(Button, string)>();
-            foreach (var choice in left)
-            {
-                var chip = new Button { Style = Ui.Res<Style>("GhostButton"), Content = choice.Label, Height = 24, MinHeight = 24, Padding = new Thickness(8, 0, 8, 0), Margin = new Thickness(0, 0, Ui.InlineGap, Ui.InlineGap), ToolTip = choice.Help };
-                System.Windows.Automation.AutomationProperties.SetName(chip, "Add " + choice.Label);
-                string id = choice.Id;
-                chip.Click += (_, _) =>
-                {
-                    if (model.Add(id, lane)) save();
-                };
-                wrap.Children.Add(chip);
-                chips.Add((chip, choice.Label));
-            }
-            var grid = new Grid { Margin = new Thickness(0, 0, 0, 0) };
-            if (title is not null)
-            {
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(CategoryWidth) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition());
-                grid.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 8, 0) });
-                Grid.SetColumn(wrap, 1);
-            }
-            grid.Children.Add(wrap);
-            var line = new Border { Padding = new Thickness(0, 5, 0, 1), Child = grid };
-            if (rows.Count > 0) Hairline.Frame(line, Sides.Top);
-            line.SetResourceReference(Border.BorderBrushProperty, "Line");
-            root.Children.Add(line);
-            rows.Add((line, chips));
-        }
-        if (rows.Count == 0)
-        {
-            search.Visibility = Visibility.Collapsed;
-            root.Children.Add(new TextBlock { Text = "Everything is shown.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 2, 0, 0) });
-        }
-        search.TextChanged += (_, _) =>
-        {
-            string q = search.Text.Trim();
-            foreach (var (row, chips) in rows)
-            {
-                bool any = false;
-                foreach (var (chip, name) in chips)
-                {
-                    bool show = q.Length == 0 || name.Contains(q, StringComparison.OrdinalIgnoreCase);
-                    chip.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-                    any |= show;
-                }
-                row.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
-            }
-        };
-        return root;
+        for (DependencyObject? at = node; at is not null; at = at is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(at) : LogicalTreeHelper.GetParent(at))
+            if (at is T found) return found;
+        return null;
     }
 
     private (string Setting, string Key, string? Id)? PartAt(HudEditorDef editor, Point at)
@@ -712,13 +440,13 @@ internal sealed partial class RaceHudWidgets
         return best;
     }
 
-    internal (string? Selected, PanelTarget? Panel) Keep() => (_selected, _openPanel);
+    internal (string? Selected, string? Tab) Keep() => (_selected, _tab);
 
-    internal void Restore((string? Selected, PanelTarget? Panel) keep)
+    internal void Restore((string? Selected, string? Tab) keep)
     {
         if (keep.Selected is null || Layout?.Widgets.All(w => w.Id != keep.Selected) != false) return;
         _selected = keep.Selected;
-        _openPanel = keep.Panel;
+        _tab = keep.Tab;
         Fill();
     }
 
@@ -732,16 +460,10 @@ internal sealed partial class RaceHudWidgets
     internal IReadOnlyList<(string Name, PanelTarget Target)> SweepParts()
     {
         var list = new List<(string, PanelTarget)>();
-        if (Selected() is not { } w || HudCatalog.Find(w.Kind) is not { } def) return list;
-        var editor = def.EditorDef;
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (id, _) in _painter.Regions ?? new())
-            if (editor.SettingForRegion(id) is { } setting && seen.Add(setting))
-                list.Add(("part-" + id, new PanelTarget(setting, id, null)));
-        foreach (var (key, id, _) in _painter.Items ?? new())
-            if (editor.SettingForRegion(key) is { } setting && seen.Add(setting + "|item"))
-                list.Add(("item-" + key + "-" + id, new PanelTarget(setting, key, id)));
-        list.Add(("all", new PanelTarget(null, null, null)));
+        if (Selected() is null) return list;
+        foreach (var tab in _tabs)
+            list.Add(("tab-" + string.Join("-", tab.Title.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries)), new PanelTarget(null, null, null, tab.Title)));
+        if (_tabs.Count > 0) list.Add(("all", new PanelTarget(null, null, null, _tabs[0].Title)));
         return list;
     }
 
@@ -759,7 +481,7 @@ internal sealed partial class RaceHudWidgets
                 else Walk(child);
             }
         }
-        if (_panel is not null) Walk(_panel);
+        if (_tabBody is not null) Walk(_tabBody);
         return found;
     }
 
@@ -787,11 +509,11 @@ internal sealed partial class RaceHudWidgets
                 if (child is UIElement { IsVisible: false } or UIElement { IsEnabled: false }) continue;
                 if (child is ComboBox combo) { found.Add(combo); continue; }
                 if (child is HotkeyBox or TextBox) continue;
-                if (child is System.Windows.Controls.Primitives.ButtonBase button && System.Windows.Automation.AutomationProperties.GetName(button) != "Close") { found.Add(button); continue; }
+                if (child is System.Windows.Controls.Primitives.ButtonBase button) { found.Add(button); continue; }
                 Walk(child);
             }
         }
-        if (_panel is not null) Walk(_panel);
+        if (_tabBody is not null) Walk(_tabBody);
         return found;
     }
 
@@ -806,12 +528,6 @@ internal sealed partial class RaceHudWidgets
         {
             OpenPanel(target);
             await Task.Delay(40);
-            if (_panel is { } shown && _well is { } well)
-            {
-                double right = Canvas.GetLeft(shown) + shown.ActualWidth, bottom = Canvas.GetTop(shown) + shown.ActualHeight;
-                if (right > well.ActualWidth + 1 || bottom > well.ActualHeight + 1)
-                    Report($"hud {kind} {name}: the panel ({right:0} x {bottom:0}) runs past the preview area ({well.ActualWidth:0} x {well.ActualHeight:0})");
-            }
             for (int i = 0; i < SweepActionCap; i++)
             {
                 var controls = PanelControls();
@@ -850,12 +566,12 @@ internal sealed partial class RaceHudWidgets
                     Report($"hud {kind} {name}: “{label}” threw {ex.GetType().Name}: {ex.Message}");
                 }
                 await Task.Delay(30);
-                if (_openPanel != target) OpenPanel(target);
+                if (_tab != target.Tab) OpenPanel(target);
                 await Task.Delay(10);
-                if (_well is { } settle) await settle.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
-                _panel?.UpdateLayout();
-                if (_panel is not null)
-                    foreach (var finding in Services.LayoutLint.Inspect(_panel, $"hud {kind} {name}")) Report(finding.ToString());
+                if (_tabBody is { } settle) await settle.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+                _settings?.UpdateLayout();
+                if (_settings is not null)
+                    foreach (var finding in Services.LayoutLint.Inspect(_settings, $"hud {kind} {name}")) Report(finding.ToString());
             }
         }
     }

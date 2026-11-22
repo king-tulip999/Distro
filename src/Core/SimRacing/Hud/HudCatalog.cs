@@ -50,7 +50,7 @@ internal static class HudCatalog
             { MinW = 240, MinH = 110, DefaultHz = 2, Options = IncidentsWidget.Options, Editor = Editors.IncidentsEditor.Def,
               Limits = "Light contact gives no points, so iRacing doesn't report it. Incidents are named from their points; the log starts when the overlay first sees the session." },
         new("result", "Race result", "Your finish once you take the checkered flag, as a card, a banner, a stamp or a lap chart: position and places gained, the car, iRating, incidents, awards, best and average lap, consistency and every lap's time.", 300, 448, () => new ResultWidget())
-            { MinW = 160, MinH = 120, DefaultHz = 2, Options = ResultWidget.Options, Editor = Editors.ResultEditor.Def, HideWhenEmpty = true, Natural = ResultWidget.Natural,
+            { MinW = 160, MinH = 120, DefaultHz = 30, Options = ResultWidget.Options, Editor = Editors.ResultEditor.Def, HideWhenEmpty = true, Natural = ResultWidget.Natural,
               Limits = "The iRating change is an estimate from the field's ratings and your finish. Awards compare this race with the ones Session Stats has recorded, so they need Session Stats on." },
         new("inputs", "Inputs", "Throttle, brake, clutch and steering with gear, speed and RPM: a gear dial with pedal bars, a trace and an RPM bar, or the gear dial and trace alone, with extra fields to pick.", 436, 96, () => new InputsWidget())
             { MinW = 225, MinH = 50, DefaultHz = 30, Options = InputsWidget.Options, Editor = Editors.InputsEditor.Def, Natural = InputsWidget.Natural,

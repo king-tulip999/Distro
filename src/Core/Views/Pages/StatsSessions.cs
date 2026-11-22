@@ -89,13 +89,13 @@ internal static class StatsSessions
                 table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = RowHeight });
                 bool raced = RaceParts.Raced(s);
                 string place = RaceParts.Place(s);
+                var finish = raced ? Finish(s, place) : TypeMark(s.Type, true);
                 if (raced)
                 {
-                    var band = new Border { IsHitTestVisible = false };
-                    band.SetResourceReference(Border.BackgroundProperty, place + "Fade");
-                    Grid.SetRow(band, row);
-                    Grid.SetColumnSpan(band, span);
-                    table.Children.Add(band);
+                    var panels = new SoftPanels(PanelSpread.Row, place, index * RowPhaseStep);
+                    Grid.SetRow(panels, row);
+                    Grid.SetColumnSpan(panels, span);
+                    table.Children.Add(panels);
                 }
                 var hit = new Border { Background = Brushes.Transparent, Cursor = Cursors.Hand, ToolTip = "Open this session" };
                 Grid.SetRow(hit, row);
@@ -113,7 +113,7 @@ internal static class StatsSessions
                     table.Children.Add(rule);
                 }
                 Cell(table, row, 0, Stat(Dates.Time(local)));
-                Cell(table, row, 1, raced ? Finish(s, place) : TypeMark(s.Type, true));
+                Cell(table, row, 1, finish);
                 var config = StatFormat.Config(s.Config);
                 var names = new StackPanel { Children = { Body(s.Track, "Heading", 13), Body(config.Length > 0 ? $"{config} · {s.Car}" : s.Car, "TextMuted", 12) } };
                 var sketch = new TrackSketch(s.Track, s.Config, "TextMuted", 1.6) { Width = MapWidth, Height = 36, TrackId = s.TrackId, TrackName = s.TrackName, Margin = new Thickness(0, 0, 10, 0) };
@@ -166,7 +166,7 @@ internal static class StatsSessions
     }
 
     private const int Columns = 10;
-    private const double RowHeight = 44, CascadeStepMs = 22, MaxCascadeMs = 420, NamesMaxWidth = 460, CarHeight = 21, MapWidth = 56,StatSize = 13;
+    private const double RowPhaseStep = 0.15, RowHeight = 44, CascadeStepMs = 22, MaxCascadeMs = 420, NamesMaxWidth = 460, CarHeight = 21, MapWidth = 56,StatSize = 13;
 
     internal static string NoTraceReason(SessionSummary s, Config.SessionStatsSettings settings, DateTime nowUtc)
     {

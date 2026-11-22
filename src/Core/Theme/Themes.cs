@@ -64,6 +64,15 @@ internal static class Themes
 
     public static ThemeSpec AppGlow => AppIdentity.IsTecnica ? Tecnica : Velocita;
 
+    public static string? SetAccent(string? hex)
+    {
+        var made = GlowAccent.Apply(AppGlow.Colors, hex);
+        var spec = AppGlow with { Colors = made.Colors ?? AppGlow.Colors };
+        _all = _all.Select(t => t.Id == spec.Id ? spec : t).ToArray();
+        OverlayPresets.ClearCache();
+        return made.Problem;
+    }
+
     public static readonly ThemeSpec Teams = SetSpec(ThemeSets.Teams, null);
 
     public static readonly ThemeSpec[] BuiltIn = { AppGlow, Custom, Teams };

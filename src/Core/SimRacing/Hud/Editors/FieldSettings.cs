@@ -7,10 +7,10 @@ internal static class FieldSettings
     public static readonly HudCategory[] ColumnCategories =
     {
         new("Position", "pos", "cpos", "change"),
-        new("Driver", "num", "name", "team", "badge", "irchange"),
+        new("Driver", "num", "logo", "name", "team", "badge", "irchange"),
         new("Gaps", "gap", "int", "gapme", "laps", "trend"),
         new("Lap times", "last", "best", "avglap", "delta"),
-        new("Race", "lapsdone", "inc"),
+        new("Race", "lapsdone", "inc", "flag"),
         new("Pit", "pit", "out", "stint", "tire"),
     };
 

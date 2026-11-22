@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 
@@ -10,7 +11,7 @@ internal static class Engine
 {
     public const string ExeName = "VelocitaSimHub.exe";
     private const string InstanceName = @"Local\Velocita SimHub.SingleInstance";
-    private const string ShowName = @"Local\Velocita SimHub.ShowWindow";
+    private const string EmbedName = @"Local\Velocita SimHub.Embed";
 
     public static string Folder => Path.GetDirectoryName(typeof(Engine).Assembly.Location) ?? AppDomain.CurrentDomain.BaseDirectory;
 
@@ -20,16 +21,7 @@ internal static class Engine
 
     public static string? Problem { get; private set; }
 
-    private static string UpdateFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Velocita SimHub", "update.txt");
-
-    public static string? UpdateNote
-    {
-        get
-        {
-            try { return File.Exists(UpdateFile) ? File.ReadAllText(UpdateFile).Trim() : null; }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
-        }
-    }
+    private static string DataFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Velocita SimHub");
 
     public static bool Running
     {
@@ -50,7 +42,7 @@ internal static class Engine
         }
     }
 
-    public static void Start(bool settings = false)
+    public static void Start()
     {
         if (!Installed)
         {
@@ -60,7 +52,7 @@ internal static class Engine
         string simHub = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
         int pid;
         using (var self = Process.GetCurrentProcess()) pid = self.Id;
-        string args = "--simhub \"" + simHub + "\" --parent " + pid + (settings ? " --settings" : "");
+        string args = "--simhub \"" + simHub + "\" --parent " + pid;
         try
         {
             Process.Start(new ProcessStartInfo(ExePath, args) { UseShellExecute = false, WorkingDirectory = Folder })?.Dispose();
@@ -73,19 +65,17 @@ internal static class Engine
         }
     }
 
-    public static void OpenSettings()
+    public static void Embed(IntPtr panelParent)
     {
-        if (Running)
+        try
         {
-            try
-            {
-                using (var show = EventWaitHandle.OpenExisting(ShowName)) show.Set();
-                return;
-            }
-            catch (Exception ex) when (ex is WaitHandleCannotBeOpenedException or UnauthorizedAccessException or IOException)
-            {
-            }
+            Directory.CreateDirectory(DataFolder);
+            File.WriteAllText(Path.Combine(DataFolder, "embed.txt"), panelParent.ToInt64().ToString(CultureInfo.InvariantCulture));
+            using var embed = EventWaitHandle.OpenExisting(EmbedName);
+            embed.Set();
         }
-        Start(settings: true);
+        catch (Exception ex) when (ex is WaitHandleCannotBeOpenedException or UnauthorizedAccessException or IOException)
+        {
+        }
     }
 }

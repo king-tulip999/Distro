@@ -3,14 +3,14 @@ using System.IO.Compression;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Windows.Threading;
-using Core.Config;
 
 namespace Core.Services;
+
+internal enum SimHubUpdateState { Idle, Checking, UpToDate, Ready, Failed }
 
 internal sealed class SimHubUpdater
 {
     public const string PluginFile = "Velocita.SimHub.Plugin.dll";
-    public const string StatusFile = "update.txt";
     internal static readonly string[] Files = { AppIdentity.SimHubExe, PluginFile };
 
     private readonly string _simHub;
@@ -26,13 +26,12 @@ internal sealed class SimHubUpdater
     }
 
     public ReleaseInfo? Ready { get; private set; }
+    public SimHubUpdateState State { get; private set; }
+    public event Action? Changed;
     private string? _staged;
-
-    public static string StatusPath => Path.Combine(ConfigStore.Folder, StatusFile);
 
     public void Start()
     {
-        WriteStatus(null);
         _first.Start();
         _timer.Start();
     }
@@ -43,15 +42,30 @@ internal sealed class SimHubUpdater
         _timer.Stop();
     }
 
+    public void CheckNow() => _ = CheckAsync();
+
+    private void SetState(SimHubUpdateState state)
+    {
+        State = state;
+        Changed?.Invoke();
+    }
+
     private async Task CheckAsync()
     {
         if (_busy || Ready is not null) return;
         _busy = true;
+        SetState(SimHubUpdateState.Checking);
+        var result = SimHubUpdateState.Failed;
         string? scratch = null;
         try
         {
             var latest = UpdateService.Newest(await UpdateService.Http.GetStringAsync(UpdateService.ReleasesApi));
-            if (latest is null || latest.Version <= UpdateService.Current || latest.ExeUrl is null || latest.ChecksumUrl is null || latest.SignatureUrl is null) return;
+            if (latest is null || latest.Version <= UpdateService.Current)
+            {
+                result = SimHubUpdateState.UpToDate;
+                return;
+            }
+            if (latest.ExeUrl is null || latest.ChecksumUrl is null || latest.SignatureUrl is null) return;
             scratch = Environment.IsPrivilegedProcess ? App.ProtectedScratch() : Path.Combine(Path.GetTempPath(), "velocita-simhub-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(scratch);
             string zip = Path.Combine(scratch, UpdateService.SimHubZip);
@@ -67,7 +81,7 @@ internal sealed class SimHubUpdater
             _staged = scratch;
             scratch = null;
             Ready = latest;
-            WriteStatus($"Update to {UpdateService.Show(latest.Version)} is ready: it installs when you close SimHub.");
+            result = SimHubUpdateState.Ready;
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or UnauthorizedAccessException or TaskCanceledException or System.Text.Json.JsonException)
         {
@@ -77,6 +91,7 @@ internal sealed class SimHubUpdater
         {
             if (scratch is not null) Remove(scratch);
             _busy = false;
+            SetState(result);
         }
     }
 
@@ -113,7 +128,6 @@ internal sealed class SimHubUpdater
         if (Ready is null || _staged is not { } staged || Environment.ProcessPath is not { } exe) return false;
         if (!Core.Services.External.Allowed("update")) return false;
         string files = Path.Combine(staged, "files");
-        WriteStatus(null);
         App.RunAfterExit("update", InstallSteps(files, _simHub), exe, staged);
         return true;
     }
@@ -131,20 +145,6 @@ internal sealed class SimHubUpdater
         steps.Add(":done");
         steps.Add($"rd /s /q {App.BatchPath(files)} >nul 2>&1");
         return steps;
-    }
-
-    private static void WriteStatus(string? text)
-    {
-        try
-        {
-            if (text is null) File.Delete(StatusPath);
-            else
-            {
-                Directory.CreateDirectory(ConfigStore.Folder);
-                File.WriteAllText(StatusPath, text);
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     private static void Remove(string folder)

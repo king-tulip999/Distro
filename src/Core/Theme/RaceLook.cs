@@ -11,7 +11,13 @@ internal static class RaceLook
     private static readonly Color[] DarkPlaces = { Color.FromRgb(0xFF, 0xB2, 0x24), Color.FromRgb(0xC9, 0xCE, 0xD6), Color.FromRgb(0xD9, 0x9A, 0x63) };
     private static readonly Color[] LightPlaces = { Color.FromRgb(0xB8, 0x86, 0x0B), Color.FromRgb(0x6E, 0x76, 0x81), Color.FromRgb(0xA0, 0x61, 0x2A) };
 
-    public static string Key(int? finish) => finish is >= 1 and <= 3 ? "Place" + finish : "Place" + Places;
+    public const string OffPodium = "Place5";
+
+    private static readonly Color OffPodiumFill = Color.FromRgb(0x9A, 0x9A, 0xA8);
+
+    public static string Key(int? finish) => finish is >= 1 and <= 3 ? "Place" + finish : OffPodium;
+
+    public static string Backdrop(string place) => place == OffPodium ? "Place" + Places : place;
 
     public static void Install(ThemeSpec spec, IReadOnlyDictionary<string, Color> p, ResourceDictionary res)
     {
@@ -23,13 +29,13 @@ internal static class RaceLook
             string key = "Place" + n;
             res[key] = Brush(fill);
             res[key + "Text"] = Brush(text);
-            res[key + "Wash"] = Brush(ThemeManager.Mix(surface, fill, 0.13));
-            res[key + "Faint"] = Brush(ThemeManager.Mix(surface, fill, 0.07));
-            res[key + "Band"] = Brush(ThemeManager.Mix(surface, fill, 0.22));
             res[key + "Soft"] = Brush(ThemeManager.Mix(p["SurfaceAlt"], fill, 0.1));
             res[key + "Edge"] = Brush(ThemeManager.Mix(surface, fill, 0.55));
-            res[key + "Fade"] = Freeze(new LinearGradientBrush(ThemeManager.Mix(surface, fill, 0.14), Color.FromArgb(0, surface.R, surface.G, surface.B), new Point(0, 0.5), new Point(0.45, 0.5)));
         }
+        res[OffPodium] = Brush(OffPodiumFill);
+        res[OffPodium + "Text"] = Brush(p["Heading"]);
+        res[OffPodium + "Soft"] = Brush(ThemeManager.Mix(p["SurfaceAlt"], OffPodiumFill, 0.06));
+        res[OffPodium + "Edge"] = Brush(ThemeManager.Mix(surface, OffPodiumFill, 0.4));
         res["RaceFont"] = ThemeManager.Family(FontPath);
     }
 

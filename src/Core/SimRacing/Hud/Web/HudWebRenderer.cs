@@ -166,6 +166,8 @@ internal sealed class HudWebRenderer : IDisposable
 
     public Func<HudWidgetConfig, TelemetryFrame, bool>? Shows { get; init; }
 
+    public Func<HudWidgetConfig, RaceState, SizeF>? SizeOf { get; init; }
+
     public int Render(IReadOnlyList<HudWebClient> clients, TelemetryFrame frame, RaceState race, RaceHudSettings settings, HudLayout? layout, HudPalette palette, bool dirty)
     {
         int fastest = 0;
@@ -277,12 +279,14 @@ internal sealed class HudWebRenderer : IDisposable
         if (OnlyLayout && !config.Enabled || Shows?.Invoke(config, frame) == false) return Empty;
         var view = new HudView { Frame = frame, Race = race, Settings = settings, Config = config, Options = t.Options!, Def = t.Def };
         if ((config.OnlyWhenNeeded ?? t.Def.HideWhenEmpty) == true && !t.Widget!.HasContent(view)) return Empty;
-        float scale = (float)Math.Min(pixels.W / config.W, pixels.H / config.H);
-        var size = new Size(Math.Clamp((int)Math.Round(config.W * scale), 1, HudWebClient.MaxPixels), Math.Clamp((int)Math.Round(config.H * scale), 1, HudWebClient.MaxPixels));
+        var layout = SizeOf?.Invoke(config, race) ?? new SizeF((float)config.W, (float)config.H);
+        if (layout.Width < 1 || layout.Height < 1) layout = new SizeF((float)config.W, (float)config.H);
+        float scale = Math.Min(pixels.W / layout.Width, pixels.H / layout.Height);
+        var size = new Size(Math.Clamp((int)Math.Round(layout.Width * scale), 1, HudWebClient.MaxPixels), Math.Clamp((int)Math.Round(layout.Height * scale), 1, HudWebClient.MaxPixels));
         var g = t.Surface.Ensure(size);
         var p = t.Painter;
         p.Simulated = frame.Simulated;
-        p.Begin(g, scale, new SizeF((float)config.W, (float)config.H), palette, settings.Appearance);
+        p.Begin(g, scale, layout, palette, settings.Appearance);
         p.Background = config.Background;
         t.Widget!.Paint(p, view);
         p.FinishPanels();

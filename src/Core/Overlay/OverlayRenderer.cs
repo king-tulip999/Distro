@@ -44,6 +44,7 @@ internal sealed class OverlayRenderer : IDisposable
     private readonly Dictionary<(string?, string?, string?, string?, string?, string?, string?, string?), Palette> _palettes = new();
     private OverlayLayout? _presetLayout;
     private OverlayColorPreset _presetOf;
+    private string? _presetAccent;
     private Palette? _presetPalette;
     private Pen? _baselinePen, _graphPen, _rulePen;
     private GraphicsPath? _backPath;
@@ -459,22 +460,22 @@ internal sealed class OverlayRenderer : IDisposable
 
     private Palette PaletteFor(OverlayLayout layout)
     {
-        if (_presetPalette is not null && ReferenceEquals(layout, _presetLayout) && layout.Colors == _presetOf)
+        if (_presetPalette is not null && ReferenceEquals(layout, _presetLayout) && layout.Colors == _presetOf && layout.Accent == _presetAccent)
             return _presetPalette;
         var c = Theme.OverlayPresets.For(layout.Colors, layout.Custom, layout.ColorSet);
         bool preset = !ReferenceEquals(c, layout.Custom);
-        var resolved = Resolve(c);
+        var resolved = Resolve(c, layout.Accent);
         if (preset)
-            (_presetLayout, _presetOf, _presetPalette) = (layout, layout.Colors, resolved);
+            (_presetLayout, _presetOf, _presetAccent, _presetPalette) = (layout, layout.Colors, layout.Accent, resolved);
         return resolved;
     }
 
-    private Palette Resolve(OverlayColors c)
+    private Palette Resolve(OverlayColors c, string? accent)
     {
-        var key = (c.Text, c.Secondary, c.Accent, c.Background, c.Graph, c.Warning, c.Critical, c.Fps);
+        var key = (c.Text, c.Secondary, accent ?? c.Accent, c.Background, c.Graph, c.Warning, c.Critical, c.Fps);
         if (_palettes.TryGetValue(key, out var cached))
             return cached;
-        var palette = new Palette(Parse(c.Text, Color.White), Parse(c.Secondary, Color.Gray), Parse(c.Accent, Color.Orange), Parse(c.Background, Color.Black),
+        var palette = new Palette(Parse(c.Text, Color.White), Parse(c.Secondary, Color.Gray), Parse(accent ?? c.Accent, Color.Orange), Parse(c.Background, Color.Black),
             Parse(c.Graph, Color.Orange), Parse(c.Warning, Color.Orange), Parse(c.Critical, Color.Red), Parse(c.Fps, Color.White));
         if (_palettes.Count >= MaxCachedPalettes)
             _palettes.Clear();

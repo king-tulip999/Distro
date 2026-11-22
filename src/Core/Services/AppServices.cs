@@ -238,6 +238,23 @@ internal sealed class AppServices : IDisposable
         Overlay.InvalidateColors();
     }
 
+    public string? UseAccent(string? hex)
+    {
+        string? stored = Theme.GlowAccent.Stored(hex);
+        if (Theme.GlowAccent.SameAs(stored, Theme.Palettes.ToHex(Theme.Themes.AppGlow.Colors["Accent"]))) stored = null;
+        if (Theme.Themes.SetAccent(stored) is { } problem)
+        {
+            Theme.Themes.SetAccent(Config.Ui.Accent);
+            return problem;
+        }
+        Config.Ui.Accent = stored;
+        if (Config.Ui.Theme != AppTheme.Glow) { SetTheme(AppTheme.Glow); return null; }
+        Save();
+        Theme.ThemeManager.Apply(Config.Ui.Theme);
+        Overlay.InvalidateColors();
+        return null;
+    }
+
     public void UsePick(Theme.ThemeSet set, string? name)
     {
         set.Set(Config.Ui, set.Known(name) ?? set.First);

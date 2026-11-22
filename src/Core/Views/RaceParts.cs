@@ -238,57 +238,9 @@ internal sealed class SegmentMeter : FrameworkElement
     }
 }
 
-internal sealed class Backdrop : Grid
-{
-    public const int Shapes = 6;
-
-    public Slant Main { get; }
-
-    public Backdrop(int shape, string place = "Place4", string? main = null)
-    {
-        IsHitTestVisible = false;
-        ClipToBounds = true;
-        Main = new Slant(main ?? place + "Faint", Shape(shape)) { Opacity = Strength };
-        Children.Add(Main);
-    }
-
-    public const double Strength = 0.55;
-
-    private static double[] Shape(int shape) => (((shape % Shapes) + Shapes) % Shapes) switch
-    {
-        0 => new[] { 0, 0, 0.62, 0, 0.4, 1, 0, 1.0 },
-        1 => new[] { 0, 0.74, 1, 0.34, 1, 0.5, 0, 0.9 },
-        2 => new[] { 0.68, 0, 0.8, 0, 0.62, 1, 0.5, 1.0 },
-        3 => new[] { 1, 0.3, 1, 1, 0.5, 1.0 },
-        4 => new[] { 0.5, 0, 1, 0, 1, 1, 0.75, 1.0 },
-        _ => new[] { 0.38, 0, 1, 0, 1, 0.42, 0.3, 0.42 },
-    };
-}
-
-internal sealed class Stripe : Grid
+internal sealed class CarZone : Grid
 {
     public FrameworkElement? Car { get; init; }
-    public Slant[] Bands { get; init; } = Array.Empty<Slant>();
-
-    private const double ClearGap = 24, FadeLength = 140;
-
-    public void KeepClearOf(FrameworkElement text)
-    {
-        double shownFor = -1, widthFor = -1;
-        void Refresh()
-        {
-            double clear = text.Margin.Left + text.ActualWidth + ClearGap, width = ActualWidth;
-            if (width <= 0 || (clear == shownFor && width == widthFor)) return;
-            shownFor = clear;
-            widthFor = width;
-            double from = Math.Clamp(clear / width, 0, 1), to = Math.Clamp((clear + FadeLength) / width, from, 1);
-            var mask = new LinearGradientBrush(new GradientStopCollection { new(Colors.Transparent, from), new(Colors.Black, to) }, new Point(0, 0.5), new Point(1, 0.5));
-            mask.Freeze();
-            foreach (var band in Bands) band.OpacityMask = mask;
-        }
-        SizeChanged += (_, _) => Refresh();
-        text.SizeChanged += (_, _) => Refresh();
-    }
 }
 
 internal sealed record RaceCardData(SessionSummary Session, IReadOnlyList<(double Time, bool Clean)> Laps, double? Consistency, IReadOnlyList<Award> Awards, string Driver,
@@ -502,20 +454,10 @@ internal static class RaceParts
         return host;
     }
 
-    public const double StripeFade = 0.55;
-
-    public static Stripe CarOnStripe(string? car, string place, double height, double carHeight, double carWidth, double lift = 0.13, double carArea = 0)
+    public static CarZone CarSpot(string? car, double height, double carHeight, double carWidth, double carArea = 0)
     {
         var picture = CarPictures.Picture(car, carHeight, carWidth);
-        var band = new Slant(place + "Band", 0, 0.55 - lift, 1, 0.23 - lift, 1, 0.59 - lift, 0, 0.91 - lift);
-        var edge = new Slant(place, 0, 0.94 - lift, 1, 0.62 - lift, 1, 0.66 - lift, 0, 0.98 - lift) { Opacity = 0.75 };
-        var zone = new Stripe { Height = height, ClipToBounds = true, Car = picture, Bands = new[] { band, edge } };
-        if (carArea > 0)
-        {
-            band.OpacityMask = edge.OpacityMask = FadeIn;
-        }
-        zone.Children.Add(band);
-        zone.Children.Add(edge);
+        var zone = new CarZone { Height = height, ClipToBounds = true, Car = picture };
         if (picture is not null)
         {
             picture.HorizontalAlignment = carArea > 0 ? HorizontalAlignment.Right : HorizontalAlignment.Center;
@@ -524,15 +466,6 @@ internal static class RaceParts
             zone.Children.Add(picture);
         }
         return zone;
-    }
-
-    private static readonly Brush FadeIn = Frozen(new LinearGradientBrush(
-        new GradientStopCollection { new(Colors.Transparent, 0), new(Colors.Black, StripeFade) }, new Point(0, 0.5), new Point(1, 0.5)));
-
-    private static T Frozen<T>(T brush) where T : Freezable
-    {
-        brush.Freeze();
-        return brush;
     }
 
     public static FrameworkElement Position(int finish, string place, double size, string label, string? tier = null, string? sub = null)
@@ -591,8 +524,6 @@ internal static class RaceParts
         var stack = new StackPanel();
 
         var hero = new Grid { Height = 146 };
-        hero.Children.Add(new Slant(place + "Wash", 0, 0, 1, 0, 1, 0.55, 0, 1));
-        hero.Children.Add(new Slant(place + "Faint", 0, 0, 0.62, 0, 0.3, 1, 0, 1));
         var position = Position(finish, place, 112, label, s.HasTier ? s.Tier : null, s.ClassPlace);
         position.Margin = new Thickness(16, 22, 0, 0);
         position.HorizontalAlignment = HorizontalAlignment.Left;
@@ -608,7 +539,7 @@ internal static class RaceParts
         stack.Children.Add(hero);
 
         var car = new Grid { Margin = new Thickness(0, -16, 0, 0) };
-        var stripe = CarOnStripe(s.Car, place, 104, 96, 250, lift: 0);
+        var stripe = CarSpot(s.Car, 104, 96, 250);
         car.Children.Add(stripe);
         stack.Children.Add(car);
 
@@ -657,7 +588,8 @@ internal static class RaceParts
         if (d.Conditions is { } conditions && ConditionsBlock(s, conditions, d.Imperial) is { } block) stack.Children.Add(block);
         else stack.Children.Add(new Border { Height = d.Laps.Count > 1 ? 14 : 12 });
 
-        var card = Hairline.Frame(new Core.Controls.Tile { Child = stack, ClipToBounds = true }, edges);
+        var panels = new SoftPanels(PanelSpread.Race, place, 0.1);
+        var card = Hairline.Frame(new Core.Controls.Tile { Child = new Grid { Children = { panels, stack } }, ClipToBounds = true }, edges);
         card.SetResourceReference(Border.BackgroundProperty, "Surface");
         card.SetResourceReference(Border.BorderBrushProperty, "CardEdge");
         if (edges == Sides.All)
@@ -744,7 +676,7 @@ internal static class RaceParts
         if (sky.Length > 0)
         {
             var line = new DockPanel { Margin = new Thickness(0, 4, 0, 8) };
-            var glyph = Glyph(c.Skies == 0 ? "I.Sun" : "I.Cloud", 26, "AccentText");
+            var glyph = Glyph(c.Skies == 0 ? "I.Sun" : "I.Cloud", 26, "TextMuted");
             glyph.Margin = new Thickness(0, 0, 10, 0);
             line.Children.Add(glyph);
             var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center };

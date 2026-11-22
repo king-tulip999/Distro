@@ -25,7 +25,7 @@ internal sealed class RaceFinish
 {
     public const double HistoryGapSeconds = 60;
 
-    private string _key = "";
+    private (long? SubSession, int SessionNum, int? TrackId, string? CarPath) _key = (null, -1, null, null);
     private int? _lapsAtCheckered;
     private DateTime _startUtc;
 
@@ -49,7 +49,7 @@ internal sealed class RaceFinish
 
     public void Update(TelemetryFrame f, RaceState race, double now, DateTime utcNow)
     {
-        string key = $"{f.Session.SubSessionId}|{f.SessionNum}|{f.Session.TrackId}|{f.Session.Player?.CarPath}";
+        var key = (f.Session.SubSessionId, f.SessionNum, f.Session.TrackId, f.Session.Player?.CarPath);
         if (key != _key)
         {
             _key = key;
@@ -77,7 +77,7 @@ internal sealed class RaceFinish
         FinishedAt = now;
         if (!RaceHistory.Available) return;
         var card = Card;
-        string at = _key;
+        var at = _key;
         RaceHistory.LoadAsync().ContinueWith(t =>
         {
             if (_key == at && ReferenceEquals(Card, card)) Card = card with { Awards = AwardsFor(facts, t.Result) };

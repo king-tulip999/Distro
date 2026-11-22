@@ -936,13 +936,13 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         public IntPtr Handle => handle;
     }
 
-    private static string? PickColor(FrameworkElement near, string current)
+    internal static string? PickColor(FrameworkElement near, string current)
     {
         if (!External.Allowed("color dialog")) return null;
         var start = CustomPalette.Parse(current);
         using var dialog = new System.Windows.Forms.ColorDialog { FullOpen = true, AnyColor = true };
         if (start is { } c) dialog.Color = System.Drawing.Color.FromArgb(c.R, c.G, c.B);
-        var owner = Window.GetWindow(near) is { } window ? new System.Windows.Interop.WindowInteropHelper(window).Handle : IntPtr.Zero;
+        var owner = PresentationSource.FromVisual(near) is System.Windows.Interop.HwndSource source ? source.Handle : IntPtr.Zero;
         var result = owner == IntPtr.Zero ? dialog.ShowDialog() : dialog.ShowDialog(new DialogOwner(owner));
         if (result != System.Windows.Forms.DialogResult.OK) return null;
         var chosen = dialog.Color;

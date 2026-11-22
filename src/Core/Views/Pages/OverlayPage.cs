@@ -12,7 +12,7 @@ using Core.Theme;
 
 namespace Core.Views.Pages;
 
-internal sealed class OverlayPage : UserControl, IPage
+internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
 {
     private readonly AppServices _app;
     private readonly MainWindow _window;
@@ -519,6 +519,38 @@ internal sealed class OverlayPage : UserControl, IPage
         return general;
     }
 
+    public IEnumerable<(string Name, Func<Task> Enter)> ScreenshotStates()
+    {
+        var before = L.Accent;
+        yield return ("accent-custom", () =>
+        {
+            L.Accent = Palettes.ToHex(ThemeManager.Resolve(ThemeManager.Current)["Sage"]);
+            Changed();
+            BuildSettings();
+            return Task.CompletedTask;
+        });
+        yield return ("accent-back", () =>
+        {
+            L.Accent = before;
+            Changed();
+            BuildSettings();
+            return Task.CompletedTask;
+        });
+    }
+
+    private IEnumerable<FrameworkElement> AccentRows(Func<Func<bool>, Action, string, Ui.SettingDefault> D)
+    {
+        var pick = Ui.Segmented(["Same as the app", "Custom"], L.Accent is null ? 0 : 1, i =>
+        {
+            L.Accent = i == 0 ? null : L.Accent ?? Palettes.ToHex(ThemeManager.Resolve(ThemeManager.Current)["AccentText"]);
+            Changed();
+            BuildSettings();
+        }, "overlay-accent");
+        yield return Anchored(Ui.SettingRow("Accent", null, pick, D(() => L.Accent is null, () => L.Accent = null, "Same as the app")), "overlay.accent");
+        if (L.Accent is not null)
+            yield return Ui.SettingRow("Accent color", null, RaceHudSection.HexField(() => L.Accent ?? "", v => { L.Accent = v; Changed(); }));
+    }
+
     private void BuildLook()
     {
         var std = new OverlayLayout();
@@ -532,6 +564,7 @@ internal sealed class OverlayPage : UserControl, IPage
             D(() => L.FontScale == std.FontScale, () => L.FontScale = std.FontScale, std.FontScale + "%")), "overlay.font"));
         general.Add(Anchored(Ui.SettingRow("Background", null, Ui.SliderWithValue(0, 100, L.BackgroundOpacity, "{0:0}%", v => Fading(() => { L.BackgroundOpacity = (int)v; Changed(); }), 105, 5),
             D(() => L.BackgroundOpacity == std.BackgroundOpacity, () => L.BackgroundOpacity = std.BackgroundOpacity, std.BackgroundOpacity + "%")), "overlay.opacity"));
+        general.AddRange(AccentRows(D));
         general.Add(Anchored(Ui.SettingRow("Frame-time graph", null,
             Ui.Switch(L.ShowGraph, v => { L.ShowGraph = v; Changed(); RenderPreview(); }),
             D(() => L.ShowGraph == std.ShowGraph, () => L.ShowGraph = std.ShowGraph, std.ShowGraph ? "On" : "Off")), "overlay.graph"));

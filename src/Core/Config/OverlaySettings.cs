@@ -112,6 +112,8 @@ public sealed class OverlayLayout
 
     public OverlayColors Custom { get; set; } = new();
 
+    public string? Accent { get; set; }
+
     public bool Shows(OverlayMetric metric) => Metrics.Any(m => m.Metric == metric && m.Enabled);
 
     public static string GroupOf(OverlayMetric m) => m switch
@@ -173,6 +175,7 @@ public sealed class OverlayLayout
         Colors = OverlayColorPreset.App;
         ColorSet = null;
         Custom = new();
+        Accent = Core.Theme.CustomPalette.Parse(Accent) is { } accent ? Core.Theme.Palettes.ToHex(accent) : null;
     }
 
     public static OverlayColorPreset For(AppTheme theme) => OverlayColorPreset.For(theme);

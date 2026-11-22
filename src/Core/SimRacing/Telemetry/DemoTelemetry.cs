@@ -42,6 +42,9 @@ internal sealed class DemoTelemetry
         }
     }
 
+    private static readonly string[] ProtoPaths = { "porsche963gtp", "cadillacvseriesrgtp", "bmwlmdh", "acuraarx06gtp" };
+    private static readonly string[] GtPaths = { "bmwm4gt3", "ferrari296gt3", "porsche992rgt3", "mercedesamgevogt3", "fordmustanggt3", "mclaren720sgt3", "chevyvettez06rgt3" };
+
     private static SessionInfo BuildSession()
     {
         var drivers = new List<DriverEntry>();
@@ -58,7 +61,7 @@ internal sealed class DemoTelemetry
                 CarNumber = i == 0 ? "0" : (i * 7 % 97 + 2).ToString(),
                 CarName = i == 0 ? "Safety Car" : proto ? "Prototype LMDh" : lmp2 ? "Prototype LMP2" : i % 3 == 0 ? "GT3 Coupé" : i % 3 == 1 ? "GT3 Evo" : "GT3 R",
                 CarShortName = i == 0 ? "Safety" : proto ? "LMDh" : lmp2 ? "LMP2" : i % 3 == 0 ? "GT3 C" : i % 3 == 1 ? "GT3 E" : "GT3 R",
-                CarPath = proto ? "demoproto" : lmp2 ? "demolmp2" : "demogt3",
+                CarPath = proto ? ProtoPaths[i % ProtoPaths.Length] : lmp2 ? "dallarap217" : GtPaths[i % GtPaths.Length],
                 ClassId = i == 0 ? 11 : proto ? 4029 : lmp2 ? 2523 : 2708,
                 ClassName = i == 0 ? "" : proto ? "GTP" : lmp2 ? "LMP2" : "GT3",
                 ClassColor = i == 0 ? 0xffffff : proto ? 0xffda59 : lmp2 ? 0x53ff77 : 0x33ceff,

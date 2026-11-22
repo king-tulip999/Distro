@@ -356,9 +356,7 @@ internal sealed class GrrDashboardSection : StackPanel
         _freshness.ToolTip = tip;
     }
 
-    private static Tile Card(string? title, UIElement body, params FrameworkElement[] tools) => Card(title, body, null, 0, tools);
-
-    private static Tile Card(string? title, UIElement body, string? place, int shape, params FrameworkElement[] tools)
+    private static Tile Card(string? title, UIElement body, params FrameworkElement[] tools)
     {
         var stack = new DockPanel { LastChildFill = true };
         if (title is not null)
@@ -379,15 +377,8 @@ internal sealed class GrrDashboardSection : StackPanel
             stack.Children.Add(head);
         }
         stack.Children.Add(body);
-        if (place is null) return new Tile { Style = Ui.Res<Style>("Card"), Child = stack };
-        stack.Margin = new Thickness(CardPadding);
-        var backdrop = new Grid { ClipToBounds = true };
-        backdrop.Children.Add(new Backdrop(shape, place, place + "Wash") { Opacity = BackdropStrength });
-        backdrop.Children.Add(stack);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = backdrop, ClipToBounds = true };
+        return new Tile { Style = Ui.Res<Style>("Card"), Child = stack };
     }
-
-    private const double CardPadding = 15, BackdropStrength = 0.4;
 
     private static TextBlock Note(string text) => GrrParts.Wrapped(text);
 
@@ -472,7 +463,7 @@ internal sealed class GrrDashboardSection : StackPanel
             left.Children.Add(outline);
             _ = ShowOutlineAsync(outline, round.Track);
         }
-        return Card(null, Split(left, ScheduleList(data, now)), RaceLook.Key(null), 1);
+        return Card(null, Split(left, ScheduleList(data, now)));
     }
 
     private const double OutlineHeight = 96;
@@ -608,7 +599,7 @@ internal sealed class GrrDashboardSection : StackPanel
             stack.Children.Add(FormTiles(form));
             side = stack;
         }
-        return Card(null, Split(body, side), tier, 3);
+        return Card(null, Split(body, side));
     }
 
     private static UniformGrid Record(List<(string Label, string Value)> items)

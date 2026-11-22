@@ -147,6 +147,7 @@ public static class ConfigStore
         }
         UiSettings.DropPastelTheme(config.Ui);
         config.Ui.OledCustom.Normalize();
+        config.Ui.Accent = Core.Theme.GlowAccent.Stored(config.Ui.Accent);
         foreach (var themeSet in Theme.ThemeSets.All)
             themeSet.Set(config.Ui, themeSet.Known(themeSet.Get(config.Ui)));
         config.Overlay.ColorsVersion = 1;

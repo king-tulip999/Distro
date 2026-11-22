@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using Core.Config;
@@ -25,7 +26,11 @@ internal static class SimHubEngine
 
     public static HudHost? Hud => _hud;
 
-    public static ReleaseInfo? UpdateReady => _updater?.Ready;
+    public static SimHubUpdater? Updater => _updater;
+
+    public const string EmbedFile = "embed.txt";
+
+    private static string EmbedEventName => $@"Local\{AppIdentity.DataName}.Embed";
 
     public static void Run(App app, string[] args)
     {
@@ -85,6 +90,7 @@ internal static class SimHubEngine
         }
 
         SingleInstance.Listen(() => app.Dispatcher.BeginInvoke(new Action(ShowSettings)));
+        ListenForEmbed(app);
         SingleInstance.ListenForQuit(() => app.Dispatcher.BeginInvoke(new Action(App.Quit)));
         if (int.TryParse(Arg(args, ParentArg), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parent)) WatchParent(app, parent);
         if (args.Contains(SettingsArg, StringComparer.OrdinalIgnoreCase)) ShowSettings();
@@ -106,7 +112,35 @@ internal static class SimHubEngine
     private static void ShowSettings()
     {
         if (_services is null || _hud is null) return;
-        SimHubWindow.Open(_services, _hud);
+        SimHubWindow.Open(_services);
+    }
+
+    private static void ListenForEmbed(App app)
+    {
+        var embed = new EventWaitHandle(false, EventResetMode.AutoReset, EmbedEventName);
+        var thread = new Thread(() =>
+        {
+            while (embed.WaitOne())
+            {
+                if (ReadEmbedParent() is { } parent)
+                    app.Dispatcher.BeginInvoke(new Action(() => { if (_services is { } services) SimHubEmbed.Attach(services, parent); }));
+            }
+        })
+        { IsBackground = true, Name = "SimHub embed" };
+        thread.Start();
+    }
+
+    private static IntPtr? ReadEmbedParent()
+    {
+        try
+        {
+            string text = File.ReadAllText(Path.Combine(ConfigStore.Folder, EmbedFile)).Trim();
+            return long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out long handle) && handle != 0 ? new IntPtr(handle) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private static void WatchParent(App app, int pid)
@@ -133,6 +167,7 @@ internal static class SimHubEngine
 
     public static void Stop()
     {
+        SimHubEmbed.Detach();
         _updater?.Stop();
         _updater = null;
         if (_services is not { } services) return;

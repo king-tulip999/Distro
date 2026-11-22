@@ -77,7 +77,7 @@ internal sealed class HudHost : IDisposable
     {
         _app = app;
         Race = new RaceState(() => Settings, app.PitLoss, app.LapProfiles) { MapLoader = TrackMaps.TrackMapLibrary.ForRace };
-        _webRenderer = AppIdentity.SimHub ? new HudWebRenderer { OnlyLayout = true, SampleWhenIdle = true, Shows = WebShows } : new HudWebRenderer();
+        _webRenderer = AppIdentity.SimHub ? new HudWebRenderer { OnlyLayout = true, SampleWhenIdle = true, Shows = WebShows, SizeOf = SizeOf } : new HudWebRenderer { SizeOf = SizeOf };
         _vr = new HudVr(app);
         _vr.Changed += OnVrChanged;
         _timer.Tick += (_, _) => SafeTick();

@@ -70,6 +70,19 @@ internal sealed class TopographyBackdrop : Grid
 
     public static Color Line => ThemeManager.ColorOf(LineKey, Colors.Gray);
 
+    private ResourceDictionary? _theme;
+
+    public void UseTheme(ResourceDictionary? theme)
+    {
+        if (ReferenceEquals(theme, _theme)) return;
+        _theme = theme;
+        if (theme?["WindowBg"] is Brush ground) Background = ground;
+        else SetResourceReference(BackgroundProperty, "WindowBg");
+        if (IsLoaded) Apply();
+    }
+
+    private Color Own(string key, Color fallback) => _theme?[key] is SolidColorBrush brush ? brush.Color : fallback;
+
     private int WantedWidth()
     {
         if (Window.GetWindow(this) is not { ActualWidth: > 0 } window || PresentationSource.FromVisual(this)?.CompositionTarget is not { } target)
@@ -90,8 +103,8 @@ internal sealed class TopographyBackdrop : Grid
 
     private void Apply()
     {
-        var bg = Bg;
-        var line = Line;
+        var bg = Own("Bg", Bg);
+        var line = Own(LineKey, Line);
         double alpha = BackdropLook.LineAlpha(line, bg);
         _image.Source = Picture(_width > 0 ? _width : BackdropLook.MaxDecodeWidth, line, alpha);
     }

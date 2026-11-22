@@ -13,7 +13,7 @@ internal static class HudFlags
     private static readonly Color Stripe = Color.FromArgb(0xFF, 0xE0, 0x00), Meatball = Color.FromArgb(0xF7, 0x8A, 0x1D),
         Frame = Color.FromArgb(235, 0x0A, 0x0A, 0x0C);
 
-    private const float TileRatio = 1.5f;
+    public const float TileRatio = 1.5f;
 
     [ThreadStatic] private static PointF[]? _quad;
 

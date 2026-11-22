@@ -121,6 +121,7 @@ internal static class SettingRows
                 return Row(label, o.Help, true, box);
             case HudOptionKind.Choice:
                 int index = Math.Max(0, o.Choices.ToList().FindIndex(ch => ch.Id == current));
+                if (s.Sample is { } sample) return SampleTiles(label, o, index, sample, i => c.SetOne(s.Key, o.Choices[i].Id), "tile" + c.W.Id + s.Key);
                 if (!s.Dropdown && o.Choices.Count <= 3 && o.Choices.All(ch => ch.Label.Length < 22)
                     && c.Pictures?.Invoke(s.Id, o.Choices.Select(ch => (IReadOnlyDictionary<string, string>)new Dictionary<string, string> { [s.Key] = ch.Id }).ToList()) is { Count: > 0 } pictures && pictures.Count == o.Choices.Count)
                     return PictureRow(label, o.Help, PictureChoice(o.Choices.Select(ch => ch.Label).ToList(), o.Choices.Select(ch => ch.Help).ToList(), pictures, index, i => c.SetOne(s.Key, o.Choices[i].Id), "pic" + c.W.Id + s.Key));
@@ -133,6 +134,23 @@ internal static class SettingRows
             default:
                 return Row(label, o.Help, s.InlineHelp, new TextBlock { Text = current });
         }
+    }
+
+    private static FrameworkElement SampleTiles(string label, HudOption o, int selected, Func<string, string> sample, Action<int> pick, string group)
+    {
+        string name = group + "-" + Guid.NewGuid().ToString("N");
+        var tiles = new System.Windows.Controls.Primitives.UniformGrid { Columns = Math.Min(4, o.Choices.Count), Margin = new Thickness(-3, 4, -3, 2) };
+        for (int i = 0; i < o.Choices.Count; i++)
+        {
+            int index = i;
+            var text = TextFit.TipWhenTrimmed(new TextBlock { Text = sample(o.Choices[i].Id), TextTrimming = TextTrimming.CharacterEllipsis });
+            var tile = new RadioButton { Content = text, Style = Ui.Res<Style>("Segment"), GroupName = name, IsChecked = i == selected, Height = 40, Margin = new Thickness(3), Padding = new Thickness(10, 0, 10, 0), ToolTip = o.Choices[i].Label };
+            System.Windows.Automation.AutomationProperties.SetName(tile, o.Choices[i].Label);
+            tile.Checked += (_, _) => pick(index);
+            tiles.Children.Add(tile);
+        }
+        var title = new TextBlock { Text = label, Style = Ui.Res<Style>("Body"), Margin = new Thickness(0, 4, 0, 0) };
+        return new StackPanel { Margin = new Thickness(0, 2, 0, 4), Children = { title, tiles } };
     }
 
     private static Grid PictureRow(string label, string? help, FrameworkElement control)

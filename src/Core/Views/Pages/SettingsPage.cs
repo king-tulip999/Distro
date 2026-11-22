@@ -338,6 +338,11 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             look.Children.Add(ThemePreview.Beside(new StackPanel { Children = { picker, custom } }, Themes.For(U.Theme).Label));
             look.Children.Add(Ui.Divider());
         }
+        else
+        {
+            look.Children.Add(new CustomThemeSection(_app));
+            look.Children.Add(Ui.Divider());
+        }
 
         string animationNote = SystemParameters.ClientAreaAnimation
             ? $"Page transitions, card entrances, spinning fan icons. Nothing animates while {AppIdentity.Name} is in the tray." + (PcClass.Weak ? " This PC gets a lighter version: 30 frames a second, no blur." : "")
@@ -897,6 +902,23 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         yield return ("pawnio-prompt-closed", () =>
         {
             _window.CloseModal(false);
+            return Task.CompletedTask;
+        });
+        yield return ("accent-mint", () =>
+        {
+            _app.UseAccent(GlowAccent.Swatches.First(s => s.Name == "Mint").Hex);
+            _window.GoTo("settings", "settings.accent", flash: false);
+            return Task.CompletedTask;
+        });
+        yield return ("accent-mint-main-page", () =>
+        {
+            _window.Navigate(_window.FirstPage);
+            return Task.CompletedTask;
+        });
+        yield return ("accent-back", () =>
+        {
+            _app.UseAccent(null);
+            _window.Navigate("settings");
             return Task.CompletedTask;
         });
         if (AppIdentity.IsTecnica) yield break;

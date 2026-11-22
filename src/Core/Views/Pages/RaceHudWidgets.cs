@@ -88,7 +88,6 @@ internal sealed partial class RaceHudWidgets
     {
         if (Layout?.Name == _filledFor) return;
         _selected = null;
-        _openPanel = null;
         Host?.Pick(null);
         Fill();
     }
@@ -103,7 +102,6 @@ internal sealed partial class RaceHudWidgets
     {
         if (id == _selected) return;
         _selected = id;
-        _openPanel = null;
         Fill();
         _list.Dispatcher.BeginInvoke(ScrollToPicked, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
@@ -123,14 +121,14 @@ internal sealed partial class RaceHudWidgets
     private void Open(string kind, PanelTarget target)
     {
         _selected = Layout?.Widgets.FirstOrDefault(w => w.Kind == kind)?.Id ?? _selected;
-        _openPanel = target;
+        _tab = target.SettingId is null ? null : _tab;
+        _pendingTarget = target;
         Fill();
     }
 
     public void Select(string kind)
     {
         _selected = Layout?.Widgets.FirstOrDefault(w => w.Kind == kind)?.Id ?? _selected;
-        _openPanel = null;
         Fill();
         _list.Dispatcher.BeginInvoke(ScrollToPicked, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
@@ -141,7 +139,7 @@ internal sealed partial class RaceHudWidgets
         w.Vr = HudVrPlacement.Cockpit;
         if (w.VrWidth <= 0) PlaceInVr(w);
         _selected = w.Id;
-        _openPanel = null;
+        _tab = PlacementTab;
         Fill();
         _list.Dispatcher.BeginInvoke(() => { if (PageOf(_pickedCard) is { } page) page.ScrollToEnd(); }, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
@@ -201,9 +199,9 @@ internal sealed partial class RaceHudWidgets
         _preview = null;
         _previewWell = null;
         _well = null;
-        _panelLayer = null;
-        _panel = null;
-        _panelScroll = null;
+        _tabBody = null;
+        _tabStrip = null;
+        _settings = null;
         _pin = (null, null);
         _laidSize = default;
         _previewHidden = null;
@@ -227,13 +225,7 @@ internal sealed partial class RaceHudWidgets
         {
             var def = HudCatalog.Find(picked.Kind);
             if (def is null) body.Children.Add(TitleCard(NameOf(picked), "This widget was made by a newer version of Velocita. It's kept, but not drawn.", null));
-            if (def is not null)
-            {
-                body.Children.Add(PreviewArea(picked, def));
-                var (cards, _, _) = WidgetPanels(picked, def);
-                cards.Margin = new Thickness(0, Ui.PanelSpacing, 0, 0);
-                body.Children.Add(cards);
-            }
+            if (def is not null) body.Children.Add(Editor(picked, def));
         }
         _list.Content = body;
         RiseIn(body);
@@ -242,24 +234,31 @@ internal sealed partial class RaceHudWidgets
             if (_previewWell is { ActualWidth: > 40 }) DrawPreview(shown2);
             ShowPreviewHidden(shown2);
         }
-        if (_openPanel is { } reopen && _well is not null)
-            _list.Dispatcher.BeginInvoke(() => { if (_openPanel == reopen) OpenPanel(reopen); }, System.Windows.Threading.DispatcherPriority.Loaded);
-        else _openPanel = null;
+        if (_pendingTarget is { } target && _tabBody is not null)
+            _list.Dispatcher.BeginInvoke(() => OpenPanel(target), System.Windows.Threading.DispatcherPriority.Loaded);
+        _pendingTarget = null;
     }
+
+    private PanelTarget? _pendingTarget;
+
+    private const string LookTab = "Look", WhenTab = "When shown", PlacementTab = "Placement";
 
     private const double ComboWidth = 194;
 
-    private const double PanelMinWidth = 330;
-
-    private (FrameworkElement Body, MasonryPanel Grid, FrameworkElement[] Side) WidgetPanels(HudWidgetConfig w, HudWidgetDef def)
+    private List<(string Tab, string Title, Func<List<FrameworkElement>> Rows)> CommonGroups(HudWidgetConfig w, HudWidgetDef def)
     {
-        static Tile Card(string title, IEnumerable<FrameworkElement> rows)
-        {
-            var box = new SettingGroup(title, true, null, foldable: false);
-            foreach (var r in rows) box.Add(r);
-            return new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(10, 2, 12, 6), Child = box };
-        }
+        var groups = new List<(string Tab, string Title, Func<List<FrameworkElement>> Rows)>();
+        groups.Add((LookTab, "Panel and redraw", () => LookRows(w, def)));
+        groups.Add((WhenTab, "When shown", () => WhenRows(w, def)));
+        if (AppIdentity.SimHub) return groups;
+        groups.Add((PlacementTab, "Placement", () => PlaceRows(w)));
+        groups.Add((PlacementTab, "Browser source", () => BrowserSourceRows(w)));
+        groups.Add((PlacementTab, "VR", () => VrRows(w)));
+        return groups;
+    }
 
+    private List<FrameworkElement> WhenRows(HudWidgetConfig w, HudWidgetDef def)
+    {
         var when = new List<FrameworkElement>();
         if (def.HideWhenEmpty is { } hideByDefault)
             when.Add(SettingRows.Row("Only when needed", def.Kind == "alerts" ? "Hidden until an alert comes up." : "Hidden until a car of another class is near.", true,
@@ -276,7 +275,11 @@ internal sealed partial class RaceHudWidgets
             });
         when.Add(SettingRows.Row("Only in", "None ticked = every session.", true, sessions));
         if (Layout is { } owner && !AppIdentity.SimHub) when.Add(SettingRows.Row("Keybind", null, true, KeybindBox(owner, w)));
+        return when;
+    }
 
+    private List<FrameworkElement> LookRows(HudWidgetConfig w, HudWidgetDef def)
+    {
         var look = new List<FrameworkElement>();
         foreach (var colorRow in RaceHudSection.LookRows(S.Appearance, () => { Changed(); if (_preview is not null) DrawPreview(w); }, () => _list.Dispatcher.BeginInvoke(Fill, System.Windows.Threading.DispatcherPriority.Background), (t, d, c, _) => SettingRows.Row(t, d, true, c)))
             look.Add((FrameworkElement)colorRow);
@@ -295,7 +298,11 @@ internal sealed partial class RaceHudWidgets
         look.Add(backgroundRow);
         var rates = new[] { 0, 1, 2, 5, 10, 15, 20, 30, 60 }.Select(r => new Choice(r.ToString(), r == 0 ? def.MovingHz > 0 ? $"Default ({def.DefaultHz} per second, {def.MovingHz} while it moves)" : $"Default ({def.DefaultHz} per second)" : $"{r} per second"));
         look.Add(SettingRows.Row("Redraw", null, true, Ui.Combo(rates, w.UpdateHz.ToString(), c => { w.UpdateHz = int.Parse(c.Id!); Changed(); }, ComboWidth)));
+        return look;
+    }
 
+    private List<FrameworkElement> PlaceRows(HudWidgetConfig w)
+    {
         var place = new List<FrameworkElement>();
         var monitors = HudHost.MonitorChoices().Select(m => new Choice(m.Id, m.Label)).ToList();
         place.Add(SettingRows.Row("Monitor", null, true, Ui.Combo(monitors, w.Monitor, c => { w.Monitor = c.Id!; Changed(); }, ComboWidth)));
@@ -326,27 +333,7 @@ internal sealed partial class RaceHudWidgets
         home.HorizontalAlignment = HorizontalAlignment.Left;
         home.Margin = new Thickness(0, 4, 0, 4);
         place.Add(home);
-
-        var web = Card("Browser source", BrowserSourceRows(w));
-        Ui.Anchor(web, RaceHudSection.WebAnchor);
-        var vr = Card("VR", VrRows(w));
-        Ui.Anchor(vr, RaceHudSection.VrAnchor);
-
-        var panels = new MasonryPanel { MinColumnWidth = PanelMinWidth, MaxColumns = 4, Gap = 14, EvenBottoms = true };
-        panels.Children.Add(Card("When shown", when));
-        var lookCard = Card("Panel and redraw", look);
-        if (AppIdentity.SimHub)
-        {
-            panels.MaxColumns = 2;
-            panels.Children.Add(lookCard);
-            return (new StackPanel { Children = { panels, ActionsRow(w) } }, panels, new FrameworkElement[] { lookCard });
-        }
-        var placeCard = Card("Placement", place);
-        panels.Children.Add(web);
-        panels.Children.Add(lookCard);
-        panels.Children.Add(placeCard);
-        panels.Children.Add(vr);
-        return (new StackPanel { Children = { panels, ActionsRow(w) } }, panels, new FrameworkElement[] { lookCard, placeCard, web });
+        return place;
     }
 
     private void PlaceInVr(HudWidgetConfig w)
@@ -473,7 +460,7 @@ internal sealed partial class RaceHudWidgets
 
     private FrameworkElement ActionsRow(HudWidgetConfig w)
     {
-        var actions = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var dup = Ui.LabeledButton("I.Copy", "Duplicate", () =>
         {
             var copy = w.Copy();
@@ -502,6 +489,7 @@ internal sealed partial class RaceHudWidgets
         reset.ToolTip = "Puts this widget's display options back as they were when it was added (place and size stay)";
         reset.Margin = Ui.AfterButton;
         actions.Children.Add(reset);
+        actions.Children.Add(RemoveButton(w));
         return actions;
     }
 
@@ -544,9 +532,9 @@ internal sealed partial class RaceHudWidgets
         grid.Children.Add(row);
         if (picked is not null)
         {
-            var remove = RemoveButton(picked);
-            Grid.SetColumn(remove, 1);
-            grid.Children.Add(remove);
+            var actions = ActionsRow(picked);
+            Grid.SetColumn(actions, 1);
+            grid.Children.Add(actions);
         }
         return grid;
     }
@@ -584,7 +572,6 @@ internal sealed partial class RaceHudWidgets
             {
                 if (widget.Id == _selected) return;
                 _selected = widget.Id;
-                _openPanel = null;
                 Host?.Pick(widget.Id);
                 Fill();
             };
@@ -669,7 +656,6 @@ internal sealed partial class RaceHudWidgets
         }
         if (_preview is not null) DrawPreview(w);
         RefreshVisibility();
-        _well?.Dispatcher.BeginInvoke(PlacePanel, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private static string SessionLabel(string kind) => kind switch { "Qualify" => "Qualifying", "TimeTrial" => "Time trial", _ => kind };
@@ -704,7 +690,8 @@ internal sealed partial class RaceHudWidgets
         {
             double room = _well is { ActualWidth: > 40 } well ? well.ActualWidth - WellPad * 2 : 560;
             var laid = host.SizeOf(w, race);
-            float scale = (float)Math.Clamp(room / Math.Max(1, laid.Width), MinPreviewScale, 1);
+            double tall = _pageScroll is { ViewportHeight: > 200 } page ? page.ViewportHeight - WellPad * 2 - 80 : double.PositiveInfinity;
+            float scale = (float)Math.Clamp(Math.Min(room / Math.Max(1, laid.Width), tall / Math.Max(1, laid.Height)), MinPreviewScale, 1);
             AlignPreview();
             double k = _previewPixels;
             host.RenderPreview(w, race, _painter, (float)(scale * k), ref _previewBitmap);
@@ -720,8 +707,7 @@ internal sealed partial class RaceHudWidgets
             _preview.Opacity = w.Opacity / 100.0;
             _preview.Width = bitmap.Width / k;
             _preview.Height = bitmap.Height / k;
-            string size = Math.Abs(scale - 1) < 0.01 ? "actual size" : $"{scale * 100:0}% of its size";
-            string note = (race.Frame.Simulated ? "Sample data (no live session)" : "Live from iRacing") + $" · {size}";
+            string note = (race.Frame.Simulated ? "Sample data" : "Live from iRacing") + $" · {laid.Width:0} × {laid.Height:0} · {scale * 100:0}%";
             if (!TextCase.Plain(_previewNote!.Text).Equals(note, StringComparison.OrdinalIgnoreCase)) _previewNote.Text = note;
             DrawHighlight();
             float drawnWidth = (float)Math.Max(laid.Width, _preview.Width / scale), drawnHeight = (float)Math.Max(laid.Height, _preview.Height / scale);
@@ -730,8 +716,8 @@ internal sealed partial class RaceHudWidgets
                 _laidSize = (drawnWidth, drawnHeight, scale);
                 _laidWidth = drawnWidth;
                 _laidHeight = drawnHeight;
-                if (_openPanel is null && _well is not null) _well.Height = WellHeight();
-                else PlacePanel();
+                if (_well is not null) _well.MinHeight = WellHeight();
+                FollowScroll();
             }
         }
         catch (Exception ex)

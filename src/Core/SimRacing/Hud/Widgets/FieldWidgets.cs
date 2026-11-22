@@ -33,6 +33,26 @@ internal readonly record struct RowStyle(bool PositionBlock = true)
     }
 }
 
+internal sealed class ClassRuns
+{
+    private readonly List<(int Class, Color Color, RectangleF Box)> _rows = new();
+
+    public void Add(int classId, Color color, RectangleF box) => _rows.Add((classId, color, box));
+
+    public void Outline(HudPainter p)
+    {
+        int start = 0;
+        for (int i = 1; i <= _rows.Count; i++)
+        {
+            if (i < _rows.Count && _rows[i].Class == _rows[start].Class) continue;
+            var first = _rows[start].Box;
+            HudTable.ClassOutline(p, RectangleF.FromLTRB(first.X, first.Y, first.Right, _rows[i - 1].Box.Bottom), _rows[start].Color);
+            start = i;
+        }
+        _rows.Clear();
+    }
+}
+
 internal static class HudTable
 {
     public const float Gap = 6, ClassEdge = 3;
@@ -68,7 +88,7 @@ internal static class HudTable
             var c = columns[i];
             natural[i] = c.Flex
                 ? (c.Template.Length > 0 ? p.Measure(c.Template, font) : 0) + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0)
-                : Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)) + 2 + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0);
+                : Math.Max(Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)), p.NextCellWidth(c.Id)) + 2 + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0);
             natural[i] += Lead(i > 0 ? columns[i - 1] : null, c);
             flex[i] = c.Flex;
             position[i] = IsPosition(c);
@@ -92,7 +112,7 @@ internal static class HudTable
             var c = columns[i];
             sum += c.Flex
                 ? Math.Max(60, (c.Template.Length > 0 ? p.Measure(c.Template, font) : 0) + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0))
-                : Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)) + 2 + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0);
+                : Math.Max(Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)), p.CellWidth(c.Id)) + 2 + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0);
             if (i > 0) sum += Gap + Lead(columns[i - 1], c);
         }
         return MathF.Ceiling(sum);
@@ -139,6 +159,15 @@ internal static class HudTable
 
     private static Font Bold(HudPainter p, Font font) => p.BoldOf(font);
 
+    public static void ClassFill(HudPainter p, RectangleF row, Color classColor, bool dim) =>
+        p.Fill(row, p.Solid(HudPalette.Mix(p.P.Surface, classColor, dim ? 0.16 : 0.25), 235));
+
+    public static void ClassOutline(HudPainter p, RectangleF box, Color classColor, float radius = 0)
+    {
+        float w = Math.Max(2, 2.5f * p.Density), apart = Math.Max(1, p.Density);
+        p.Outline(RectangleF.FromLTRB(box.X + w / 2, box.Y + w / 2 + apart, box.Right - w / 2, box.Bottom - w / 2 - apart), classColor, w, radius);
+    }
+
     public static void Header(HudPainter p, List<(Column Col, float Width)> cols, RectangleF row)
     {
         float x = row.X;
@@ -161,12 +190,12 @@ internal static class HudTable
         }
     }
 
-    public static void Row(HudPainter p, List<(Column Col, float Width)> cols, RectangleF row, int car, Color classColor, int emphasis, bool dim, Font font, Color? tint = null, bool alternate = false, RowStyle style = default)
+    public static void Row(HudPainter p, List<(Column Col, float Width)> cols, RectangleF row, int car, Color classColor, int emphasis, bool dim, Font font, Color? tint = null, bool alternate = false, RowStyle style = default, bool lifted = false)
     {
         var pal = p.P;
         if (emphasis == 1)
         {
-            p.Fill(row, p.Solid(HudPalette.Mix(pal.Surface, pal.RowTint, 0.26), 185));
+            p.Fill(row, p.Solid(HudPalette.Mix(pal.Surface, pal.RowTint, 0.3), 240));
             if (pal.HighlightEdge is { } edge) p.Outline(row, edge);
         }
         else if (alternate) p.Fill(row, HudPalette.Alpha(pal.Heading, 7));
@@ -175,6 +204,7 @@ internal static class HudTable
         Color Shade(Color c)
         {
             if (over is { } o && (c == pal.Heading || c == pal.Text || c == pal.Muted)) c = o;
+            else if (lifted) c = c == pal.Text ? pal.Heading : c == pal.Muted ? pal.Text : c == pal.Faint || c == pal.Slate ? pal.Muted : c;
             return dim ? HudPalette.Alpha(c, 150) : c;
         }
         var bold = Bold(p, font);
@@ -188,6 +218,7 @@ internal static class HudTable
             var cell = pc.Value(car);
             Color? bg = cell.Pill ?? (emphasis == 1 && style.PositionBlock ? pal.Player : null);
             if (bg is { } b) p.Fill(block, dim ? HudPalette.Alpha(b, 150) : b);
+            p.SeeCell(pc.Id, p.Measure(cell.Text, bold));
             p.Text(cell.Text, bold, bg is { } on ? HudPalette.On(on) : Shade(pal.Heading), block, HAlign.Center, VAlign.Center, false);
             if (tagRoom > 0) ProTag(p, pc, car, new RectangleF(block.Right + 6, row.Y, tagRoom - 6, row.Height), dim);
             x = block.Right + tagRoom;
@@ -205,7 +236,9 @@ internal static class HudTable
             if (!col.Flex) box = ProTag(p, col, car, box, dim);
             if (cell.Pill is { } pill && cell.Text.Length > 0)
             {
-                float pw = Math.Min(box.Width, p.Measure(cell.Text, p.SmallBold) + 8);
+                float pillWidth = p.Measure(cell.Text, p.SmallBold) + 8;
+                p.SeeCell(col.Id, pillWidth);
+                float pw = Math.Min(box.Width, pillWidth);
                 float px = col.Align == HAlign.Right ? box.Right - pw : col.Align == HAlign.Center ? box.X + (box.Width - pw) / 2 : box.X;
                 p.Pill(new RectangleF(px, row.Y + row.Height * 0.16f, pw, row.Height * 0.68f), cell.Text, dim ? HudPalette.Alpha(pill, 150) : pill, p.SmallBold);
                 x += w + Gap;
@@ -221,19 +254,14 @@ internal static class HudTable
             {
                 _marks.Clear();
                 marks(car, _marks);
-                FlagKind flag = FlagKind.None;
                 bool fastest = false;
                 Color fastFill = default, fastFore = default;
-                foreach (var (text, tagFill, fore, kind) in _marks)
-                {
+                foreach (var (text, tagFill, fore, _) in _marks)
                     if (text == FastestMark) { fastest = true; fastFill = tagFill; fastFore = fore; }
-                    else if (kind != FlagKind.None && flag == FlagKind.None) flag = kind;
-                }
                 float side = row.Height - 2;
-                var outside = new RectangleF(p.Bounds.Right + 3, row.Y + 1, side, side);
-                if (flag != FlagKind.None) HudFlags.Draw(p, outside, flag);
-                else if (fastest)
+                if (fastest)
                 {
+                    var outside = new RectangleF(p.Bounds.Right + 3, row.Y + 1, side, side);
                     p.Fill(outside, dim ? HudPalette.Alpha(fastFill, 150) : fastFill, 2);
                     Stopwatch(p, outside, fastFore);
                 }
@@ -253,6 +281,7 @@ internal static class HudTable
             }
             var cellFont = cell.Bold ? bold : font;
             string shown = cell.Text;
+            if (!col.Flex) p.SeeCell(col.Id, p.Measure(shown, cellFont));
             if (col.Shorter is { } shorter && p.Measure(shown, cellFont) > box.Width && shorter(car) is { Length: > 0 } brief) shown = brief;
             p.Text(shown, cellFont, Shade(cell.Color), box, col.Align, VAlign.Center);
             x += w + Gap;
@@ -373,6 +402,8 @@ internal static class FieldColumns
     public static readonly HudChoice Number = new("num", "Car number");
     public static readonly HudChoice Name = new("name", "Driver");
     public static readonly HudChoice Team = new("team", "Team");
+    public static readonly HudChoice Logo = new("logo", "Car logo", "The maker of each car");
+    public static readonly HudChoice Flag = new("flag", "Flags", "A driver's black, repair (meatball), disqualified or blue flag");
     public static readonly HudChoice IRatingChange = new("irchange", "iRating gain / loss (est.)", "Races: what each driver would gain or lose if it finished in this order (an estimate of iRacing's rating)");
     public static readonly HudChoice Last = new("last", "Last lap");
     public static readonly HudChoice Best = new("best", "Best lap");
@@ -426,21 +457,20 @@ internal static class FieldColumns
         return (uint)car < (uint)memo.Positions.Length ? memo.Positions[car] : 0;
     }
 
+    public static readonly HudOption ClassRowsOption = HudOption.Bool("classRows", "Class-colored rows", false, "Multiclass: every row tinted in its class color");
+
+    public static readonly HudOption ClassBorderOption = HudOption.Bool("classBorder", "Class outlines", false, "Multiclass: an outline in the class color around each class");
+
     public static readonly HudOption[] Shared =
     {
         NameFormat, NoDigits, ProAmOption, TimeFormat, Decimals, BadgeFormat, PitShow, PitTime, AvgLaps,
-        PositionBlock, FlagEdgeOption, FlagWidth,
+        PositionBlock, FlagEdgeOption, FlagWidth, ClassRowsOption, ClassBorderOption,
     };
 
     private static void Marks(HudPalette pal, TelemetryFrame f, int car, List<(string, Color, Color, FlagKind)> list)
     {
         int? cls = f.Session.NumCarClasses > 1 && f.Session.ByCar.TryGetValue(car, out var d) ? d.ClassId : null;
         if (f.CarBestLap[car] > 0 && Fastest(f, cls) is { } fl && fl.Car == car) list.Add((HudTable.FastestMark, pal.Fastest, Color.White, FlagKind.None));
-        var flags = f.CarFlags[car];
-        if ((flags & RaceFlags.Disqualify) != 0) list.Add(("", default, default, FlagKind.Disqualified));
-        else if ((flags & RaceFlags.Black) != 0) list.Add(("", default, default, FlagKind.Black));
-        if ((flags & RaceFlags.Repair) != 0) list.Add(("", default, default, FlagKind.Meatball));
-        if ((flags & RaceFlags.Blue) != 0) list.Add(("", default, default, FlagKind.Blue));
     }
 
     private sealed class FastestMemo
@@ -473,8 +503,18 @@ internal static class FieldColumns
         return known;
     }
 
-    public static readonly HudOption MarksOption = HudOption.Bool("marks", "Fastest lap and flag marks", true,
-        "Beside the row: a stopwatch on the session's fastest lap (per class in multiclass), or the flag when a driver has a black, repair (meatball), disqualified or blue flag");
+    public static readonly HudOption MarksOption = HudOption.Bool("marks", "Fastest lap mark", true,
+        "Beside the row: a stopwatch on the session's fastest lap (per class in multiclass)");
+
+    public static FlagKind DriverFlag(TelemetryFrame f, int car)
+    {
+        var flags = f.CarFlags[car];
+        return (flags & RaceFlags.Disqualify) != 0 ? FlagKind.Disqualified
+            : (flags & RaceFlags.Black) != 0 ? FlagKind.Black
+            : (flags & RaceFlags.Repair) != 0 ? FlagKind.Meatball
+            : (flags & RaceFlags.Blue) != 0 ? FlagKind.Blue
+            : FlagKind.None;
+    }
 
     public static Column? Make(string id, HudPainter p, HudView v, Func<int, Cell> gap, string gapHeader)
     {
@@ -526,9 +566,27 @@ internal static class FieldColumns
                 {
                     Marks = v.Def.Option("marks") is not null && v.Options.Bool("marks") ? (car, list) => Marks(pal, f, car, list) : null,
                     ProTag = proAm && !tagBesideClassPos ? proTag : null,
-                    Robot = car => D(car) is { IsAi: true },
+                    Robot = f.Simulated ? null : car => D(car) is { IsAi: true },
                     Shorter = nameFormat != "full" ? null
                         : car => D(car) is { Name.Length: > 0 } d ? RaceFormat.Name(d.Name, "first", noDigits) : null,
+                };
+            case "flag":
+                return new Column(id, "", "MM", HAlign.Center, _ => new Cell("", pal.Faint))
+                {
+                    Draw = (painter, car, box, dim) =>
+                    {
+                        if (DriverFlag(f, car) is var kind && kind != FlagKind.None)
+                            HudFlags.Draw(painter, RectangleF.Inflate(box, 0, -3), kind);
+                    },
+                };
+            case "logo":
+                return new Column(id, "", "MMM", HAlign.Center, _ => new Cell("", pal.Faint))
+                {
+                    Draw = (painter, car, box, dim) =>
+                    {
+                        if (D(car) is { } d && HudArt.Logo(CarBrands.Of(d.CarPath, d.CarName)) is { } logo)
+                            painter.Picture(logo, RectangleF.Inflate(box, -1, -box.Height * 0.16f), dim);
+                    },
                 };
             case "team": return new Column(id, "TEAM", "Team Name Here", HAlign.Left, car => D(car) is { TeamName.Length: > 0 } d ? new Cell(d.TeamName, pal.Muted) : None);
             case "badge":
@@ -642,15 +700,16 @@ internal static class FieldColumns
 internal sealed class RelativeWidget : HudWidget
 {
     private readonly List<(int Car, RectangleF Row)> _hits = new();
+    private readonly ClassRuns _runs = new();
 
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
         HudOption.Int("ahead", "Cars ahead", 4, 0, 10),
         HudOption.Int("behind", "Cars behind", 4, 0, 10),
         HudOption.Columns("columns", "Columns", "cpos,num,badge,name,out,last,gap",
-            FieldColumns.Pos, FieldColumns.ClassPos, FieldColumns.Change, FieldColumns.Number, FieldColumns.Name, FieldColumns.Team,
+            FieldColumns.Pos, FieldColumns.ClassPos, FieldColumns.Change, FieldColumns.Number, FieldColumns.Logo, FieldColumns.Name, FieldColumns.Team,
             FieldColumns.Badge, FieldColumns.IRatingChange, FieldColumns.Last, FieldColumns.Best, FieldColumns.AvgLap,
-            FieldColumns.PaceDelta, FieldColumns.Laps, FieldColumns.LapsDone, FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Tire, FieldColumns.Incidents, FieldColumns.Trend,
+            FieldColumns.PaceDelta, FieldColumns.Laps, FieldColumns.LapsDone, FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Tire, FieldColumns.Incidents, FieldColumns.Flag, FieldColumns.Trend,
             new HudChoice("gap", "Gap (seconds)")),
         Editors.HudClassFilter.Scope,
         Editors.HudClassFilter.List,
@@ -762,20 +821,26 @@ internal sealed class RelativeWidget : HudWidget
         y += Math.Max(0, missingAbove) * rowH;
         bool lapColors = o.Bool("lapColors") && f.SessionKind == SessionKind.Race;
         bool highlight = o.Bool("highlightMe"), stripes = o.Bool("stripes");
+        bool multiclass = f.Session.NumCarClasses > 1;
+        bool classRows = multiclass && o.Bool("classRows"), classBorder = multiclass && o.Bool("classBorder");
         for (int i = 0; i < rows.Count; i++)
         {
             var row = rows[i];
             var box = new RectangleF(area.X, y, area.Width, rowH - p.RowGap);
             int emphasis = row.IsPlayer && highlight ? 1 : row.CarIdx == v.Race.SelectedCar ? 2 : 0;
             bool dim = f.CarOnPitRoad[row.CarIdx] && !row.IsPlayer;
-            var cls = p.ClassColor(f.Session, FieldOrder.ClassOf(f, row.CarIdx));
+            int classId = FieldOrder.ClassOf(f, row.CarIdx);
+            var cls = p.ClassColor(f.Session, classId);
             Color? tint = lapColors && row.LapDiff != 0 && !row.IsPlayer
                 ? (row.LapDiff > 0 ? p.P.Lapping : p.P.Lapped) : null;
-            HudTable.Row(p, fitted, box, row.CarIdx, cls, emphasis, dim, font, tint, stripes && i % 2 == 1, style);
+            if (classRows) HudTable.ClassFill(p, box, cls, dim);
+            HudTable.Row(p, fitted, box, row.CarIdx, cls, emphasis, dim, font, tint, stripes && i % 2 == 1, style, classRows);
+            if (classBorder) _runs.Add(classId, cls, box);
             if (row.IsPlayer) p.Region("myrow", box);
             _hits.Add((row.CarIdx, box));
             y += rowH;
         }
+        _runs.Outline(p);
         HudTable.Track(p, fitted, RectangleF.FromLTRB(area.X, area.Y, area.Right, Math.Max(y, area.Y + rowH)));
         if (rows.Count == 1 && ahead + behind > 0 && y + rowH <= area.Bottom + 1)
             p.Text("No other cars near you", p.Small, p.P.Faint, new RectangleF(area.X, y, area.Width, rowH), HAlign.Center);
@@ -813,6 +878,7 @@ internal sealed class RelativeWidget : HudWidget
 internal sealed class StandingsWidget : HudWidget
 {
     private readonly List<(int Car, RectangleF Row)> _hits = new();
+    private readonly ClassRuns _runs = new();
     private readonly List<StandingRow> _shown = new();
     private readonly List<List<StandingRow>> _single = new(), _blocks = new(), _grouped = new(), _freeBlocks = new();
     private readonly List<int> _blockClasses = new(), _blockOrder = new();
@@ -870,10 +936,10 @@ internal sealed class StandingsWidget : HudWidget
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
         HudOption.Columns("columns", "Columns", "cpos,badge,num,name,pit,change,last,int,gap",
-            FieldColumns.Pos, FieldColumns.ClassPos, FieldColumns.Change, FieldColumns.Number, FieldColumns.Name, FieldColumns.Team,
+            FieldColumns.Pos, FieldColumns.ClassPos, FieldColumns.Change, FieldColumns.Number, FieldColumns.Logo, FieldColumns.Name, FieldColumns.Team,
             FieldColumns.Badge, FieldColumns.IRatingChange, new HudChoice("gap", "Gap"), new HudChoice("int", "Interval (car ahead)"),
             new HudChoice("gapme", "Gap to you"), FieldColumns.LapsDone, FieldColumns.Last, FieldColumns.Best, FieldColumns.AvgLap, FieldColumns.PaceDelta,
-            FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Tire, FieldColumns.Incidents),
+            FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Tire, FieldColumns.Incidents, FieldColumns.Flag),
         FieldColumns.LastLaps,
         HudOption.Bool("group", "Group by class", true, "Multiclass: one block per class, positions within the class."),
         HudOption.Choice("classOrder", "Class order", "fastest", new HudChoice("position", "By their leader's position"), new HudChoice("fastest", "Fastest class first")),
@@ -1050,6 +1116,8 @@ internal sealed class StandingsWidget : HudWidget
         if (!mineFound && group && pickFrom.Count > 0) fit -= Math.Min(otherTop, pickFrom[0].Count);
         var shown = Pick(pickFrom, Math.Max(1, fit), top, otherTop, me, around);
         bool highlight = o.Bool("highlightMe"), stripes = o.Bool("stripes");
+        bool multiclass = f.Session.NumCarClasses > 1;
+        bool classRows = multiclass && o.Bool("classRows"), classBorder = multiclass && o.Bool("classBorder");
         int drawn = 0;
         bool firstBlock = true;
         for (int b = 0; b < blocks.Count; b++)
@@ -1069,7 +1137,9 @@ internal sealed class StandingsWidget : HudWidget
                     lastI = idx;
                 }
                 rowsH = Math.Min(rowsH, area.Bottom - y - classHead - underHead - blockPad * 2);
-                p.Panel(new RectangleF(box.X, y, box.Width, classHead + underHead + rowsH + blockPad * 2));
+                var panel = new RectangleF(box.X, y, box.Width, classHead + underHead + rowsH + blockPad * 2);
+                p.Panel(panel);
+                if (classBorder) HudTable.ClassOutline(p, panel, cc, p.Look.Corner);
                 y += blockPad;
                 if (firstBlock && headH > 0)
                 {
@@ -1114,13 +1184,18 @@ internal sealed class StandingsWidget : HudWidget
                 Color? tint = null;
                 if (race && car != me && v.Race.StandingOf(me) is { } mine && FieldOrder.ClassOf(f, car) == FieldOrder.ClassOf(f, me))
                     tint = row.LapsDown < mine.LapsDown ? p.P.Lapping : row.LapsDown > mine.LapsDown ? p.P.Lapped : null;
-                HudTable.Row(p, fitted, rowBox, car, p.ClassColor(f.Session, FieldOrder.ClassOf(f, car)), emphasis, dim, font, tint, stripes && drawn++ % 2 == 1, style);
+                int classId = FieldOrder.ClassOf(f, car);
+                var cls = p.ClassColor(f.Session, classId);
+                if (classRows) HudTable.ClassFill(p, rowBox, cls, dim);
+                HudTable.Row(p, fitted, rowBox, car, cls, emphasis, dim, font, tint, stripes && drawn++ % 2 == 1, style, classRows);
+                if (classBorder && !group) _runs.Add(classId, cls, rowBox);
                 if (car == me) p.Region("myrow", rowBox);
                 _hits.Add((car, rowBox));
                 y += rowH;
             }
             if (group) y += blockPad + blockGap;
         }
+        _runs.Outline(p);
         float footH = footShown ? pill + sep : 0;
         p.Need(natural + pad * 2, y + (group ? 0 : pad) + footH);
         if (group && y < box.Bottom - 1) p.Panel(RectangleF.FromLTRB(box.X, y, box.Right, box.Bottom));

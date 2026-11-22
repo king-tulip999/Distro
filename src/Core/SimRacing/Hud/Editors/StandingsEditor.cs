@@ -25,16 +25,17 @@ internal static class StandingsEditor
     {
         Groups = new HudGroup[]
         {
-            new("layout", "Table", HudTab.Layout, true, TitleRow, O("showHeader"), O("stripes"), Grouping, O("divider")),
-            new("rows", "Rows", HudTab.Layout, true, MyRow, O("top"), O("around"), O("otherTop") with { ShowIf = Grouped, InlineHelp = true }, O("otherRows") with { ShowIf = Grouped, InlineHelp = true }, O("nameFormat"), O("noDigits"), O("proAm"),
-                O("badgeFormat") with { ShowIf = Has("columns", "badge") }),
-            new("timing", "Timing", HudTab.Layout, false, O("gapTo"), O("timeFormat"), O("decimals"), O("lastLaps") with { ShowIf = Has("columns", "last") }, O("avgLaps") with { ShowIf = Has("columns", "avglap") }),
-            new("pit", "Pit", HudTab.Layout, false, O("pitShow") with { ShowIf = Has("columns", "pit") }, O("pitTime") with { ShowIf = Has("columns", "pit") }),
-            new("colors", "Colors and flags", HudTab.Layout, false, FlagBorder, O("marks")),
-            new("columns", "Columns", HudTab.Content, true, new PickerSetting("columns", ColumnCategories)),
-            new("classhead", "Class headings", HudTab.Content, true, O("classInfo") with { ShowIf = Grouped, Label = "Shows" }),
-            new("infobars", "Info bars", HudTab.Content, true, InfoBars),
-            new("cars", "Which cars", HudTab.Content, true, new ClassFilterSetting(), O("retired")),
+            new("columns", "Columns", HudTab.Content, true, new PickerSetting("columns", ColumnCategories)) { Page = "Columns" },
+            new("names", "Driver names", HudTab.Layout, true, O("nameFormat") with { Sample = format => Race.RaceFormat.Name("Lucía Fernández", format) }, O("noDigits"), O("proAm"), O("badgeFormat") with { ShowIf = Has("columns", "badge") }) { Page = "Columns" },
+            new("timing", "Values", HudTab.Layout, true, O("gapTo"), O("timeFormat"), O("decimals"), O("lastLaps") with { ShowIf = Has("columns", "last") }, O("avgLaps") with { ShowIf = Has("columns", "avglap") },
+                O("pitShow") with { ShowIf = Has("columns", "pit") }, O("pitTime") with { ShowIf = Has("columns", "pit") }) { Page = "Columns" },
+            new("rows", "Your class", HudTab.Layout, true, O("top"), O("around"), O("divider")) { Page = "Rows" },
+            new("cars", "Other classes", HudTab.Content, true, new ClassFilterSetting(), Grouping, O("otherTop") with { ShowIf = Grouped, InlineHelp = true }, O("otherRows") with { ShowIf = Grouped, InlineHelp = true },
+                O("classInfo") with { ShowIf = Grouped, Label = "Class headings" }) { Page = "Rows" },
+            new("layout", "Rows", HudTab.Layout, true, MyRow, O("stripes"), O("classRows"), O("classBorder"), O("marks"), O("retired")) { Page = "Rows" },
+            new("header", "Title", HudTab.Layout, true, TitleRow, O("showHeader")) { Page = "Header and footer" },
+            new("infobars", "Info bars", HudTab.Content, true, InfoBars) { Page = "Header and footer" },
+            new("colors", "Flags", HudTab.Layout, true, FlagBorder) { Page = "Look" },
         },
         Regions = new Dictionary<string, string>
         {

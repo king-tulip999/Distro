@@ -213,6 +213,8 @@ public sealed class UiSettings
 
     public CustomThemeSettings OledCustom { get; set; } = new();
 
+    public string? Accent { get; set; }
+
     public string? Team { get; set; }
 
     public string? PastelPreset { get; set; }

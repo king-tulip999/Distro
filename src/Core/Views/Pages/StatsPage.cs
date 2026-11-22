@@ -94,10 +94,10 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
 
     private void BuildDriverPlate()
     {
-        _numberPlate.SetResourceReference(Tile.BackgroundProperty, "AccentSoft");
-        _numberPlate.SetResourceReference(Tile.BorderBrushProperty, "AccentText");
+        _numberPlate.SetResourceReference(Tile.BackgroundProperty, "TileRaised");
+        _numberPlate.SetResourceReference(Tile.BorderBrushProperty, "InputEdge");
         _numberPlate.VerticalAlignment = VerticalAlignment.Center;
-        _number.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
+        _number.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
         _number.SetResourceReference(TextBlock.FontFamilyProperty, "MetricFont");
         _numberPlate.Child = _number;
         _numberPlate.ToolTip = "Your car number";
@@ -1030,13 +1030,12 @@ internal static class StatsSections
     private static FrameworkElement Hero(StatsCharts.Data charts, StatQuery q, string range, List<(StatDef Def, StatResult Result)> headline, FrameworkElement racecraft, FrameworkElement? lastRace)
     {
         var block = new Grid { MinHeight = 128, ClipToBounds = true };
-        block.Children.Add(new Slant("Place4Wash", 0, 0, 0.58, 0, 0.44, 1, 0, 1));
-        block.Children.Add(new Slant("Place4Faint", 0.58, 0, 0.64, 0, 0.5, 1, 0.44, 1));
+        block.Children.Add(new SoftPanels(PanelSpread.Best, "Place4", 0.35));
         var best = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(23, 12, 23, 10), HorizontalAlignment = HorizontalAlignment.Left };
         best.Children.Add(Scoped("Personal best", "all time, in the car and track you drove last"));
         if (charts.Bests.FirstOrDefault() is { } pb)
         {
-            var carZone = RaceParts.CarOnStripe(pb.Car, "Place4", 128, 116, 330, carArea: CarArea);
+            var carZone = RaceParts.CarSpot(pb.Car, 128, 116, 330, carArea: CarArea);
             var outline = new Border
             {
                 Width = OutlineWidth, Height = OutlineHeight, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
@@ -1054,7 +1053,6 @@ internal static class StatsSections
             var figures = new DockPanel { Margin = new Thickness(0, 1, 0, 0), Children = { lap, names } };
             DockPanel.SetDock(lap, Dock.Left);
             best.Children.Add(figures);
-            carZone.KeepClearOf(best);
             block.SizeChanged += (_, e) =>
             {
                 var shown = e.NewSize.Width - best.ActualWidth >= CarRoom ? Visibility.Visible : Visibility.Collapsed;

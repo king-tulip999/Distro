@@ -204,6 +204,9 @@ public partial class MainWindow : Window, IModalHost
         TitleNav.CopyAccent(TitleBar.Resources, theme);
         TitleNav.CopyAccent(TitleRule.Resources, theme);
         TitleRule.InvalidateVisual();
+        if (theme?["WindowBg"] is Brush ground) ContentArea.Background = ground;
+        else ContentArea.SetResourceReference(Panel.BackgroundProperty, "WindowBg");
+        Backdrop.UseTheme(theme);
     }
 
     private ISectionedPage? _watched;

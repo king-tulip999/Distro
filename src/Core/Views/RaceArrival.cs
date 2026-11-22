@@ -12,7 +12,7 @@ internal static class RaceArrival
     private static readonly IEasingFunction Slam = Motion.Frozen(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.35 });
     private static readonly IEasingFunction Drive = Motion.Frozen(new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 });
 
-    public static void When(FrameworkElement card, FrameworkElement position, FrameworkElement climb, Stripe stripe, LapStrip? laps)
+    public static void When(FrameworkElement card, FrameworkElement position, FrameworkElement climb, CarZone stripe, LapStrip? laps)
     {
         bool played = false;
         card.Loaded += (_, _) =>
@@ -32,7 +32,7 @@ internal static class RaceArrival
         if (laps is not null) laps.Grow = 0;
     }
 
-    private static void Play(FrameworkElement position, FrameworkElement climb, Stripe stripe, LapStrip? laps)
+    private static void Play(FrameworkElement position, FrameworkElement climb, CarZone stripe, LapStrip? laps)
     {
         position.Opacity = 1;
         climb.Opacity = 1;
@@ -65,7 +65,7 @@ internal static class RaceArrival
         laps?.BeginAnimation(LapStrip.GrowProperty, Keys(BarsFromMs + BarsMs, null, (0, 0), (BarsFromMs, 0), (BarsFromMs + BarsMs, 1)));
     }
 
-    private static void SpeedLines(Stripe stripe)
+    private static void SpeedLines(CarZone stripe)
     {
         double[] rows = { 0.42, 0.56, 0.68 };
         var lines = new List<Border>();

@@ -54,6 +54,32 @@ internal static class HudArt
 
     private static int _liveryVersion;
 
+    private static readonly Dictionary<string, Image?> Logos = new(StringComparer.OrdinalIgnoreCase);
+
+    public static Image? Logo(string? brand)
+    {
+        if (string.IsNullOrEmpty(brand)) return null;
+        lock (Gate)
+        {
+            if (Logos.TryGetValue(brand, out var known)) return known;
+            Image? image = null;
+            try
+            {
+                if (Read($"Logos/{brand}.png") is { } bytes)
+                {
+                    using var stream = new MemoryStream(bytes);
+                    using var loaded = Image.FromStream(stream);
+                    image = new Bitmap(loaded);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or ArgumentException or ExternalException or UriFormatException)
+            {
+                App.LogError(ex);
+            }
+            return Logos[brand] = image;
+        }
+    }
+
     private static byte[]? Painted(string key)
     {
         if (LiveryPictures.FileFor(key) is not { } file) return null;
