@@ -363,6 +363,12 @@ namespace
         return true;
     }
 
+    void ReleaseProcess()
+    {
+        if (g_processClaim) CloseHandle(g_processClaim);
+        g_processClaim = nullptr;
+    }
+
     bool IsTargetProcess()
     {
         wchar_t path[MAX_PATH] = {};
@@ -776,8 +782,10 @@ namespace
             {
                 DropSession();
                 CloseShared();
+                if (g_active) Log("iRacing closed its OpenXR instance");
                 g_active = false;
                 g_instance = nullptr;
+                ReleaseProcess();
             }
         }
         return destroy ? destroy(instance) : XR_ERROR_FUNCTION_UNSUPPORTED;
@@ -885,6 +893,12 @@ namespace
         Log("Loaded in iRacing on runtime \"%s\": active, curved widgets %s", props.runtimeName, cylinder ? "on" : "off");
         return result;
     }
+}
+
+BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID reserved)
+{
+    if (reason == DLL_PROCESS_DETACH && reserved == nullptr) ReleaseProcess();
+    return TRUE;
 }
 
 extern "C" __declspec(dllexport) XrResult xrNegotiateLoaderApiLayerInterface(const XrNegotiateLoaderInfo* loaderInfo, const char*, XrNegotiateApiLayerRequest* request)

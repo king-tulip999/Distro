@@ -127,6 +127,7 @@ internal static class DiagnosticReport
         if (!AppIdentity.IsTecnica)
         {
             sb.AppendLine("## VR");
+            sb.AppendLine($"- iRacing Overlay: {(c.SimRacing.Hud.Enabled ? "shown" : "off")}");
             var vr = app.Plugins.Find(Plugins.PluginIds.SimRacing) is Plugins.BuiltIn.SimRacingPlugin { Hud: { } hud } ? hud.Vr : null;
             foreach (string line in SimRacing.Hud.Vr.OpenXrSetup.ReportLines(app.Demo ? null : vr, c.SimRacing.Hud.VrOverlays))
                 sb.AppendLine(line);

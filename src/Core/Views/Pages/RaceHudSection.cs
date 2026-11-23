@@ -38,6 +38,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private readonly StackPanel _titleTools = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly ContentControl _layoutSlot = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private Border _statusChip = new();
+    private FrameworkElement? _offBanner;
+    private CheckBox? _power;
     private (string, string, string) _statusShown;
     private Border _segments = new();
     private int _tab;
@@ -68,6 +70,11 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         _segments.VerticalAlignment = VerticalAlignment.Center;
         var tabRow = Ui.SplitRow(_segments, _layoutSlot, 19);
         tabRow.Margin = Ui.TabRowMargin;
+        if (!AppIdentity.SimHub)
+        {
+            _offBanner = OffBanner();
+            Children.Add(_offBanner);
+        }
         Children.Add(tabRow);
         Children.Add(_body);
         Ui.Anchor(this, "simracing.hud");
@@ -79,7 +86,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     {
         _arrange.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
         _titleTools.Children.Add(_arrange);
-        var power = Ui.Switch(S.Enabled, on => Host?.SetEnabled(on));
+        var power = _power = Ui.Switch(S.Enabled, on => { Host?.SetEnabled(on); RefreshStatus(); });
         var powerTitle = ToggleCards.RowTitle("Show the overlay");
         Ui.AddInfo(powerTitle, "Shows over borderless and windowed iRacing, not exclusive fullscreen. Nothing is injected into the sim. When each widget shows is set per widget and under Overlay settings.");
         ToggleCards.Row(power, powerTitle, null);
@@ -91,6 +98,15 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     }
 
     public FrameworkElement TitleTools => _titleTools;
+
+    private FrameworkElement OffBanner()
+    {
+        var banner = Ui.Notice("Danger", "I.Alert", "The overlay is off", "No widgets show in iRacing, VR included, until it's turned on.",
+            ("Show the overlay", () => { Host?.SetEnabled(true); RefreshStatus(); }));
+        if (banner.Child is Grid grid) foreach (var button in grid.Children.OfType<Button>()) button.Style = Ui.Res<Style>("PrimaryButton");
+        banner.Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
+        return banner;
+    }
 
     private bool _warmed;
 
@@ -272,6 +288,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private void RefreshStatus()
     {
         SyncEditLayout();
+        if (_offBanner is not null) _offBanner.Visibility = S.Enabled ? Visibility.Collapsed : Visibility.Visible;
+        if (_power is not null && _power.IsChecked != S.Enabled) _power.IsChecked = S.Enabled;
         var t = _app.Telemetry;
         var h = Host;
         var (text, soft, deep) = !S.Enabled && !AppIdentity.SimHub ? ("Off", "DangerSoft", "Danger")
