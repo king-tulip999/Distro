@@ -63,7 +63,7 @@ internal sealed class SimRacingPlugin : Plugin
         }
         foreach (var layout in h.Layouts)
         {
-            string group = $"Show / hide widgets in “{layout.Name}”";
+            string group = WidgetGroup(layout);
             foreach (var widget in layout.Widgets)
             {
                 var w = widget;
@@ -72,6 +72,8 @@ internal sealed class SimRacingPlugin : Plugin
             }
         }
     }
+
+    public static string WidgetGroup(Config.HudLayout layout) => $"Show / hide widgets in “{layout.Name}”";
 
     public static string WidgetHotkeyId(Config.HudLayout layout, Config.HudWidgetConfig widget) => $"hud.widget:{layout.Name}:{widget.Id}";
 

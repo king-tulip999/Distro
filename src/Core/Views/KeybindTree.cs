@@ -20,12 +20,15 @@ internal sealed class KeybindTree : Tile
     private readonly int _skip;
     private readonly Func<string, string> _label;
     private readonly bool _flat;
+    private readonly Func<string, string?> _heading;
     private readonly StackPanel _root = new();
     private string _query = "";
 
-    public KeybindTree(AppServices app, Func<HotkeyEntry, bool> include, int skip = 0, Action<string>? navigate = null, Func<string, string>? label = null, bool flat = false)
+    public KeybindTree(AppServices app, Func<HotkeyEntry, bool> include, int skip = 0, Action<string>? navigate = null, Func<string, string>? label = null, bool flat = false,
+        Func<string, string?>? heading = null)
     {
         _flat = flat;
+        _heading = heading ?? (_ => null);
         _app = app;
         _include = include;
         _skip = skip;
@@ -149,7 +152,19 @@ internal sealed class KeybindTree : Tile
             else stacks.Add(group);
             last = single ? "" : group[0].Cluster;
         }
-        if (_flat) stacks = stacks.SelectMany(s => s.Chunk(Math.Max(FlatStack, (int)Math.Ceiling(s.Count / 3.0))).Select(c => c.ToList())).ToList();
+        if (!_flat) return StackGrid(stacks, hue);
+        var sections = new StackPanel();
+        foreach (var part in stacks.GroupBy(s => s[0].Cluster is { } c ? _heading(c) : null))
+        {
+            if (part.Key is { } heading)
+                sections.Children.Add(new TextBlock { Text = heading, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(RowIndent + 5, 9, 0, 4) });
+            sections.Children.Add(StackGrid(part.SelectMany(s => s.Chunk(Math.Max(FlatStack, (int)Math.Ceiling(s.Count / 3.0))).Select(c => c.ToList())).ToList(), hue));
+        }
+        return sections;
+    }
+
+    private UIElement StackGrid(List<List<HotkeyEntry>> stacks, (string Soft, string Deep) hue)
+    {
         var panel = new MasonryPanel { MinColumnWidth = CellWidth, Gap = CellGap, MaxColumns = 6, Margin = new Thickness(RowIndent, 0, 0, 4) };
         foreach (var stack in stacks)
         {

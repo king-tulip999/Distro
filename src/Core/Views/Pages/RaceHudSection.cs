@@ -928,7 +928,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         root.Children.Add(Group("Overlay", null, overlayRows.ToArray()));
         if (!AppIdentity.SimHub)
         {
-            var keys = new KeybindTree(app, e => e.Id.StartsWith("hud.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true) { Style = null, Padding = new Thickness(0), Margin = new Thickness(-5, 5, 0, 0) };
+            var keys = new KeybindTree(app, e => e.Id.StartsWith("hud.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true,
+                heading: c => S.Layouts.FirstOrDefault(l => SimRacingPlugin.WidgetGroup(l) == c) is { } layout ? $"Widgets in “{layout.Name}”" : null) { Style = null, Padding = new Thickness(0), Margin = new Thickness(-5, 5, 0, 0) };
             root.Children.Add(new Tile
             {
                 Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing),
