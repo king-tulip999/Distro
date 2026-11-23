@@ -146,7 +146,7 @@ internal sealed class TrackMap
             TrackName = A("data-track-name"),
             Source = Enum.TryParse<TrackMapSource>(A("data-source"), out var src) ? src : TrackMapSource.IracingSvg,
             Width = float.TryParse(A("data-width"), NumberStyles.Float, CultureInfo.InvariantCulture, out var w) ? w : 10,
-            Surface = g.Shapes.Where(s => s.Id == "surface").SelectMany(s => s.Figures).Select(f => f.Points).ToList(),
+            Surface = g.Shapes.Where(s => s.Id == "surface").SelectMany(s => s.Figures).Select(f => DropSpikes(f.Points)).ToList(),
             Centerline = centre,
             Pit = g.Shapes.Where(s => s.Id == "pit").ToList(),
             StartLine = line is { Length: >= 2 } ? (line[0], line[1]) : null,
@@ -182,6 +182,33 @@ internal sealed class TrackMap
             result[k] = new PointF((float)(a.X + (b.X - a.X) * t), (float)(a.Y + (b.Y - a.Y) * t));
         }
         return result;
+    }
+
+    private const double SpikeReturn = 0.1, SamePoint = 0.05;
+
+    public static PointF[] DropSpikes(PointF[] pts)
+    {
+        var list = pts.ToList();
+        bool changed = true;
+        while (changed && list.Count > 3)
+        {
+            changed = false;
+            for (int k = 0; k < list.Count && list.Count > 3; k++)
+            {
+                int n = list.Count;
+                var a = list[(k - 1 + n) % n];
+                var b = list[k];
+                var c = list[(k + 1) % n];
+                double ab = Distance(a, b), bc = Distance(b, c), ac = Distance(a, c);
+                if (ab <= SamePoint || ac < SpikeReturn * Math.Min(ab, bc))
+                {
+                    list.RemoveAt(k);
+                    k--;
+                    changed = true;
+                }
+            }
+        }
+        return list.Count == pts.Length ? pts : list.ToArray();
     }
 
     public static PointF[] Simplify(PointF[] pts, double tolerance)
