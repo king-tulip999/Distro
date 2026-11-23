@@ -872,15 +872,27 @@ internal sealed class HudPainter : IDisposable
 
     public bool TitleRowShown { get; set; } = true;
 
-    public RectangleF Header(string title, string? right = null, Color? rightColor = null)
+    public RectangleF HeaderBody()
     {
         float pillH = PillHeight, padH = 8 * Density;
-        Panel(Bounds);
         if (!TitleRowShown) return Bounds.Inflated(-padH, -6 * Density);
+        return new RectangleF(0, pillH + 1, Bounds.Width, Bounds.Height - pillH - 1).Inflated(-padH, -6 * Density);
+    }
+
+    public RectangleF Header(string title, string? right = null, Color? rightColor = null, float bodyHeight = float.NaN)
+    {
+        float pillH = PillHeight;
+        var body = HeaderBody();
+        if (!float.IsNaN(bodyHeight) && bodyHeight < body.Height)
+        {
+            body.Height = Math.Max(0, bodyHeight);
+            Panel(RectangleF.FromLTRB(Bounds.X, Bounds.Y, Bounds.Right, MathF.Ceiling(body.Bottom + 6 * Density)));
+        }
+        else Panel(Bounds);
+        if (!TitleRowShown) return body;
         TitleRow(new RectangleF(0, 0, Bounds.Width, pillH), title, right, rightColor);
         Line(1, pillH, Bounds.Width - 1, pillH, HudPalette.Alpha(P.LineStrong, 160), 1);
-        var body = new RectangleF(0, pillH + 1, Bounds.Width, Bounds.Height - pillH - 1);
-        return body.Inflated(-padH, -6 * Density);
+        return body;
     }
 
     public void AccentRule(float x1, float x2, float y) => Line(x1, y, x2, y, HudPalette.Alpha(P.Accent, P.Dark ? 70 : 90), 1);

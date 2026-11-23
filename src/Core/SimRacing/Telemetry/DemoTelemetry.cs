@@ -7,8 +7,12 @@ internal sealed class DemoTelemetry
 {
     private const double TrackKm = 5.2, RaceSeconds = 45 * 60, StartOffset = 14 * 60;
     private const int Player = 12, Cars = 28, FirstLmp2 = 23;
-    private const int TowedCar = 14, SlowLmp2 = 27;
-    private const double WarmUpSeconds = 6 * 110, WarmUpStep = 0.5;
+    private const int TowedCar = 14;
+    private const double TrainCycle = 600, TrainBehind = 0.065, TrainAhead = 0.02, TrainHeldShare = 0.4, DiceLaps = 0.006, DiceEvery = 27;
+    private const double GlueFrom = 0.15, GlueTo = 0.85, GlueBehind = 0.024, GlueClose = 0.01;
+    private static readonly int[] Train = { 8, 27, 7, 26, 6, 25, 5, 24, 4, 23, 3, 2, 1 };
+    private const double WarmUpSeconds = 6 * 110, WarmUpStep = 0.5, LineNear = 0.996, LineStep = 0.01;
+    private const double ShowerEvery = 240, ShowerFrom = 60, ShowerFor = 90, IncidentEvery = 40, OilEvery = 170, OilFor = 10;
     private const double TowFrom = 820, TowEvery = 30, BackOnTrack = 1, PitEvery = 750, StallFrom = 12, StallTo = 32;
     private static readonly string[] Names =
     {
@@ -34,7 +38,7 @@ internal sealed class DemoTelemetry
         var demo = new DemoTelemetry();
         double end = (until ?? StartOffset) - StartOffset;
         double start = Math.Max(end - WarmUpSeconds, -StartOffset);
-        for (double t = start; t < end; t += WarmUpStep)
+        for (double t = start; t < end; t += frame.LapDistPct > LineNear ? LineStep : WarmUpStep)
         {
             demo.Fill(frame, t);
             frame.Sequence = ++sequence;
@@ -83,7 +87,7 @@ internal sealed class DemoTelemetry
             TrackId = 0,
             TrackLengthKm = TrackKm,
             PitSpeedLimitKph = 60,
-            IncidentLimit = 17,
+            IncidentLimit = 25,
             NumCarClasses = 3,
             Sessions = new[]
             {
@@ -115,13 +119,19 @@ internal sealed class DemoTelemetry
         return (h % 2001) / 1000.0 - 1;
     }
 
-    private static double LapTime(int car) => car == SlowLmp2 ? LapTime(Player) + 0.4 : car is >= 1 and <= 8 ? 97.4 + car * 0.05 : car >= FirstLmp2 ? 101.0 + (car - FirstLmp2) * 0.06 : 107.2 + (car - 9) * 0.045;
+    private static double LapTime(int car) => car is >= 1 and <= 8 ? 97.4 + car * 0.05 : car >= FirstLmp2 ? 101.0 + (car - FirstLmp2) * 0.06 : 107.2 + (car - 9) * 0.045;
 
     private static double LapOf(int car, int lap) => LapTime(car) + 0.3 + 0.7 * Noise(car, lap) - 0.035 * Math.Min(lap, 40);
 
     private static double Dist(int car, double t)
     {
-        if (car == SlowLmp2) return Math.Max(0, Dist(Player, t) - 1 + 0.035 * Math.Sin(t / 23));
+        int inTrain = Array.IndexOf(Train, car);
+        if (inTrain >= 0)
+        {
+            double u = (double)inTrain / Train.Length + t / TrainCycle, phase = u - Math.Floor(u);
+            double dice = DiceLaps * DiceShape(phase) * Math.Sin(2 * Math.PI * t / DiceEvery + inTrain * 1.9);
+            return Math.Max(0, Dist(Player, t) + (car <= 8 ? 1 : 0) + Math.Floor(u) + TrainOffset(phase) + dice);
+        }
         double lap = LapTime(car);
         double grid = -(car >= FirstLmp2 ? car - FirstLmp2 + 3 : car - 1) * 0.006;
         double swing = 0.03 * Math.Sin(t / 40 + car * 1.7) + 0.008 * Math.Sin(t / 14 + car * 2.9);
@@ -148,7 +158,29 @@ internal sealed class DemoTelemetry
         return x - Math.Floor(x);
     }
 
-    private static bool InPits(int car, double t) => car != SlowLmp2 && (t + car * 97) % PitEvery < 40 && t > 60;
+    internal static double TrainOffset(double phase)
+    {
+        double fast = 1 - TrainHeldShare, approach = fast * (0.5 - TrainBehind) / (1 - TrainBehind - TrainAhead);
+        if (phase < approach) return -0.5 + phase / approach * (0.5 - TrainBehind);
+        if (phase < approach + TrainHeldShare) return HeldOffset((phase - approach) / TrainHeldShare);
+        return TrainAhead + (phase - approach - TrainHeldShare) / (fast - approach) * (0.5 - TrainAhead);
+    }
+
+    private static double HeldOffset(double q)
+    {
+        if (q < GlueFrom) return -TrainBehind + q / GlueFrom * (TrainBehind - GlueBehind);
+        if (q < GlueTo) return -GlueBehind + (q - GlueFrom) / (GlueTo - GlueFrom) * (GlueBehind - GlueClose);
+        return -GlueClose + (q - GlueTo) / (1 - GlueTo) * (GlueClose + TrainAhead);
+    }
+
+    private static double DiceShape(double phase)
+    {
+        double approach = (1 - TrainHeldShare) * (0.5 - TrainBehind) / (1 - TrainBehind - TrainAhead);
+        double q = ((phase - approach) / TrainHeldShare - GlueFrom) / (GlueTo - GlueFrom);
+        return q is > 0 and < 1 ? Math.Sin(Math.PI * q) : 0;
+    }
+
+    private static bool InPits(int car, double t) => Array.IndexOf(Train, car) < 0 && (t + car * 97) % PitEvery < 40 && t > 60;
 
     private static readonly (double At, double Depth, double Width)[] Corners = { (0.08, 42, 0.02), (0.21, 30, 0.025), (0.33, 22, 0.03), (0.47, 48, 0.018), (0.6, 26, 0.03), (0.74, 35, 0.022), (0.9, 30, 0.025) };
 
@@ -242,7 +274,8 @@ internal sealed class DemoTelemetry
 
         double pd = dist[Player], ppct = pd - Math.Floor(pd);
         double v = SpeedAt(ppct), ahead = SpeedAt(ppct + 0.004);
-        f.Speed = f.CarOnPitRoad[Player] ? 16.4 : v;
+        double laneTime = (raceT + Player * 97) % PitEvery;
+        f.Speed = f.CarOnPitRoad[Player] ? laneTime < 4 ? 17.6 : 16.4 : v;
         f.OnPitRoad = f.CarOnPitRoad[Player];
         f.InPitStall = f.OnPitRoad && (raceT + Player * 97) % PitEvery is > StallFrom and < StallTo;
         f.PlayerSurface = f.OnPitRoad ? TrackSurface.InPitStall : TrackSurface.OnTrack;
@@ -260,7 +293,7 @@ internal sealed class DemoTelemetry
         f.LapCompleted = f.CarLapCompleted[Player];
         f.LapDistPct = ppct;
         f.LapDist = ppct * TrackKm * 1000;
-        f.LapCurrent = ppct * LapTime(Player);
+        f.LapCurrent = ppct * LapOf(Player, f.CarLapCompleted[Player] + 1);
         f.LapLast = f.CarLastLap[Player] > 0 ? f.CarLastLap[Player] : null;
         f.LapBest = f.CarBestLap[Player] > 0 ? f.CarBestLap[Player] : null;
         f.DeltaBest = 0.35 * Math.Sin(ppct * 9) + 0.12;
@@ -273,10 +306,11 @@ internal sealed class DemoTelemetry
         f.Fuel = Math.Max(1.2, 92 - stintLaps * 3.05);
         f.FuelPct = f.Fuel / 120;
         f.FuelUsePerHour = 72;
-        f.Incidents = DemoIncidents(raceT);
+        f.Incidents = DemoIncidents(raceT, _session.IncidentLimit ?? 17);
         f.TeamIncidents = f.Incidents;
         f.DriverIncidents = f.Incidents;
-        f.OilTemp = 104 + 3 * Math.Sin(t / 60);
+        bool oilHot = (raceT - StartOffset) % OilEvery is > OilEvery - OilFor;
+        f.OilTemp = oilHot ? 131 : 104 + 3 * Math.Sin(t / 60);
         f.OilPress = 4.1;
         f.WaterTemp = 88 + 2 * Math.Sin(t / 80);
         f.FuelPress = 3.2;
@@ -292,7 +326,7 @@ internal sealed class DemoTelemetry
         f.AbsActive = f.Brake > 0.85;
         f.PushToPassCount = 150;
         f.PushToPassActive = (int)(t / 15) % 4 == 0 && f.Throttle > 0.95;
-        f.Warnings = f.OnPitRoad ? EngineWarnings.PitLimiter : EngineWarnings.None;
+        f.Warnings = (f.OnPitRoad ? EngineWarnings.PitLimiter : EngineWarnings.None) | (oilHot ? EngineWarnings.OilTemp : EngineWarnings.None);
         f.PitFlags = PitServices.Fuel | PitServices.LeftFront | PitServices.RightFront | PitServices.LeftRear | PitServices.RightRear;
         f.PitFuel = 60;
         f.PitStatus = f.InPitStall ? 1 : 0;
@@ -320,14 +354,15 @@ internal sealed class DemoTelemetry
             f.TyreWearMiddle[c] = 0.87 + 0.05 * Spread(stop, c, 5);
             f.TyreWearOuter[c] = 0.89 + 0.05 * Spread(stop, c, 6);
         }
-        f.AirTemp = 21.5 + Math.Sin(t / 900);
-        f.TrackTemp = 31.2 + 2 * Math.Sin(t / 900);
-        f.WindSpeed = 3.4;
-        f.WindDir = 1.2;
-        f.Humidity = 0.55;
+        double rain = Shower(raceT);
+        f.AirTemp = 21.5 + Math.Sin(t / 900) - 1.5 * rain;
+        f.TrackTemp = 31.2 + 2.5 * Math.Sin(t / 180) - 3 * rain;
+        f.WindSpeed = 3.4 + 1.1 * Math.Sin(t / 7) + 0.5 * Math.Sin(t / 2.3) + 2 * rain;
+        f.WindDir = 1.2 + 0.25 * Math.Sin(t / 50);
+        f.Humidity = 0.55 + 0.3 * rain;
         f.Fog = 0;
-        f.Precipitation = 0;
-        f.TrackWetness = 1;
+        f.Precipitation = 0.25 * rain;
+        f.TrackWetness = rain > 0.6 ? 3 : rain > 0.05 ? 2 : 1;
         f.DeclaredWet = false;
 
         var flags = RaceFlags.Green;
@@ -347,5 +382,16 @@ internal sealed class DemoTelemetry
 
     private static readonly int[] DemoIncidentTotals = { 0, 0, 1, 3, 3, 4, 8, 9, 9, 11, 11, 12, 14, 14, 15 };
 
-    private static int DemoIncidents(double raceT) => DemoIncidentTotals[Math.Clamp((int)(raceT / 115), 0, DemoIncidentTotals.Length - 1)];
+    private static int DemoIncidents(double raceT, int limit)
+    {
+        int before = DemoIncidentTotals[Math.Clamp((int)(StartOffset / 115), 0, DemoIncidentTotals.Length - 1)];
+        if (raceT < StartOffset) return Math.Min(before, DemoIncidentTotals[Math.Clamp((int)(raceT / 115), 0, DemoIncidentTotals.Length - 1)]);
+        return Math.Min(limit - 1, before + 1 + (int)Math.Floor((raceT - StartOffset) / IncidentEvery));
+    }
+
+    private static double Shower(double raceT)
+    {
+        double into = ((raceT - StartOffset - ShowerFrom) % ShowerEvery + ShowerEvery) % ShowerEvery;
+        return into < ShowerFor ? Math.Sin(Math.PI * into / ShowerFor) : 0;
+    }
 }

@@ -23,6 +23,7 @@ internal sealed class LapsWidget : HudWidget
     private double _start = double.NaN, _now, _until;
     private int _seenCount = -1;
     private string _seenLook = "";
+    private string _headRight = "";
 
     public override bool Animating => _now < _until;
 
@@ -48,13 +49,16 @@ internal sealed class LapsWidget : HudWidget
     {
         if (DrawWaiting(p, v, "Laps")) return;
         var laps = v.Race.Laps.Laps;
-        var area = p.Header("Laps", laps.Count == 0 ? "none yet" : PooledText.Number("", laps.Count, " this session"));
+        var area = p.HeaderBody();
         if (laps.Count == 0)
         {
-            p.NeedBelow(area, p.LineHeight(p.Small) * 3);
+            float emptyH = p.LineHeight(p.Small) * 3;
+            p.NeedBelow(area, emptyH);
+            area = p.Header("Laps", "none yet", bodyHeight: emptyH);
             p.Text("Laps appear here as you complete them", p.Small, p.P.Faint, area, HAlign.Center, VAlign.Center);
             return;
         }
+        _headRight = PooledText.Number("", laps.Count, " this session");
         int sectors = v.Race.Laps.SectorCount;
         var s = SummaryFor(laps, v.Options.Int("window"), sectors);
         string look = v.Options.Choice("look");
@@ -181,6 +185,10 @@ internal sealed class LapsWidget : HudWidget
 
     private float FootHeight(HudPainter p) => p.LineHeight(p.SmallBold) + 8 * p.Density;
 
+    private RectangleF Head(HudPainter p, float used) => p.Header("Laps", _headRight, bodyHeight: MathF.Ceiling(used + 1));
+
+    private static int Shown(HudView v) => Math.Min(v.Options.Int("count"), v.Race.Laps.Laps.Count);
+
     private void Footer(HudPainter p, RectangleF foot, int n)
     {
         float d = p.Density, gap = 5 * d;
@@ -206,6 +214,7 @@ internal sealed class LapsWidget : HudWidget
         bool fuel = v.Options.Bool("fuel"), stats = v.Options.Bool("stats") && s.Stats is not null;
         float topH = p.LineHeight(p.Big), headH = p.LineHeight(p.Tiny) + 2 * d, footH = FootHeight(p);
         p.NeedBelow(area, topH + gap + headH + gap + pitch * Math.Min(3, laps.Count) + (stats ? footH : 0));
+        area = Head(p, topH + gap + headH + gap + Shown(v) * pitch - gap + (stats ? gap + footH : 0));
 
         var top = area.Top(topH, out var rest);
         float x = Pair(p, top.X, top, "BEST", p.Label, p.P.Faint, RaceFormat.LapTime(s.Best), p.Big, p.P.Fastest, 8 * d);
@@ -306,6 +315,8 @@ internal sealed class LapsWidget : HudWidget
         bool fuel = v.Options.Bool("fuel"), stats = v.Options.Bool("stats") && s.Stats is not null;
         float topH = p.LineHeight(p.Bold), headH = p.LineHeight(p.Tiny) + 2 * d, rowH = 22 * d;
         p.NeedBelow(area, topH + gap + 120 * d + gap + headH + rowH * 2);
+        float chartH = Math.Min(168 * d, Math.Max(100 * d, (area.Height - topH - gap) * 0.45f));
+        area = Head(p, topH + gap + chartH + gap + headH + Shown(v) * rowH);
 
         var top = area.Top(topH, out var rest);
         float x = Pair(p, top.X, top, "BEST", p.Tiny, p.P.Faint, RaceFormat.LapTime(s.Best), p.Bold, p.P.Fastest, 5 * d);
@@ -324,7 +335,6 @@ internal sealed class LapsWidget : HudWidget
         }
 
         rest = RectangleF.FromLTRB(rest.X, rest.Y + gap, rest.Right, rest.Bottom);
-        float chartH = Math.Min(168 * d, Math.Max(100 * d, rest.Height * 0.45f));
         var chart = rest.Top(chartH, out rest);
         DrawChart(p, v, chart, s, stats);
 
@@ -457,6 +467,13 @@ internal sealed class LapsWidget : HudWidget
         float labelH = p.LineHeight(p.Label), heroH = labelH + p.LineHeight(p.Huge) * 0.85f;
         float tileH = p.LineHeight(p.Bold) + 12 * d, smallTileH = p.LineHeight(p.Tiny) * 2 + p.LineHeight(p.Bold) + 10 * d, footH = FootHeight(p);
         p.NeedBelow(area, heroH + gap + tileH + gap + labelH + smallTileH);
+        const int Columns = 3;
+        float cg = 6 * d;
+        int earlier = Math.Max(0, Shown(v) - 1), earlierRows = (earlier + Columns - 1) / Columns;
+        float used = heroH + gap + (stats ? p.LineHeight(p.Tiny) + 9 * d + gap : 0) + tileH;
+        if (earlier > 0) used += gap + labelH + 6 * d + earlierRows * smallTileH + (earlierRows - 1) * cg;
+        if (stats) used += gap + footH;
+        area = Head(p, used);
 
         var hero = area.Top(heroH, out var rest);
         float ha = In(0, 0.6f);
@@ -525,8 +542,7 @@ internal sealed class LapsWidget : HudWidget
         if (laps.Count < 2 || rest.Height < labelH + smallTileH) return;
         p.Text("EARLIER", p.Label, p.P.Faint, rest.Top(labelH, out rest), HAlign.Left, VAlign.Center, false);
         rest = RectangleF.FromLTRB(rest.X, rest.Y + 6 * d, rest.Right, rest.Bottom);
-        const int Columns = 3;
-        float cg = 6 * d, cw = (rest.Width - cg * (Columns - 1)) / Columns;
+        float cw = (rest.Width - cg * (Columns - 1)) / Columns;
         int rows = Math.Max(1, (int)((rest.Height + cg) / (smallTileH + cg)));
         int n = Math.Min(Math.Min(v.Options.Int("count") - 1, laps.Count - 1), rows * Columns);
         var tinyBold = p.Font(10f, true);
@@ -568,6 +584,7 @@ internal sealed class LapsWidget : HudWidget
         if (cellW < 6 * d) return false;
         float headH = p.LineHeight(p.Tiny) + 6 * d, rowH = 28 * d, pitch = rowH + 4 * d, optH = 28 * d, legendH = p.LineHeight(p.SmallBold) + 2 * d;
         p.NeedBelow(area, headH + pitch * Math.Min(3, laps.Count) + optH + legendH);
+        area = Head(p, headH + Shown(v) * pitch + 4 * d + optH + legendH);
         double near = NearBest(count);
         var cellFont = times ? p.SmallBold : p.Font(10.5f, true);
         var tinyBold = p.Font(9f, true);

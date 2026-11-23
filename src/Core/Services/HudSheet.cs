@@ -77,6 +77,7 @@ internal static class HudSheet
 
     private const float SiteScale = 2;
     private const double SiteClipSeconds = 8;
+    private const int SiteFps = 30;
     private static readonly HashSet<string> Searched = new(StringComparer.OrdinalIgnoreCase) { "tyres", "incidents", "alerts", "laps", "notes", "events" };
     private static readonly Dictionary<string, double> SiteSpeeds = new(StringComparer.OrdinalIgnoreCase) { ["block"] = 1, ["incidents"] = 60, ["notes"] = 10, ["laps"] = 80 };
 
@@ -137,10 +138,10 @@ internal static class HudSheet
             new("wind", "Crosswind", O(("title", "true")), WindFrom: Cross),
             new("wind", "Tailwind", O(("title", "true")), WindFrom: Behind),
             new("wind", "Accent color", O(("colors", "accent")), WindFrom: Cross + 0.6),
-            new("laps", "Delta bars", O(), Fit: true),
-            new("laps", "Trend chart", O(("look", "trend")), Fit: true),
-            new("laps", "Last lap first", O(("look", "last")), Fit: true),
-            new("laps", "Sector cells", O(("look", "sectors")), Fit: true),
+            new("laps", "Delta bars", O(), H: 290),
+            new("laps", "Trend chart", O(("look", "trend")), H: 356),
+            new("laps", "Last lap first", O(("look", "last")), H: 302),
+            new("laps", "Sector cells", O(("look", "sectors")), H: 340),
             new("incidents", "Budget bar", O(), Fit: true),
             new("incidents", "Chips", O(("style", "chips")), Fit: true),
             new("incidents", "Single line", O(("style", "line")), Fit: true),
@@ -279,7 +280,7 @@ internal static class HudSheet
             site.To(Searched.Contains(def.Kind) ? SiteBusiest(shot, def, config, size, speed) : shot.At);
             double from = site.T;
             site.Settle();
-            int fps = EveryFrame.Contains(def.Kind) || def.Kind is "ledboard" or "block" or "result" ? 30 : 15;
+            const int fps = SiteFps;
             double start = site.T;
             var widget = def.Create();
             var view = new HudOptions(def, config);
