@@ -3,7 +3,9 @@
 #include <windows.h>
 #include <d3d11.h>
 #include <cmath>
+#include <cstdarg>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <cwchar>
 #include <mutex>
@@ -297,6 +299,52 @@ namespace
         report->tick = GetTickCount64();
     }
 
+    constexpr LONGLONG MaxLogBytes = 64 * 1024;
+    bool g_logStarted = false;
+    int g_sharedState = -1;
+    bool g_firstFrameLogged = false;
+    bool g_firstWidgetsLogged = false;
+    bool g_firstRejectLogged = false;
+
+    void Log(const char* format, ...)
+    {
+        wchar_t folder[MAX_PATH] = {};
+        DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", folder, MAX_PATH);
+        if (length == 0 || length >= MAX_PATH - 40) return;
+        wchar_t path[MAX_PATH] = {};
+        swprintf_s(path, L"%s\\Velocita", folder);
+        CreateDirectoryW(path, nullptr);
+        wcscat_s(path, L"\\OpenXR");
+        CreateDirectoryW(path, nullptr);
+        wcscat_s(path, L"\\layer.log");
+        DWORD disposition = OPEN_ALWAYS;
+        if (!g_logStarted)
+        {
+            WIN32_FILE_ATTRIBUTE_DATA info{};
+            if (GetFileAttributesExW(path, GetFileExInfoStandard, &info)
+                && ((LONGLONG(info.nFileSizeHigh) << 32) | info.nFileSizeLow) > MaxLogBytes)
+                disposition = CREATE_ALWAYS;
+            g_logStarted = true;
+        }
+        HANDLE file = CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file == INVALID_HANDLE_VALUE) return;
+        char line[768] = {};
+        SYSTEMTIME now{};
+        GetLocalTime(&now);
+        int at = sprintf_s(line, "%04u-%02u-%02u %02u:%02u:%02u [%lu] ", now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond, GetCurrentProcessId());
+        if (at < 0) at = 0;
+        va_list args;
+        va_start(args, format);
+        vsnprintf(line + at, sizeof(line) - size_t(at) - 3, format, args);
+        va_end(args);
+        size_t used = strnlen(line, sizeof(line) - 3);
+        line[used++] = '\r';
+        line[used++] = '\n';
+        DWORD written = 0;
+        WriteFile(file, line, DWORD(used), &written, nullptr);
+        CloseHandle(file);
+    }
+
     HANDLE g_processClaim = nullptr;
 
     bool ClaimProcess()
@@ -338,7 +386,12 @@ namespace
         if (now - g_lastOpenTry < 1000) return false;
         g_lastOpenTry = now;
         g_mapping = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, L"Local\\VelocitaVr");
-        if (!g_mapping) return false;
+        if (!g_mapping)
+        {
+            if (g_sharedState != 0) Log("Velocita's widget memory not found (error %lu): Velocita isn't running with VR widgets on, or runs as another user", GetLastError());
+            g_sharedState = 0;
+            return false;
+        }
         g_shared = static_cast<uint8_t*>(MapViewOfFile(g_mapping, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0));
         if (!g_shared)
         {
@@ -352,12 +405,16 @@ namespace
         auto header = reinterpret_cast<SharedHeader*>(g_shared);
         if (!whole || header->magic != Magic || header->version != Version)
         {
+            if (g_sharedState != 2) Log("Velocita's widget memory doesn't match this layer (magic %08x, version %u, whole %d)", header->magic, header->version, whole ? 1 : 0);
+            g_sharedState = 2;
             UnmapViewOfFile(g_shared);
             CloseHandle(g_mapping);
             g_shared = nullptr;
             g_mapping = nullptr;
             return false;
         }
+        if (g_sharedState != 1) Log("Connected to Velocita's widget memory");
+        g_sharedState = 1;
         return true;
     }
 
@@ -567,6 +624,12 @@ namespace
     {
         std::lock_guard<std::mutex> guard(g_lock);
         if (g_faulted || session != g_session || !info) return g_next.endFrame(session, info);
+        if (!g_firstFrameLogged)
+        {
+            g_firstFrameLogged = true;
+            Log("First frame from iRacing: %u game layers, room for %u", info->layerCount, g_maxLayers);
+        }
+        OpenShared();
         uint32_t quads = 0;
         try { quads = BuildQuads(info->displayTime); }
         catch (...)
@@ -591,9 +654,19 @@ namespace
         XrResult result = g_next.endFrame(session, &copy);
         g_lastEndFrame = result;
         g_framesWithWidgets++;
+        if (!g_firstWidgetsLogged)
+        {
+            g_firstWidgetsLogged = true;
+            Log("First frame with %u widgets: result %d", quads, result);
+        }
         if (result < 0)
         {
             g_framesRejected++;
+            if (!g_firstRejectLogged)
+            {
+                g_firstRejectLogged = true;
+                Log("The headset rejected a frame with widgets (result %d); widgets stop if a frame without them works", result);
+            }
             XrResult plain = g_next.endFrame(session, info);
             if (plain >= 0) g_rejected = true;
             result = plain;
@@ -608,6 +681,14 @@ namespace
         if (g_next.enumerateSwapchainFormats(g_session, 0, &count, nullptr) != XR_SUCCESS || count == 0) return;
         std::vector<int64_t> formats(count);
         if (g_next.enumerateSwapchainFormats(g_session, count, &count, formats.data()) != XR_SUCCESS) return;
+        char offered[256] = {};
+        size_t at = 0;
+        for (uint32_t i = 0; i < count && at < sizeof(offered) - 24; i++)
+        {
+            int n = sprintf_s(offered + at, sizeof(offered) - at, i == 0 ? "%lld" : " %lld", static_cast<long long>(formats[i]));
+            if (n > 0) at += size_t(n);
+        }
+        Log("Picture formats offered by the headset: %s", offered);
         const int64_t wanted[] = { FormatBgraSrgb, FormatRgbaSrgb, FormatBgra, FormatRgba };
         for (int64_t w : wanted)
             for (int64_t f : formats)
@@ -629,9 +710,20 @@ namespace
         ID3D11Device* device = nullptr;
         for (auto p = static_cast<const XrBaseHeader*>(info->next); p; p = static_cast<const XrBaseHeader*>(p->next))
             if (p->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR) { device = reinterpret_cast<const XrGraphicsBindingD3D11KHR*>(p)->device; break; }
-        if (!device || g_faulted) return result;
+        if (!device)
+        {
+            Log("VR session started without Direct3D 11, so no widgets can be drawn");
+            return result;
+        }
+        if (g_faulted)
+        {
+            Log("VR session started, but the layer stopped after an earlier fault");
+            return result;
+        }
         try { SetUpSession(instance, info, *session, device); }
         catch (...) { g_faulted = true; }
+        g_firstFrameLogged = g_firstWidgetsLogged = g_firstRejectLogged = false;
+        Log("VR session started: Direct3D 11, picture format %lld%s, layer limit %u", static_cast<long long>(g_format), g_format ? "" : " (none usable, so no widgets)", g_maxLayers);
         return result;
     }
 
@@ -732,7 +824,11 @@ namespace
         if (result != XR_SUCCESS)
         {
             result = layerInfo->nextInfo->nextCreateApiLayerInstance(info, &nextInfo, instance);
-            if (result != XR_SUCCESS) return result;
+            if (result != XR_SUCCESS)
+            {
+                if (IsTargetProcess()) Log("iRacing's OpenXR start failed further down the chain (result %d)", result);
+                return result;
+            }
         }
         std::lock_guard<std::mutex> guard(g_lock);
         g_next = Next{};
@@ -759,15 +855,34 @@ namespace
         bool complete = g_next.destroyInstance && g_next.getInstanceProperties && g_next.createSession && g_next.destroySession && g_next.endFrame
             && g_next.enumerateSwapchainFormats && g_next.createSwapchain && g_next.destroySwapchain && g_next.enumerateSwapchainImages
             && g_next.acquireSwapchainImage && g_next.waitSwapchainImage && g_next.releaseSwapchainImage && g_next.createReferenceSpace && g_next.destroySpace;
-        if (!complete || !IsTargetProcess()) return result;
+        if (!IsTargetProcess()) return result;
+        if (!complete)
+        {
+            Log("Loaded in iRacing, but the runtime is missing functions the layer needs; staying out");
+            return result;
+        }
         XrInstanceProperties props{};
         props.type = XR_TYPE_INSTANCE_PROPERTIES;
-        if (g_next.getInstanceProperties(g_instance, &props) != XR_SUCCESS) return result;
+        if (g_next.getInstanceProperties(g_instance, &props) != XR_SUCCESS)
+        {
+            Log("Loaded in iRacing, but the runtime didn't give its name; staying out");
+            return result;
+        }
         props.runtimeName[sizeof(props.runtimeName) - 1] = 0;
         memcpy(g_runtimeName, props.runtimeName, sizeof(g_runtimeName));
-        if (strstr(props.runtimeName, "SteamVR") != nullptr) return result;
-        if (!ClaimProcess()) return result;
+        if (strstr(props.runtimeName, "SteamVR") != nullptr)
+        {
+            Log("Loaded in iRacing on runtime \"%s\": SteamVR shows Velocita's widgets itself, so the layer stays out", props.runtimeName);
+            return result;
+        }
+        if (!ClaimProcess())
+        {
+            Log("Loaded in iRacing on runtime \"%s\": another copy of the layer is already active", props.runtimeName);
+            return result;
+        }
         g_active = true;
+        OpenShared();
+        Log("Loaded in iRacing on runtime \"%s\": active, curved widgets %s", props.runtimeName, cylinder ? "on" : "off");
         return result;
     }
 }
@@ -778,6 +893,7 @@ extern "C" __declspec(dllexport) XrResult xrNegotiateLoaderApiLayerInterface(con
         || request->structType != XR_LOADER_INTERFACE_STRUCT_API_LAYER_REQUEST
         || loaderInfo->minInterfaceVersion > XR_CURRENT_LOADER_API_LAYER_VERSION || loaderInfo->maxInterfaceVersion < XR_CURRENT_LOADER_API_LAYER_VERSION)
         return XR_ERROR_INITIALIZATION_FAILED;
+    if (IsTargetProcess()) Log("Layer loaded by the OpenXR loader in iRacing");
     request->layerInterfaceVersion = XR_CURRENT_LOADER_API_LAYER_VERSION;
     request->layerApiVersion = loaderInfo->maxApiVersion < ((uint64_t(1) << 48) | (uint64_t(1) << 32)) ? loaderInfo->maxApiVersion : ((uint64_t(1) << 48) | (uint64_t(1) << 32));
     request->getInstanceProcAddr = &Layer_xrGetInstanceProcAddr;

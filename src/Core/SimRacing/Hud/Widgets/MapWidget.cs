@@ -99,6 +99,7 @@ internal sealed class MapWidget : HudWidget
         float d = p.Density;
         float side = Math.Min(area.Width, area.Height);
         float dot = Math.Clamp(side / 60, 4, 8) * d * (float)(v.Options.Number("dotSize") / 100);
+        if (v.Options.Bool("positions") && v.Options.Value("dotStyle") is not ("pill" or "circle")) dot = Math.Max(dot, LabelDot(p, v));
         Build(map);
         float mine = (dot + 2 * d) * (float)(v.Options.Number("myDotSize") / 100);
         _view = View(p, v, map, area, Math.Max(dot, mine) + 2 * d);
@@ -220,7 +221,7 @@ internal sealed class MapWidget : HudWidget
         var s = f.Session;
         float d = p.Density;
         bool multiclass = s.NumCarClasses > 1;
-        bool text = v.Options.Bool("positions") && dot >= 7 * d;
+        bool text = v.Options.Bool("positions");
         bool carNumbers = v.Options.Value("dotText") == "number";
         bool pit = v.Options.Bool("pit");
         int me = f.PlayerCarIdx;
@@ -264,6 +265,22 @@ internal sealed class MapWidget : HudWidget
         }
     }
 
+    private static float LabelDot(HudPainter p, HudView v)
+    {
+        var f = v.Frame;
+        var s = f.Session;
+        bool carNumbers = v.Options.Value("dotText") == "number";
+        bool pit = v.Options.Bool("pit");
+        float need = 0;
+        for (int car = 0; car < TelemetryFrame.MaxCars; car++)
+        {
+            if (car == f.PlayerCarIdx || f.CarLapDistPct[car] < 0 || !s.ByCar.TryGetValue(car, out var driver) || !driver.Races || !v.ClassShown(car)) continue;
+            if (f.CarOnPitRoad[car] && !pit) continue;
+            if (Label(f, driver, car, carNumbers) is { Length: > 0 } label) need = Math.Max(need, DotLabels.RadiusFor(p, label));
+        }
+        return need;
+    }
+
     private void Badges(HudPainter p, HudView v, TrackMap map, float dot, float myDot)
     {
         var f = v.Frame;
@@ -271,7 +288,7 @@ internal sealed class MapWidget : HudWidget
         float d = p.Density;
         bool circle = v.Options.Value("dotStyle") == "circle";
         bool multiclass = s.NumCarClasses > 1;
-        bool text = v.Options.Bool("positions") && dot >= 5 * d;
+        bool text = v.Options.Bool("positions");
         bool carNumbers = v.Options.Value("dotText") == "number";
         bool pit = v.Options.Bool("pit");
         int me = f.PlayerCarIdx;
@@ -302,7 +319,7 @@ internal sealed class MapWidget : HudWidget
             _order[n] = n;
             n++;
         }
-        var size = BadgeSize(circle, dot * BadgeHeight, text ? widest : 0);
+        var size = BadgeSize(circle, Math.Max(dot * BadgeHeight, text && widest > 0 ? p.LineHeight(font) * 0.85f : 0), text ? widest : 0);
         float edge = 1.5f * d;
         for (int i = 0; i < n; i++)
         {

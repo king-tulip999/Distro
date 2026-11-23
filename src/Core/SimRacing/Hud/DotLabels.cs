@@ -47,6 +47,17 @@ internal static class DotLabels
         return px >= SmallestPx ? px : 0;
     }
 
+    public const float LabelPx = 8;
+
+    public static float RadiusFor(HudPainter p, string text)
+    {
+        if (text.Length == 0) return 0;
+        var (top, bottom) = DigitBand;
+        var font = p.Font(LabelPx, true);
+        float w = p.Measure(text, font), h = (bottom - top) * font.Size;
+        return MathF.Sqrt(w * w + h * h) / 2 / Inner + 0.5f;
+    }
+
     public static bool Fits(float width, float digitHeight, float radius)
     {
         float room = radius * Inner;

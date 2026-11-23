@@ -314,10 +314,10 @@ internal sealed class UpdateService
         if (Repository.Length > 0) Views.Ui.OpenUrl(Latest?.PageUrl ?? ReleasesPage);
     }
 
-    public static string Show(Version v) => $"{v.Major}.{MinorText(v.Minor)}.{v.Build}" + (v.Revision > 0 ? $".{v.Revision}" : "");
+    public static string Show(Version v) => $"{v.Major}.{MinorText(v.Minor)}.{MinorText(Math.Max(0, v.Build))}" + (v.Revision > 0 ? $".{v.Revision}" : "");
 
     public static string Tag(Version v) =>
-        $"v{v.Major}.{MinorText(v.Minor)}" + (v.Build > 0 || v.Revision > 0 ? $".{v.Build}" : "") + (v.Revision > 0 ? $".{v.Revision}" : "");
+        $"v{v.Major}.{MinorText(v.Minor)}" + (v.Build > 0 || v.Revision > 0 ? $".{MinorText(Math.Max(0, v.Build))}" : "") + (v.Revision > 0 ? $".{v.Revision}" : "");
 
     private const int MinorDigits = 3;
 
@@ -403,7 +403,8 @@ internal sealed class UpdateService
         {
             var parts = digits.Split('.');
             int minor = parts.Length > 1 ? DecimalMinor(parts[1]) : 0;
-            version = v.Revision > 0 ? new(v.Major, minor, Math.Max(0, v.Build), v.Revision) : new(v.Major, minor, Math.Max(0, v.Build));
+            int build = parts.Length > 2 ? DecimalMinor(parts[2]) : 0;
+            version = v.Revision > 0 ? new(v.Major, minor, build, v.Revision) : new(v.Major, minor, build);
             return true;
         }
         version = new Version(0, 0, 0);
@@ -411,7 +412,7 @@ internal sealed class UpdateService
     }
 
     private static Version Normalize(Version v) =>
-        v.Revision > 0 ? new(v.Major, DecimalMinor(v.Minor), Math.Max(0, v.Build), v.Revision) : new(v.Major, DecimalMinor(v.Minor), Math.Max(0, v.Build));
+        v.Revision > 0 ? new(v.Major, DecimalMinor(v.Minor), DecimalMinor(Math.Max(0, v.Build)), v.Revision) : new(v.Major, DecimalMinor(v.Minor), DecimalMinor(Math.Max(0, v.Build)));
 
     internal void ShowForScreenshots(ReleaseInfo? release)
     {

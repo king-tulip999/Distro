@@ -90,6 +90,47 @@ internal static class OpenXrSetup
         _ => "code " + code,
     };
 
+    public static string LayerLogPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Velocita", "OpenXR", "layer.log");
+
+    private const int LayerLogLinesShown = 30;
+
+    private static bool IracingRunning()
+    {
+        try
+        {
+            var found = System.Diagnostics.Process.GetProcessesByName(IracingFiles.IracingPaths.SimProcess);
+            foreach (var p in found) p.Dispose();
+            return found.Length > 0;
+        }
+        catch (InvalidOperationException) { return false; }
+    }
+
+    internal static IEnumerable<string> LayerLogLines() => LayerLogLines(ReadLayerLog());
+
+    internal static IEnumerable<string> LayerLogLines(string[]? lines)
+    {
+        if (lines is null)
+        {
+            yield return "- Layer log: none yet (the layer has never loaded in iRacing since this version)";
+            yield break;
+        }
+        var kept = lines.Where(l => !string.IsNullOrWhiteSpace(l)).TakeLast(LayerLogLinesShown).ToList();
+        yield return $"- Layer log, last {kept.Count} lines:";
+        foreach (string line in kept) yield return "  - " + line.Trim();
+    }
+
+    private static string[]? ReadLayerLog()
+    {
+        try
+        {
+            using var stream = new FileStream(LayerLogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            if (stream.Length > MaxManifestBytes * 2) stream.Seek(-MaxManifestBytes, SeekOrigin.End);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd().Split('\n');
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
+
     public static IEnumerable<string> ReportLines(HudVr? vr, bool settingOn)
     {
         yield return $"- VR widgets: {(settingOn ? "on" : "off")}{(vr is null ? ", overlay not running" : vr.On ? "" : ", waiting for iRacing")}";
@@ -103,6 +144,8 @@ internal static class OpenXrSetup
         foreach (var layer in layers)
             yield return $"  - {layer.Name ?? "unreadable manifest"}: {(layer.MachineWide ? "machine-wide" : "per user")}{(layer.Enabled ? "" : ", turned off")} ({layer.Manifest})";
         yield return $"- Admin setup for iRacing: {(OpenXrLayer.MachineInstalled ? OpenXrLayer.MachineCurrent ? "set up" : "set up, out of date" : "not set up")}";
+        yield return $"- iRacing running now: {(IracingRunning() ? "yes" : "no")}";
+        foreach (string line in LayerLogLines()) yield return line;
         if (vr?.LayerReport is not { } r)
         {
             yield return "- Velocita's layer inside iRacing: not seen since Velocita started";
