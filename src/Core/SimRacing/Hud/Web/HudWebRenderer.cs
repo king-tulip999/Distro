@@ -208,6 +208,7 @@ internal sealed class HudWebRenderer : IDisposable
                 redraw = true;
             }
             int hz = config.UpdateHz > 0 ? config.UpdateHz : def.Hz(t.Options!);
+            if (t.Widget?.Animating == true) hz = Math.Max(hz, def.MovingHz);
             fastest = Math.Max(fastest, hz);
             string? look = null;
             foreach (var client in group)

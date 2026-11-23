@@ -9,6 +9,7 @@ internal static class SessionEditor
         ContentTitle = "Shows",
         Groups = new HudGroup[]
         {
+            new("style", "Style", HudTab.Layout, true, O("style")),
             new("main", null, HudTab.Layout, true, O("titleRow"), O("progress")),
             new("fields", "Shows", HudTab.Content, true, new PickerSetting("fields", new HudCategory[]
             {

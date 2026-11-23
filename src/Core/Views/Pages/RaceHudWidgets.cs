@@ -293,7 +293,7 @@ internal sealed partial class RaceHudWidgets
                 Changed();
             });
         when.Add(SettingRows.Row("Show only in", "Inside any layout. Hidden in the sessions left unticked. None ticked = shown in every session.", true, sessions));
-        if (Layout is { } owner && !AppIdentity.SimHub) when.Add(SettingRows.Row("Keybind", null, true, KeybindBox(owner, w)));
+        if (Layout is { } owner) when.Add(SettingRows.Row("Keybind", null, true, KeybindBox(owner, w)));
         return when;
     }
 
@@ -488,7 +488,7 @@ internal sealed partial class RaceHudWidgets
 
     private HotkeyBox KeybindBox(HudLayout layout, HudWidgetConfig w)
     {
-        var box = new HotkeyBox { Width = ComboWidth, ToolTip = "Works in any program" };
+        var box = new HotkeyBox { Width = ComboWidth, ToolTip = AppIdentity.SimHub ? "Shows or hides this widget in the headset. A key or a wheel button" : "Works in any program" };
         box.SetHotkey(w.Hotkey);
         box.HotkeyChanged += hk =>
         {
@@ -594,6 +594,7 @@ internal sealed partial class RaceHudWidgets
 
     private const double WidgetPickWidth = 260;
     private const int AddWidgetColumns = 2;
+    private const int WidgetMenuRows = 8;
 
     internal static List<T> DownColumns<T>(IReadOnlyList<T> items, int columns)
     {
@@ -608,6 +609,10 @@ internal sealed partial class RaceHudWidgets
     private void WidgetMenu(Button anchor, List<HudWidgetConfig> widgets)
     {
         var menu = new ContextMenu { PlacementTarget = anchor, MinWidth = WidgetPickWidth };
+        var layout = new FrameworkElementFactory(typeof(MenuColumns));
+        layout.SetValue(MenuColumns.RowsProperty, WidgetMenuRows);
+        layout.SetValue(MenuColumns.CellsProperty, widgets.Count);
+        menu.ItemsPanel = new ItemsPanelTemplate(layout);
         Ui.DropBelow(menu);
         bool toggled = false;
         foreach (var w in widgets)

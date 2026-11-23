@@ -7,7 +7,7 @@ internal enum AlertLevel { Info, Good, Warning, Critical }
 internal sealed record AlertDef(string Id, string Title, string Description, AlertLevel Level, bool OnByDefault, double? Threshold = null,
     string ThresholdUnit = "", double DefaultCooldown = 20, bool Sticky = false);
 
-internal sealed class HudAlert(string id, string key, string title, string? detail, AlertLevel level, double raisedAt, bool sticky)
+internal sealed class HudAlert(string id, string key, string title, string? detail, AlertLevel level, double raisedAt, bool sticky, int? lap = null)
 {
     public string Id { get; } = id;
     public string Key { get; } = key;
@@ -16,6 +16,7 @@ internal sealed class HudAlert(string id, string key, string title, string? deta
     public AlertLevel Level { get; } = level;
     public double RaisedAt { get; } = raisedAt;
     public bool Sticky { get; } = sticky;
+    public int? Lap { get; } = lap;
     public bool Active { get; set; } = true;
 }
 internal readonly record struct AlertChoice(bool Enabled, double Cooldown, double? Threshold, double Duration);
@@ -71,13 +72,18 @@ internal sealed class AlertEngine
 {
     public const int HistorySize = 100;
     private readonly Func<AlertDef, AlertChoice> _choice;
+    private readonly Func<int?>? _lap;
     private readonly Dictionary<string, double> _lastRaised = new();
     private readonly Dictionary<string, bool> _condition = new();
     private readonly List<HudAlert> _visible = new();
     private readonly List<HudAlert> _history = new();
     private readonly HashSet<string> _dismissed = new();
 
-    public AlertEngine(Func<AlertDef, AlertChoice> choice) => _choice = choice;
+    public AlertEngine(Func<AlertDef, AlertChoice> choice, Func<int?>? lap = null)
+    {
+        _choice = choice;
+        _lap = lap;
+    }
 
     public event Action<HudAlert, AlertChoice>? Raised;
 
@@ -112,7 +118,7 @@ internal sealed class AlertEngine
         if (!choice.Enabled) return false;
         if (_lastRaised.TryGetValue(key, out var last) && now - last < choice.Cooldown) return false;
         _lastRaised[key] = now;
-        var alert = new HudAlert(id, key, title ?? def.Title, detail, def.Level, now, sticky ?? def.Sticky);
+        var alert = new HudAlert(id, key, title ?? def.Title, detail, def.Level, now, sticky ?? def.Sticky, _lap?.Invoke());
         _visible.RemoveAll(a => a.Key == key);
         _visible.Add(alert);
         _history.Add(alert);

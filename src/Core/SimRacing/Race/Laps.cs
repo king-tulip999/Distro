@@ -73,6 +73,10 @@ internal sealed class LapTracker
 
     public int SectorCount => _sectorStarts.Count;
 
+    public IReadOnlyList<double> SectorStarts => _sectorStarts;
+
+    public double SectorStartTime => _sectorStartTime;
+
     public event Action<LapRecord>? LapCompleted;
 
     public void Clear()

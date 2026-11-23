@@ -6,6 +6,6 @@ internal static class TrafficEditor
 {
     public static readonly HudEditorDef Def = new()
     {
-        Groups = new HudGroup[] { new("main", null, HudTab.Layout, true, O("titleRow"), O("window"), O("max"), O("sameClass")) },
+        Groups = new HudGroup[] { new("main", null, HudTab.Layout, true, O("style"), O("titleRow"), O("window"), O("max"), O("sameClass")) },
     };
 }

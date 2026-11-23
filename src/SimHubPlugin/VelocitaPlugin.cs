@@ -31,6 +31,8 @@ public class VelocitaPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
         this.AddAction("TurnOff", (_, _) => Engine.SetOn(false));
         this.AddAction("EditVrWidgets", (_, _) => Engine.EditVr());
         this.AddAction("RecenterVrWidgets", (_, _) => Engine.RecenterVr());
+        this.AddAction("NextLayout", (_, _) => Engine.NextLayout());
+        this.AddAction("PreviousLayout", (_, _) => Engine.PreviousLayout());
         if (Engine.On && !Engine.Running) Engine.Start();
         _sinceCheck.Restart();
     }

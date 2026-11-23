@@ -777,6 +777,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 : "Widgets set to show in VR appear in SteamVR and in OpenXR games, iRacing included. Each widget's spot is on its page.", toggle),
             status,
             adminRow,
+            Ui.SettingRow("Brightness", "Dims every VR widget, for night races. See-through parts stay the same.",
+                Ui.SliderWithValue(RaceHudSettings.MinVrBrightness, 100, S.VrBrightness, "{0:0}%", v => { S.VrBrightness = (int)v; changed(); Host()?.SettingsChanged(save: false); }, 190, 5)),
             Ui.SubHeader("Move every cockpit widget"),
             Shift("Sideways", "Right is positive.", HudWidgetConfig.VrReach, S.VrShiftX, v => S.VrShiftX = v),
             Shift("Height", "Up is positive.", HudWidgetConfig.VrReach, S.VrShiftY, v => S.VrShiftY = v),
@@ -810,9 +812,25 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                     Ui.SubHeader("Keys and wheel buttons"),
                     KeyRow("Edit VR widgets", S.VrAdjustHotkey, k => S.VrAdjustHotkey = k),
                     KeyRow("Recenter VR widgets", S.VrRecenterHotkey, k => S.VrRecenterHotkey = k),
+                    KeyRow("Next layout", S.NextLayoutHotkey, k => S.NextLayoutHotkey = k),
+                    KeyRow("Previous layout", S.PreviousLayoutHotkey, k => S.PreviousLayoutHotkey = k),
+                    KeyRow("Show / hide VR widgets", S.ToggleHotkey, k => S.ToggleHotkey = k),
+                    KeyRow("Dismiss alerts", S.DismissHotkey, k => S.DismissHotkey = k),
                     new TextBlock
                     {
-                        Text = "Click a box, then press a key or a wheel button. SimHub's Controls and events can run both too, as Velocita actions.",
+                        Text = "Click a box, then press a key or a wheel button. A layout switch shows the layout list in the headset for a moment. Each widget's own show / hide button is on its page. SimHub's Controls and events can run these too, as Velocita actions.",
+                        Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4),
+                    },
+                    Ui.SubHeader("While editing in the headset"),
+                    KeyRow("Next widget", S.VrNextHotkey, k => S.VrNextHotkey = k),
+                    KeyRow("Move, size or angle", S.VrSettingHotkey, k => S.VrSettingHotkey = k),
+                    KeyRow("Left", S.VrLeftHotkey, k => S.VrLeftHotkey = k),
+                    KeyRow("Right", S.VrRightHotkey, k => S.VrRightHotkey = k),
+                    KeyRow("Up", S.VrUpHotkey, k => S.VrUpHotkey = k),
+                    KeyRow("Down", S.VrDownHotkey, k => S.VrDownHotkey = k),
+                    new TextBlock
+                    {
+                        Text = "These work only while the editor is open. The picked widget shows which way they move it.",
                         Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4),
                     },
                 },
@@ -933,7 +951,19 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             root.Children.Add(new Tile
             {
                 Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing),
-                Child = new StackPanel { Children = { Ui.Text("Keybinds", "H3"), keys } },
+                Child = new StackPanel
+                {
+                    Children =
+                    {
+                        Ui.Text("Keybinds", "H3"),
+                        new TextBlock
+                        {
+                            Text = "Wheel and button box buttons work too: click a box, then press the button.",
+                            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0),
+                        },
+                        keys,
+                    },
+                },
             });
         }
         root.Children.Add(Group("Look", null, LookRows(a, changed, rebuild, (t, d, c, f) => Ui.SettingRow(t, d, c, f is null ? null : D(f.Value.Same, f.Value.Reset, f.Value.Shown))).Concat(new UIElement[] {

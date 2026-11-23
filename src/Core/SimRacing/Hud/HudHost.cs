@@ -254,14 +254,17 @@ internal sealed class HudHost : IDisposable
 
     public void ToggleHidden()
     {
-        if (!Settings.Enabled) { SetEnabled(true); return; }
+        if (!Settings.Enabled && !HeadsetOnly) { SetEnabled(true); return; }
         _hidden = !_hidden;
+        if (_vr.Showing) VrToast(_hidden ? "Widgets hidden" : "Widgets shown", null);
         Refresh();
     }
 
     public void ToggleWidget(HudWidgetConfig widget)
     {
-        if (!_hiddenWidgets.Remove(widget)) _hiddenWidgets.Add(widget);
+        bool hidden = !_hiddenWidgets.Remove(widget);
+        if (hidden) _hiddenWidgets.Add(widget);
+        if (widget.Vr != HudVrPlacement.Off && HudCatalog.Find(widget.Kind) is { } def) VrToast(def.Name + (hidden ? " hidden" : " shown"), null);
         foreach (var s in _slots.Values)
             if (ReferenceEquals(s.Config, widget)) s.Dirty = true;
         Refresh();
@@ -299,12 +302,69 @@ internal sealed class HudHost : IDisposable
         int i = list.FindIndex(l => string.Equals(l.Name, _layoutName, StringComparison.OrdinalIgnoreCase));
         if (i < 0) i = delta > 0 ? -1 : 0;
         UseLayout(list[((i + delta) % list.Count + list.Count) % list.Count].Name);
-        _app.Notify("iRacing Overlay layout applied", _layoutName, NoticeKind.Success);
+        if (_editor is not null) _editorDirty = true;
+        else if (_vr.Showing) ShowLayoutMenu();
+        if (!AppIdentity.SimHub || !_vr.Showing) _app.Notify("iRacing Overlay layout applied", _layoutName, NoticeKind.Success);
+    }
+
+    private const string FlashId = "vr-flash";
+    private System.Windows.Threading.DispatcherTimer? _flashTimer;
+
+    private void ShowLayoutMenu(string? footer = null)
+    {
+        var names = Settings.Layouts.Select(l => l.Name).ToList();
+        int current = names.FindIndex(n => string.Equals(n, _layoutName, StringComparison.OrdinalIgnoreCase));
+        var layout = VrFlash.Size(names.Count);
+        var size = VrPlacement.Pixels(layout, VrShare.MaxPixels / 2);
+        float scale = size.Width / layout.Width;
+        _vr.Remove(FlashId);
+        var target = _vr.Begin(FlashId, size, top: true);
+        var p = target.Painter;
+        p.Begin(target.Surface.Graphics!, scale, new SizeF(layout.Width, size.Height / scale), Palette, Settings.Appearance);
+        VrFlash.Paint(p, names, Math.Max(0, current), footer ?? (HasVrCandidate() ? "Press again for the next one" : "No VR widgets in this layout"));
+        p.End(target.Surface.Dc, size);
+        _vr.Publish(target, FlashId, "Layout", EditorConfig, EditorPose(Settings));
+        RestartFlash(VrFlash.ShowSeconds);
+    }
+
+    private void VrToast(string title, string? detail)
+    {
+        if (!_vr.Showing || _app.Demo) return;
+        var layout = VrFlash.ToastSize(detail is not null);
+        var size = VrPlacement.Pixels(layout, VrShare.MaxPixels / 4);
+        float scale = size.Width / layout.Width;
+        _vr.Remove(FlashId);
+        var target = _vr.Begin(FlashId, size, top: true);
+        var p = target.Painter;
+        p.Begin(target.Surface.Graphics!, scale, new SizeF(layout.Width, size.Height / scale), Palette, Settings.Appearance);
+        VrFlash.PaintToast(p, title, detail);
+        p.End(target.Surface.Dc, size);
+        _vr.Publish(target, FlashId, title, EditorConfig, EditorPose(Settings));
+        RestartFlash(VrFlash.ToastSeconds);
+    }
+
+    private void RestartFlash(double seconds)
+    {
+        _flashTimer ??= new System.Windows.Threading.DispatcherTimer();
+        _flashTimer.Tick -= OnFlashTimeout;
+        _flashTimer.Tick += OnFlashTimeout;
+        _flashTimer.Stop();
+        _flashTimer.Interval = TimeSpan.FromSeconds(seconds);
+        _flashTimer.Start();
+    }
+
+    private void OnFlashTimeout(object? sender, EventArgs e) => HideFlash();
+
+    private void HideFlash()
+    {
+        _flashTimer?.Stop();
+        _vr.Remove(FlashId);
     }
 
     public void DismissAlerts()
     {
         Race.Alerts.DismissAll();
+        VrToast("Alerts dismissed", null);
         foreach (var s in _slots.Values) s.Dirty = true;
     }
 
@@ -371,9 +431,11 @@ internal sealed class HudHost : IDisposable
         string name = layout?.Name ?? "";
         if (!force && name == _layoutName) return;
         bool changed = name != _layoutName;
+        bool byRule = changed && _layoutName.Length > 0 && MatchedRule is not null;
         _layoutName = name;
         NoteEditStart();
         Sync(layout);
+        if (byRule && _editor is null && _vr.Showing) ShowLayoutMenu("Picked by a rule for this session");
         if (changed) Changed?.Invoke();
     }
 
@@ -441,6 +503,7 @@ internal sealed class HudHost : IDisposable
                 continue;
             }
             int hz = s.Config.UpdateHz > 0 ? s.Config.UpdateHz : s.Def.Hz(s.Options);
+            if (s.Widget.Animating) hz = Math.Max(hz, s.Def.MovingHz);
             fastest = Math.Max(fastest, hz);
             bool due = Stopwatch.GetElapsedTime(s.LastDraw, now).TotalMilliseconds >= 1000.0 / hz - 4;
             if (!_editing && frame.Status == SimStatus.Connected && (s.Config.OnlyWhenNeeded ?? s.Def.HideWhenEmpty) == true)
@@ -628,12 +691,13 @@ internal sealed class HudHost : IDisposable
     {
         if (_editor is not null) { EndVrAdjust(); return; }
         var candidates = VrCandidates();
-        if (!_vr.Showing || candidates.Count == 0)
+        if (!_vr.Showing)
         {
-            _app.Notify("Nothing to edit in VR", !_vr.On ? "VR widgets are off in Overlay settings." : !_vr.Showing ? "No headset is showing VR widgets right now." : "No widget in this layout is set to show in VR.", NoticeKind.Info);
+            _app.Notify("Nothing to edit in VR", !_vr.On ? "VR widgets are off in Overlay settings." : "No headset is showing VR widgets right now.", NoticeKind.Info);
             return;
         }
-        _editor = new VrEditor(Settings);
+        HideFlash();
+        _editor = new VrEditor(Settings, StepLayout);
         _editor.SetCandidates(candidates);
         _vrSetting = VrAdjustSetting.Move;
         _mouse.Moved += OnMouseMoved;
@@ -717,7 +781,6 @@ internal sealed class HudHost : IDisposable
             _vr.PollPointer(EditorId, OnPointer);
             if (_editor is null) return;
             var candidates = VrCandidates();
-            if (candidates.Count == 0) { EndVrAdjust(); return; }
             if (!candidates.SequenceEqual(_editor.Candidates, ReferenceEqualityComparer.Instance))
             {
                 _editor.SetCandidates(candidates);
@@ -753,7 +816,7 @@ internal sealed class HudHost : IDisposable
         var target = _vr.Begin(EditorId, size, top: true);
         var painter = target.Painter;
         painter.Begin(target.Surface.Graphics!, _editorScale, new SizeF(layout.Width, size.Height / _editorScale), Palette, Settings.Appearance);
-        VrEditorPainter.Paint(painter, editor, editor.PickedName(w => HudCatalog.Find(w.Kind)?.Name ?? w.Kind));
+        VrEditorPainter.Paint(painter, editor, editor.PickedName(w => HudCatalog.Find(w.Kind)?.Name ?? w.Kind), _layoutName);
         painter.End(target.Surface.Dc, size);
         _vr.Publish(target, EditorId, "VR widgets", EditorConfig, EditorPose(Settings), pointer: true);
     }
@@ -862,8 +925,10 @@ internal sealed class HudHost : IDisposable
         if (!_vr.Recenter())
         {
             _app.Notify("Couldn't recenter", "The headset's position wasn't available. Try again while wearing it.", NoticeKind.Info);
+            VrToast("Couldn't recenter", "The headset's position wasn't available");
             return;
         }
+        VrToast("Recentered", null);
         VrRedraw();
     }
 
@@ -1535,6 +1600,7 @@ internal sealed class HudHost : IDisposable
         _web?.Dispose();
         _mouse.Dispose();
         _editorTimer?.Stop();
+        _flashTimer?.Stop();
         _vr.Changed -= OnVrChanged;
         _vr.Dispose();
         _webRenderer.Dispose();

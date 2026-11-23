@@ -223,6 +223,8 @@ internal abstract class HudWidget : IDisposable
 
     public virtual bool HasContent(HudView v) => true;
 
+    public virtual bool Animating => false;
+
     public virtual bool Click(PointF at, HudView v) => false;
 
     protected static bool DrawWaiting(HudPainter p, HudView v, string? title = null)

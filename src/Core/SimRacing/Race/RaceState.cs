@@ -46,7 +46,7 @@ internal sealed class RaceState
         _settings = settings;
         Profile = new EstProfile(lapProfiles);
         _pitExit = new PitExitFeed(pitLoss ?? new PitLossStore(null));
-        Alerts = new AlertEngine(def => ChoiceFor(settings(), def));
+        Alerts = new AlertEngine(def => ChoiceFor(settings(), def), () => Frame.Lap);
         Laps.LapCompleted += OnLap;
         TrackLimits.Left += OnOffTrack;
     }
@@ -98,6 +98,7 @@ internal sealed class RaceState
     public RadarModel Radar { get; } = new();
     public FuelModel FuelData { get; } = new();
     public LapTracker Laps { get; } = new();
+    public DeltaHistory Deltas { get; } = new();
     public AlertEngine Alerts { get; }
 
     public int SelectedCar { get; set; } = -1;
@@ -354,6 +355,7 @@ internal sealed class RaceState
         if (!f.IsReplayPlaying)
         {
             Laps.Update(Now, f.LapCompleted, f.LapDistPct, f.LapCurrent, f.LapLast, f.Incidents, f.Fuel, f.OnPitRoad, caution);
+            Deltas.Update(Now, f);
             FuelData.Update(f, _fuelIdentity, s.Fuel.Window);
             if (f.LapCompleted != _fuelLap || f.OnPitRoad) { _fuelLap = f.LapCompleted; _lapStartFuel = f.Fuel; FuelThisLapFrom = f.LapDistPct is { } at && at < 0.95 ? at : 0; }
         }
@@ -406,6 +408,7 @@ internal sealed class RaceState
     private void NewSession(TelemetryFrame f)
     {
         Laps.Clear();
+        Deltas.Clear();
         Gaps.Clear();
         TrackLimits.Clear();
         Weather.Clear();

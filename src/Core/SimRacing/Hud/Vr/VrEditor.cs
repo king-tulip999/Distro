@@ -4,7 +4,7 @@ using Units = Core.Services.CapsUnits;
 
 namespace Core.SimRacing.Hud.Vr;
 
-internal enum VrEditorPart { None, Done, Previous, Next, Minus, Plus, Track, Curve, VrOnly, Face, Grip }
+internal enum VrEditorPart { None, Done, LayoutPrevious, LayoutNext, Previous, Next, Minus, Plus, Track, Curve, VrOnly, Face, Grip }
 
 internal readonly record struct VrEditorHit(VrEditorPart Part, int Row = -1)
 {
@@ -23,15 +23,21 @@ internal sealed class VrEditor
     public const double MouseSpeed = 0.6, PanelMetresPerCount = 0.0006, PanelWidthStep = 0.02;
 
     private readonly RaceHudSettings _settings;
+    private readonly Action<int> _stepLayout;
     private List<HudWidgetConfig?> _candidates = new();
     private int _dragRow = -1;
     private float _dragFromX;
     private double _dragFromValue;
-    private bool _panelDrag;
+    private bool _panelDrag, _pointerDrag;
+    private PointF _grab;
 
     public bool MovingPanel => _panelDrag;
 
-    public VrEditor(RaceHudSettings settings) => _settings = settings;
+    public VrEditor(RaceHudSettings settings, Action<int> stepLayout)
+    {
+        _settings = settings;
+        _stepLayout = stepLayout;
+    }
 
     public int Pick { get; private set; }
 
@@ -47,7 +53,7 @@ internal sealed class VrEditor
 
     public bool AllPicked => Pick >= 0 && Pick < _candidates.Count && _candidates[Pick] is null;
 
-    public string PickedName(Func<HudWidgetConfig, string> name) => Picked is { } w ? name(w) : "All cockpit widgets";
+    public string PickedName(Func<HudWidgetConfig, string> name) => Picked is { } w ? name(w) : AllPicked ? "All cockpit widgets" : "No VR widgets in this layout";
 
     public void SetCandidates(List<HudWidgetConfig?> candidates)
     {
@@ -88,7 +94,7 @@ internal sealed class VrEditor
         return rows;
     }
 
-    public const float FooterHeight = 34;
+    public const float FooterHeight = 34, LayoutRowTop = 52, WidgetRowTop = 100;
 
     public float Height => Layout(Rows().Count).Max(e => e.Box.Bottom) + Pad + FooterHeight;
 
@@ -100,10 +106,12 @@ internal sealed class VrEditor
         {
             new(VrEditorPart.Done, -1, new RectangleF(Width - Pad - 76, Pad, 76, 28)),
             new(VrEditorPart.Grip, -1, new RectangleF(Pad, Pad, Width - Pad * 2 - 76 - 8, 28)),
-            new(VrEditorPart.Previous, -1, new RectangleF(Pad, 52, ButtonSize + 6, 32)),
-            new(VrEditorPart.Next, -1, new RectangleF(Width - Pad - ButtonSize - 6, 52, ButtonSize + 6, 32)),
+            new(VrEditorPart.LayoutPrevious, -1, new RectangleF(Pad, LayoutRowTop, ButtonSize + 6, 32)),
+            new(VrEditorPart.LayoutNext, -1, new RectangleF(Width - Pad - ButtonSize - 6, LayoutRowTop, ButtonSize + 6, 32)),
+            new(VrEditorPart.Previous, -1, new RectangleF(Pad, WidgetRowTop, ButtonSize + 6, 32)),
+            new(VrEditorPart.Next, -1, new RectangleF(Width - Pad - ButtonSize - 6, WidgetRowTop, ButtonSize + 6, 32)),
         };
-        float y = 96;
+        float y = WidgetRowTop + 44;
         for (int i = 0; i < rows; i++)
         {
             float x = Pad + LabelWidth;
@@ -150,6 +158,14 @@ internal sealed class VrEditor
 
     public VrEditorResult MoveTo(PointF p, bool cursor)
     {
+        if (_panelDrag && _pointerDrag)
+        {
+            double metres = _settings.VrPanelWidth / Width;
+            _settings.VrPanelX += (p.X - _grab.X) * metres;
+            _settings.VrPanelY -= (p.Y - _grab.Y) * metres;
+            _settings.ClampVrPanel();
+            return VrEditorResult.Redraw;
+        }
         Cursor = p;
         CursorShown = cursor;
         var hover = HitTest(p);
@@ -167,9 +183,13 @@ internal sealed class VrEditor
         switch (hit.Part)
         {
             case VrEditorPart.Done: return VrEditorResult.Close;
-            case VrEditorPart.Grip when at is null:
+            case VrEditorPart.Grip:
                 _panelDrag = true;
+                _pointerDrag = at is not null;
+                _grab = Cursor;
                 return VrEditorResult.Redraw;
+            case VrEditorPart.LayoutPrevious: _stepLayout(-1); return VrEditorResult.Redraw;
+            case VrEditorPart.LayoutNext: _stepLayout(1); return VrEditorResult.Redraw;
             case VrEditorPart.Previous: Step(-1); return VrEditorResult.Redraw;
             case VrEditorPart.Next: Step(1); return VrEditorResult.Redraw;
             case VrEditorPart.Minus when hit.Row < rows.Count: return Nudge(rows[hit.Row], -1);
@@ -192,7 +212,7 @@ internal sealed class VrEditor
     {
         _dragRow = -1;
         if (!_panelDrag) return VrEditorResult.None;
-        _panelDrag = false;
+        _panelDrag = _pointerDrag = false;
         return VrEditorResult.Redraw;
     }
 

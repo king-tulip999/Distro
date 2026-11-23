@@ -21,6 +21,8 @@ internal static class Engine
     private const string ResumedName = @"Local\Velocita SimHub.Resumed";
     private const string EditVrName = @"Local\Velocita SimHub.EditVr";
     private const string RecenterVrName = @"Local\Velocita SimHub.RecenterVr";
+    private const string NextLayoutName = @"Local\Velocita SimHub.NextLayout";
+    private const string PreviousLayoutName = @"Local\Velocita SimHub.PreviousLayout";
     private const string OffFile = "off.txt";
     private const uint GwChild = 5, PmNoRemove = 0;
     private static readonly TimeSpan ReleaseTimeout = TimeSpan.FromSeconds(2);
@@ -102,6 +104,10 @@ internal static class Engine
     public static void EditVr() => Signal(EditVrName);
 
     public static void RecenterVr() => Signal(RecenterVrName);
+
+    public static void NextLayout() => Signal(NextLayoutName);
+
+    public static void PreviousLayout() => Signal(PreviousLayoutName);
 
     public static void SetOn(bool on)
     {

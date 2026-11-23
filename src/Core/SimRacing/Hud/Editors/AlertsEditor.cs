@@ -6,6 +6,6 @@ internal static class AlertsEditor
 {
     public static readonly HudEditorDef Def = new()
     {
-        Groups = new HudGroup[] { new("main", null, HudTab.Layout, true, O("max"), O("big"), O("history")) },
+        Groups = new HudGroup[] { new("main", null, HudTab.Layout, true, O("style"), O("max")) },
     };
 }

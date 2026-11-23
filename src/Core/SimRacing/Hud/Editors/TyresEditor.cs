@@ -8,7 +8,8 @@ internal static class TyresEditor
     {
         Groups = new HudGroup[]
         {
-            new("shows", "Shows", HudTab.Layout, true, O("titleRow"), new TogglesSetting("shows", "Each corner shows", new[] { "pressure", "temps", "wear" })),
+            new("main", null, HudTab.Layout, true, O("look"), O("titleRow")),
+            new("shows", "Shows", HudTab.Layout, true, new TogglesSetting("shows", "Each corner shows", new[] { "pressure", "temps", "wear" })),
             new("limits", "Temperature limits", HudTab.Layout, false, O("low") with { ShowIf = o => o.Bool("temps") }, O("high") with { ShowIf = o => o.Bool("temps") }),
         },
     };

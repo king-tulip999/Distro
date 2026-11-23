@@ -40,6 +40,8 @@ internal static class SimHubEngine
     private static string ResumedEventName => $@"Local\{AppIdentity.DataName}.Resumed";
     private static string EditVrEventName => $@"Local\{AppIdentity.DataName}.EditVr";
     private static string RecenterVrEventName => $@"Local\{AppIdentity.DataName}.RecenterVr";
+    private static string NextLayoutEventName => $@"Local\{AppIdentity.DataName}.NextLayout";
+    private static string PreviousLayoutEventName => $@"Local\{AppIdentity.DataName}.PreviousLayout";
     private static readonly TimeSpan ParentExitGrace = TimeSpan.FromSeconds(10);
     private static bool _watchingParent;
     private static bool _parentHandled;
@@ -115,6 +117,8 @@ internal static class SimHubEngine
         Listen(app, ResumedEventName, "SimHub resumed", StopParentGrace);
         Listen(app, EditVrEventName, "SimHub edit VR", () => _hud?.ToggleVrAdjust());
         Listen(app, RecenterVrEventName, "SimHub recenter VR", () => _hud?.RecenterVr());
+        Listen(app, NextLayoutEventName, "SimHub next layout", () => _hud?.NextLayout());
+        Listen(app, PreviousLayoutEventName, "SimHub previous layout", () => _hud?.PreviousLayout());
         SingleInstance.ListenForQuit(() => app.Dispatcher.BeginInvoke(new Action(App.Quit)));
         if (int.TryParse(Arg(args, ParentArg), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parent)) WatchParent(app, parent);
         if (args.Contains(SettingsArg, StringComparer.OrdinalIgnoreCase)) ShowSettings();

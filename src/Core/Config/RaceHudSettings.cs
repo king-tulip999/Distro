@@ -18,7 +18,7 @@ public enum HudVrPlacement { Off, Cockpit, Head }
 
 public sealed class RaceHudSettings
 {
-    public const int CurrentVersion = 7;
+    public const int CurrentVersion = 8;
 
     public int Version { get; set; }
 
@@ -60,6 +60,10 @@ public sealed class RaceHudSettings
     public bool VrEditButton { get; set; }
 
     public bool VrEditorIntroDone { get; set; }
+
+    public const int MinVrBrightness = 20;
+
+    public int VrBrightness { get; set; } = 100;
 
     public const double MaxVrShiftDistance = 1;
 
@@ -246,7 +250,7 @@ public sealed class RaceHudSettings
             Layouts.AddRange(defaults());
             Rules.AddRange(defaultRules());
         }
-        bool before2 = Version < 2, before3 = Version < 3, before4 = Version < 4, before5 = Version < 5, before6 = Version < 6, before7 = Version < 7;
+        bool before2 = Version < 2, before3 = Version < 3, before4 = Version < 4, before5 = Version < 5, before6 = Version < 6, before7 = Version < 7, before8 = Version < 8;
         Version = CurrentVersion;
         Appearance ??= new();
         if (before4) { Appearance.Colors = HudAppearance.DefaultColors; Appearance.Custom = new(); }
@@ -254,6 +258,7 @@ public sealed class RaceHudSettings
         if (WebPort is < MinWebPort or > MaxWebPort) WebPort = DefaultWebPort;
         ClampVrShift();
         ClampVrPanel();
+        VrBrightness = Math.Clamp(VrBrightness, MinVrBrightness, 100);
         var builtIn = defaults();
         if (!Layouts.Any(l => l is not null && IsDefaultName(l.Name ?? ""))) Layouts.Add(builtIn[0]);
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -274,7 +279,7 @@ public sealed class RaceHudSettings
                 if (before6) InputsShowGear(w);
                 if (before7) SwitchToNewLooks(w);
                 if (before2) ShowClassesInsteadOfHiding(w);
-                if (before3) ScaleFromNaturalSize(w);
+                if (before3 || before8 && string.Equals(w.Kind, "tyres", StringComparison.OrdinalIgnoreCase)) ScaleFromNaturalSize(w);
                 w.Clamp();
             }
         }

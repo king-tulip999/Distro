@@ -4,7 +4,7 @@ namespace Core.SimRacing.Hud.Vr;
 
 internal static class VrEditorPainter
 {
-    public static void Paint(HudPainter p, VrEditor editor, string pickedName)
+    public static void Paint(HudPainter p, VrEditor editor, string pickedName, string layoutName)
     {
         var b = p.Bounds;
         p.Fill(b, HudPalette.Alpha(p.P.Bg, 240), p.Look.Corner);
@@ -23,6 +23,16 @@ internal static class VrEditorPainter
                     break;
                 case VrEditorPart.Done:
                     Button(p, e.Box, "Done", hover, true);
+                    break;
+                case VrEditorPart.LayoutPrevious:
+                    Arrow(p, e.Box, hover, -1);
+                    break;
+                case VrEditorPart.LayoutNext:
+                    Arrow(p, e.Box, hover, 1);
+                    var middle = new RectangleF(VrEditor.Pad + VrEditor.ButtonSize + 12, e.Box.Y, VrEditor.Width - 2 * (VrEditor.Pad + VrEditor.ButtonSize + 12), e.Box.Height);
+                    p.Fill(middle, p.Sunken(0.25), 6);
+                    p.Text("Layout", p.Tiny, p.P.Faint, new RectangleF(middle.X + 8, middle.Y, 60, middle.Height));
+                    p.Text(layoutName, p.Bold, p.P.Heading, new RectangleF(middle.X + 60, middle.Y, middle.Width - 120, middle.Height), HAlign.Center);
                     break;
                 case VrEditorPart.Previous:
                     Arrow(p, e.Box, hover, -1);

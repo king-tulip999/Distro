@@ -2,7 +2,7 @@
 
   <!-- One version for Core, Tecnica and Velocita; it changes only on a release and equals the tag (v1.4 = 1.4.0). -->
   <PropertyGroup>
-    <Version>4.4.04</Version>
+    <Version>4.4.05</Version>
   </PropertyGroup>
 
 </Project>

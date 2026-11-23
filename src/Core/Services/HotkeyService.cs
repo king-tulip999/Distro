@@ -30,7 +30,7 @@ internal sealed class HotkeyService : IDisposable
 
         if (AppIdentity.SimHub)
         {
-            foreach (var hotkey in PluginHotkeys().Where(h => SimHubKeybinds.Contains(h.Id) && h.Live?.Invoke() != false))
+            foreach (var hotkey in PluginHotkeys().Where(h => SimHubKeybind(h.Id) && h.Live?.Invoke() != false))
                 Register(hotkey.Get(), hotkey.Invoke, hotkey.Label);
             ReportFailures(failures);
             return;
@@ -60,7 +60,13 @@ internal sealed class HotkeyService : IDisposable
         ReportFailures(failures);
     }
 
-    public static readonly IReadOnlySet<string> SimHubKeybinds = new HashSet<string> { "hud.vr.adjust", "hud.vr.recenter" };
+    public static readonly IReadOnlySet<string> SimHubKeybinds = new HashSet<string>
+    {
+        "hud.toggle", "hud.dismiss", "hud.layout", "hud.layout.previous",
+        "hud.vr.adjust", "hud.vr.recenter", "hud.vr.next", "hud.vr.setting", "hud.vr.left", "hud.vr.right", "hud.vr.up", "hud.vr.down",
+    };
+
+    public static bool SimHubKeybind(string id) => SimHubKeybinds.Contains(id) || id.StartsWith("hud.widget:", StringComparison.Ordinal);
 
     private void ReportFailures(List<string> failures)
     {

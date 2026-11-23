@@ -8,8 +8,9 @@ internal static class IncidentsEditor
     {
         Groups = new HudGroup[]
         {
-            new("main", null, HudTab.Layout, true, O("titleRow"), O("count")),
-            new("columns", "Columns", HudTab.Content, true, O("columns")),
+            new("main", null, HudTab.Layout, true, O("style"),
+                O("titleRow") with { ShowIf = o => o.Choice("style") != Widgets.IncidentsWidget.Line },
+                O("count") with { ShowIf = o => o.Choice("style") == Widgets.IncidentsWidget.Chips }),
         },
     };
 }

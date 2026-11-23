@@ -98,16 +98,35 @@ internal static class HudSheet
             new("timing", "Delta to the session best", O(("reference", "session"))),
             new("timing", "Delta to my best lap", O(("reference", "best"))),
             new("timing", "Compact", O(("look", "compact"), ("reference", "session")), H: 110),
+            new("timing", "Delta strip", O(("look", "strip")), W: 380, H: 90),
+            new("timing", "Times and sectors", O(("look", "full")), Fit: true),
+            new("timing", "Sector column", O(("look", "column")), Fit: true),
+            new("timing", "Sector board", O(("look", "board")), W: 340, H: 80),
+            new("timing", "Lap ribbon", O(("look", "ribbon")), W: 400, H: 110),
+            new("timing", "Thin ribbon", O(("look", "thin")), W: 380, H: 50),
+            new("timing", "Delta pill", O(("look", "pill")), Fit: true),
             new("fuel", "Default", O(), At: 600),
             new("fuel", "Pit exit", O(("parts", "header,figures"), ("head", "togo,pitexit,stops,add"), ("top", "pitexit,level,laps")), At: 600, H: 122),
             new("fuel", "Fuel saving", O(("parts", "header,save")), At: 600, H: 122),
             new("fuel", "Every section", O(("parts", "header,gauge,plan,save,figures,table,grid"), ("head", "togo,nextpit,stops,pitby,add,pitexit,level"), ("gridRows", "curr,avg,max,min,last")), At: 600, Fit: true),
-            new("session", "Default", O()),
-            new("session", "Time, position, phase and track", O(("fields", "remain,elapsed,pos,cpos,phase,track"))),
+            new("session", "Tall", O(("fields", "remain,lapsleft,lap,cpos,pos,inc,clock")), Fit: true),
+            new("session", "Strip", O(("style", "strip"), ("fields", "remain,lapsleft,lap,cpos,inc")), Fit: true),
+            new("session", "Position first", O(("style", "position"), ("fields", "remain,lapsleft,lap,inc,clock")), Fit: true),
+            new("session", "Grid", O(("style", "grid"), ("fields", "remain,lapsleft,lap,cpos,pos,inc,clock")), Fit: true),
+            new("session", "Default", O(), Fit: true),
+            new("session", "Time, position, phase and track", O(("fields", "remain,elapsed,pos,cpos,phase,track")), Fit: true),
             new("map", "Whole track", O()),
             new("map", "Zoomed in on you", O(("zoom", "4"))),
             new("map", "Turns with the car", O(("rotate", "true"), ("zoom", "3"))),
-            new("tyres", "Default", O()),
+            new("flatmap", "Lap strip", O(), Fit: true),
+            new("flatmap", "Around me", O(("style", "around")), Fit: true),
+            new("flatmap", "Class lanes", O(("style", "lanes")), Fit: true),
+            new("flatmap", "Corner profile", O(("style", "profile")), Fit: true),
+            new("flatmap", "Thin bar", O(("style", "bar")), Fit: true),
+            new("flatmap", "Car numbers", O(("dotText", "number")), Fit: true),
+            new("tyres", "Rings", O()),
+            new("tyres", "Tread bars", O(("look", "bars"))),
+            new("tyres", "Strip", O(("look", "strip"))),
             new("tyres", "Without wear", O(("wear", "false"))),
             new("weather", "Panel", O()),
             new("weather", "Strip", O(("look", "strip")), W: 340, H: 124, Speed: 300),
@@ -118,13 +137,23 @@ internal static class HudSheet
             new("wind", "Crosswind", O(("title", "true")), WindFrom: Cross),
             new("wind", "Tailwind", O(("title", "true")), WindFrom: Behind),
             new("wind", "Accent color", O(("colors", "accent")), WindFrom: Cross + 0.6),
-            new("laps", "Last 10 laps", O()),
-            new("laps", "Last 3 laps, no statistics", O(("count", "3"), ("stats", "false")), Fit: true),
-            new("incidents", "Default", O()),
+            new("laps", "Delta bars", O(), Fit: true),
+            new("laps", "Trend chart", O(("look", "trend")), Fit: true),
+            new("laps", "Last lap first", O(("look", "last")), Fit: true),
+            new("laps", "Sector cells", O(("look", "sectors")), Fit: true),
+            new("incidents", "Budget bar", O(), Fit: true),
+            new("incidents", "Chips", O(("style", "chips")), Fit: true),
+            new("incidents", "Single line", O(("style", "line")), Fit: true),
+            new("incidents", "Session timeline", O(("style", "timeline")), Fit: true),
             new("events", "Default", O()),
             new("events", "Longer timeline", O(("count", "14")), H: 330),
-            new("notes", "Default", O()),
-            new("alerts", "Default", O()),
+            new("notes", "Countdown", O(), Fit: true),
+            new("notes", "Ticker", O(("style", "ticker")), Fit: true),
+            new("notes", "Approach strip", O(("style", "strip")), Fit: true),
+            new("notes", "Distance list", O(("style", "list")), Fit: true),
+            new("alerts", "Headline", O(), At: 1500, Fit: true),
+            new("alerts", "Stripe stack", O(("style", "stripes")), At: 1500, Fit: true),
+            new("alerts", "Race log", O(("style", "log")), At: 1500, Fit: true),
             new("result", "Card", O()),
             new("result", "Banner", O(("look", "banner")), Fit: true),
             new("result", "Stamp", O(("look", "stamp")), Fit: true),
@@ -160,7 +189,7 @@ internal static class HudSheet
         };
         foreach (var (kind, options, count, name) in new[]
         {
-            ("traffic", O(("window", "30"), ("max", "6")), 2, "Wider window"), ("traffic", O(("window", "30"), ("max", "6"), ("sameClass", "true")), 1, "Wider window, my class too"),
+            ("traffic", O(("window", "30"), ("max", "6")), 2, "Wider window"), ("traffic", O(("window", "30"), ("max", "6"), ("sameClass", "true")), 1, "Wider window, my class too"), ("traffic", O(("style", "timeline"), ("window", "30"), ("max", "6")), 1, "Timeline"),
             ("radar", O(), 2, "Default"), ("radar", O(("range", "40")), 1, "Longer range"), 
         })
         {
@@ -351,6 +380,7 @@ internal static class HudSheet
             }
             const float Tall = 2400;
             Clean((float)def.W, Tall);
+            if (fit.Needed is { } asked) return new SizeF(Math.Max(asked.Width, fit.MinWidth), asked.Height);
             float width = Math.Max((float)def.W, fit.MinWidth);
             Clean(width, Tall);
             width = Math.Max(width, fit.MinWidth);
@@ -430,17 +460,20 @@ internal static class HudSheet
     private static void Render(string folder)
     {
         var settings = new RaceHudSettings();
-        var race = new RaceState(() => settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
+        double simNow = -1500;
+        var race = new RaceState(() => settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace, Clock = () => simNow };
         var demo = new DemoTelemetry();
         var frame = new TelemetryFrame();
         long seq = 0;
         for (double t = -1500; t <= 0; t += 0.25)
         {
+            simNow = t;
             demo.Fill(frame, t);
             frame.Sequence = ++seq;
             race.Update(frame);
         }
         Thread.Sleep(300);
+        simNow = 0.25;
         demo.Fill(frame, 0.25);
         frame.Sequence = ++seq;
         race.Update(frame);
@@ -483,6 +516,11 @@ internal static class HudSheet
                 ("result", "result-banner", new[] { ("look", "banner") }),
                 ("result", "result-stamp", new[] { ("look", "stamp") }),
                 ("result", "result-story", new[] { ("look", "story") }),
+                ("tyres", "tyres-bars", new[] { ("look", "bars") }),
+                ("tyres", "tyres-strip", new[] { ("look", "strip") }),
+                ("laps", "laps-trend", new[] { ("look", "trend") }),
+                ("laps", "laps-last", new[] { ("look", "last") }),
+                ("laps", "laps-sectors", new[] { ("look", "sectors") }),
             })
             {
                 var def = HudCatalog.Find(kind)!;
@@ -517,6 +555,23 @@ internal static class HudSheet
                 Save(flat, size.Width, size.Height, Path.Combine(dir, file + ".png"), 1, options);
             }
             Save(flat, 64, 250, Path.Combine(dir, "flatmap-upright.png"), 1, ("style", "bar"), ("upright", "true"));
+            var traffic = HudCatalog.Find("traffic")!;
+            foreach (var style in new[] { "ladder", "timeline" })
+            {
+                var options = new[] { ("style", style), ("window", "30"), ("max", "6") };
+                var size = Asked(traffic, options);
+                Save(traffic, size.Width, size.Height, Path.Combine(dir, "traffic-" + style + ".png"), 1, options);
+                race.Frame.Flags = RaceFlags.Blue;
+                Save(traffic, size.Width, size.Height, Path.Combine(dir, "traffic-" + style + "-blue.png"), 1, options);
+                race.Frame.Flags = flags;
+            }
+            var notes = HudCatalog.Find("notes")!;
+            foreach (var style in new[] { "countdown", "ticker", "strip", "list" })
+            {
+                var options = new[] { ("style", style) };
+                var size = Asked(notes, options);
+                Save(notes, size.Width, size.Height, Path.Combine(dir, "notes-" + style + ".png"), 1, options);
+            }
             Save(timing, 200, 110, Path.Combine(dir, "timing-compact.png"), 1, ("look", "compact"), ("reference", "session"));
             var weather = HudCatalog.Find("weather")!;
             Save(weather, 340, 124, Path.Combine(dir, "weather-strip.png"), 1, ("look", "strip"));
@@ -551,6 +606,14 @@ internal static class HudSheet
             Save(standings, standingsThree.Width, standingsThree.Height, Path.Combine(dir, "standings-last3.png"), 1, threeLaps);
             var threeLapsSize = Asked(relative, threeLaps);
             Save(relative, threeLapsSize.Width, threeLapsSize.Height, Path.Combine(dir, "relative-last3.png"), 1, threeLaps);
+            var session = HudCatalog.Find("session")!;
+            foreach (var style in new[] { "tall", "strip", "position", "grid" })
+                foreach (var (suffix, fields) in new[] { ("", "remain,lapsleft,lap,cpos,pos,inc,clock"), ("-default", ""), ("-one", "remain") })
+                {
+                    var styled = fields.Length > 0 ? new[] { ("style", style), ("fields", fields) } : new[] { ("style", style) };
+                    var styledSize = Asked(session, styled);
+                    Save(session, styledSize.Width, styledSize.Height, Path.Combine(dir, $"session-{style}{suffix}.png"), 1, styled);
+                }
 
             SizeF Asked(HudWidgetDef def, (string Key, string Value)[] options)
             {
@@ -586,6 +649,7 @@ internal static class HudSheet
                 }
                 const float Tall = 2400;
                 Clean((float)def.W, Tall);
+                if (fit.Needed is { } asked) return new SizeF(Math.Max(asked.Width, fit.MinWidth), asked.Height);
                 float width = Math.Max((float)def.W, fit.MinWidth);
                 Clean(width, Tall);
                 width = Math.Max(width, fit.MinWidth);
@@ -611,6 +675,7 @@ internal static class HudSheet
             {
                 for (; mixAt < until; mixAt += 0.25)
                 {
+                    simNow = mixAt;
                     demo.Fill(frame, mixAt);
                     frame.Sequence = ++seq;
                     race.Update(frame);
@@ -619,6 +684,27 @@ internal static class HudSheet
                 Save(mixRelative, mixRelative.W, mixRelative.H, Path.Combine(dir, $"mix-{at}-both.png"), 1, ("classRows", "true"), ("classBorder", "true"));
                 Save(mixRelative, mixRelative.W, mixRelative.H, Path.Combine(dir, $"mix-{at}-outlines.png"), 1, ("classBorder", "true"));
             }
+
+            for (; mixAt < 330; mixAt += 0.25)
+            {
+                simNow = mixAt;
+                demo.Fill(frame, mixAt);
+                frame.Sequence = ++seq;
+                race.Update(frame);
+            }
+            foreach (var (file, w, h, options) in new[]
+            {
+                ("timing-strip", 560f, 64f, new[] { ("look", "strip") }),
+                ("timing-full", 380f, 150f, new[] { ("look", "full") }),
+                ("timing-column", 300f, 170f, new[] { ("look", "column") }),
+                ("timing-board", 460f, 84f, new[] { ("look", "board") }),
+                ("timing-ribbon", 460f, 112f, new[] { ("look", "ribbon") }),
+                ("timing-thin", 460f, 56f, new[] { ("look", "thin") }),
+                ("timing-pill", 250f, 52f, new[] { ("look", "pill") }),
+                ("timing-pill-predicted", 250f, 52f, new[] { ("look", "pill"), ("pill", "predicted") }),
+                ("timing-pill-none", 150f, 52f, new[] { ("look", "pill"), ("pill", "none") }),
+            })
+                Save(timing, w, h, Path.Combine(dir, file + ".png"), 1, options);
 
             var mapDef = HudCatalog.Find("map")!;
             frame.Simulated = false;
