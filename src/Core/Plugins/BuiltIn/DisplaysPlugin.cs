@@ -13,10 +13,10 @@ internal sealed class DisplaysPlugin : Plugin
     public override (string Soft, string Deep) Colors => ("SlateSoft", "SlateDeep");
     public override int Order => 20;
     public override string Reads =>
-        "Your monitors (arrangement, resolution, refresh rate, HDR), taskbar, wallpapers and audio devices, only while its page is open or a profile is applied.";
-    public override string BackgroundWork => "Never. Only its profile keybinds are registered.";
+        "Your monitors (arrangement, resolution, refresh rate, HDR), taskbar, wallpapers and audio devices, only while its page is open or a setup is applied.";
+    public override string BackgroundWork => "Never. Only its setup keybinds are registered.";
     public override string Changes =>
-        "Only when you apply a display profile: monitor arrangement, resolution, HDR, taskbar, wallpapers and default audio device.";
+        "Only when you apply a display setup: monitor arrangement, resolution, HDR, taskbar, wallpapers and default audio device.";
 
     public override IEnumerable<PluginHotkey> Hotkeys(AppServices app)
     {
@@ -26,8 +26,8 @@ internal sealed class DisplaysPlugin : Plugin
             if (HotkeyCatalog.Step(app.Config.Displays.Profiles, app.DisplayProfiles.Active, delta) is { } profile)
                 _ = app.DisplayProfiles.ApplyAsync(profile);
         }
-        yield return new PluginHotkey("displays.next", "Next display profile", () => k.NextDisplayProfile, hk => k.NextDisplayProfile = hk, () => Step(1), "Switch profiles");
-        yield return new PluginHotkey("displays.previous", "Previous display profile", () => k.PreviousDisplayProfile, hk => k.PreviousDisplayProfile = hk, () => Step(-1), "Switch profiles");
+        yield return new PluginHotkey("displays.next", "Next display setup", () => k.NextDisplayProfile, hk => k.NextDisplayProfile = hk, () => Step(1), "Switch setups");
+        yield return new PluginHotkey("displays.previous", "Previous display setup", () => k.PreviousDisplayProfile, hk => k.PreviousDisplayProfile = hk, () => Step(-1), "Switch setups");
     }
 
     public override IReadOnlyList<PluginPage> Pages { get; } = new[]

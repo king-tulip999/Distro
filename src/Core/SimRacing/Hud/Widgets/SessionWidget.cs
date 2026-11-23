@@ -351,6 +351,8 @@ internal sealed class SessionWidget : HudWidget
         if (bar) Progress(p, new RectangleF(pad, top + gridH + pad, w - pad * 2, barH), done);
     }
 
+    private static readonly string[] PositionParts = { "position", "details" };
+
     private void DrawPosition(HudPainter p, HudView v, string title, string track, bool bar, double? done)
     {
         const float PosPx = 54;
@@ -414,15 +416,18 @@ internal sealed class SessionWidget : HudWidget
         p.Need(w, h);
         p.Header(title, track);
 
+        Span<RectangleF> boxes = stackalloc RectangleF[2];
+        p.Arrange(v, "session.position", new RectangleF(pad, bodyTop, leftW + split * 2 + rightW, bodyH), true, split * 2, PositionParts, stackalloc float[] { leftW, rightW }, boxes);
+        float lx = boxes[0].X;
         float ly = bodyTop + (bodyH - leftH) / 2;
-        p.Display(big, PosPx, p.P.Heading, new RectangleF(pad, ly, leftW, pcap), HAlign.Left, VAlign.Bottom);
-        float sx = pad, sy = ly + pcap + 9 * d;
+        p.Display(big, PosPx, p.P.Heading, new RectangleF(lx, ly, leftW, pcap), HAlign.Left, VAlign.Bottom);
+        float sx = lx, sy = ly + pcap + 9 * d;
         if (subLead.Length > 0) { Ink(p, subLead, bf, p.P.Muted, sx, sy, leftW, HAlign.Left, false); sx += p.Measure(subLead, bf); }
         if (subBold.Length > 0) { Ink(p, subBold, bb, p.P.Heading, sx, sy, leftW, HAlign.Left, false); sx += p.Measure(subBold, bb); }
-        if (subTail.Length > 0) Ink(p, subTail, bf, p.P.Muted, sx, sy, Math.Max(0, pad + leftW - sx), HAlign.Left, false);
-        p.Divider(pad + leftW + split, bodyTop, bodyTop + bodyH);
+        if (subTail.Length > 0) Ink(p, subTail, bf, p.P.Muted, sx, sy, Math.Max(0, lx + leftW - sx), HAlign.Left, false);
+        p.Divider(Math.Min(boxes[0].Right, boxes[1].Right) + split, bodyTop, bodyTop + bodyH);
 
-        float rx = pad + leftW + split * 2, ry = bodyTop + (bodyH - rightH) / 2;
+        float rx = boxes[1].X, ry = bodyTop + (bodyH - rightH) / 2;
         if (line1 > 0)
         {
             if (hero >= 0)

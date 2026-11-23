@@ -274,7 +274,7 @@ internal sealed class LedBoardWidget : HudWidget
                 int i = y * LedBoard.Size + x;
                 var full = _dots[i] switch
                 {
-                    LedDot.White => HudPalette.FlagWhite,
+                    LedDot.White => p.P.Night ? p.P.Text : HudPalette.FlagWhite,
                     LedDot.Yellow => HudPalette.FlagYellow,
                     LedDot.Green => HudPalette.FlagGreen,
                     LedDot.Blue => HudPalette.FlagBlue,

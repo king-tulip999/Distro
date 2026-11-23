@@ -54,6 +54,8 @@ internal abstract class Plugin
 
     public virtual bool ShowsPages(AppServices app) => true;
 
+    public virtual bool ShowsPage(AppServices app, string key) => ShowsPages(app);
+
     public virtual IEnumerable<SearchEntry> SearchEntries => Array.Empty<SearchEntry>();
 
     public virtual IEnumerable<PluginHotkey> Hotkeys(AppServices app) => Array.Empty<PluginHotkey>();

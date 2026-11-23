@@ -174,14 +174,14 @@ internal sealed class TrayService : IDisposable
         {
             var profiles = _app.Config.Displays.Profiles;
             var activeProfile = _app.DisplayProfiles.Active;
-            var menu = new ToolStripMenuItem("Display profile");
+            var menu = new ToolStripMenuItem("Display setup");
             foreach (var profile in profiles)
             {
                 var target = profile;
                 menu.DropDownItems.Add(new ToolStripMenuItem(profile.Name, null, (_, _) => _ = _app.DisplayProfiles.ApplyAsync(target)) { Checked = profile == activeProfile, ShortcutKeyDisplayString = Core.Hotkeys.Hotkey.Display(profile.Hotkey) });
             }
             if (profiles.Count > 0) menu.DropDownItems.Add(new ToolStripSeparator());
-            menu.DropDownItems.Add(new ToolStripMenuItem("Create a profile…", null, (_, _) => OpenRequested?.Invoke("displays")) { ToolTipText = "Opens Displays, where profiles are made" });
+            menu.DropDownItems.Add(new ToolStripMenuItem("Create a setup…", null, (_, _) => OpenRequested?.Invoke("displays")) { ToolTipText = "Opens Displays, where setups are made" });
             _menu.Items.Add(menu);
             _menu.Items.Add(new ToolStripMenuItem("Identify displays", null, (_, _) => Views.IdentifyDisplays.Show(_app)) { ToolTipText = "Shows each display's number on it for a few seconds" });
         }

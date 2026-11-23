@@ -3,7 +3,9 @@
   <!-- Shared by Tecnica.csproj and Velocita.csproj: everything an app exe needs around the Core library. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>bin/$(Configuration)/net10.0-windows/</OutputPath>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
@@ -51,6 +53,7 @@
     <UnusedPublishFile Include="mscordaccore.dll;mscordbi.dll;createdump.exe;System.Design.dll;System.Drawing.Design.dll;System.Windows.Forms.Design.Editors.dll;Mono.Posix.NETStandard.dll" />
     <UnusedPublishFile Include="Microsoft.Extensions.DependencyInjection.dll;Microsoft.Extensions.DependencyInjection.Abstractions.dll;Microsoft.Extensions.Logging.dll;Microsoft.Extensions.Options.dll;Microsoft.Extensions.Primitives.dll" />
     <UnusedPublishFile Include="System.Diagnostics.EventLog.Messages.dll;System.DirectoryServices.dll;Microsoft.Win32.Registry.AccessControl.dll;UIAutomationClient.dll;UIAutomationClientSideProviders.dll;System.Resources.Extensions.dll" />
+    <UnusedPublishFile Include="Microsoft.Web.WebView2.Core.xml;Microsoft.Web.WebView2.WinForms.xml;Microsoft.Web.WebView2.Wpf.xml" />
   </ItemGroup>
   <!-- Framework files are taken out where the runtime pack's files are listed, so the app's deps.json doesn't list
        files that aren't there; package files at publish. -->

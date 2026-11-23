@@ -57,6 +57,21 @@ internal static class HudTable
 {
     public const float Gap = 6, ClassEdge = 3;
 
+    private static readonly string[] BlockParts = { "title", "header", "table", "footer" };
+
+    public static RectangleF Blocks(HudPainter p, HudView v, string group, RectangleF box, bool title, bool header, bool footer, float pill, float sep, out RectangleF titleBox, out RectangleF headerBox, out RectangleF footerBox)
+    {
+        Span<RectangleF> boxes = stackalloc RectangleF[4];
+        p.Arrange(v, group, box, false, sep, BlockParts, stackalloc float[] { title ? pill : -1, header ? pill : -1, 0, footer ? pill : -1 }, boxes);
+        titleBox = boxes[0];
+        headerBox = boxes[1];
+        footerBox = boxes[3];
+        return boxes[2];
+    }
+
+    public static void BlockSeam(HudPainter p, RectangleF whole, RectangleF strip) =>
+        p.Seam(whole, strip.Bottom < whole.Bottom - 0.5f ? strip.Bottom : strip.Y);
+
     private static readonly List<(string Text, Color Fill, Color Fore, FlagKind Flag)> _marks = new();
 
     public const string FastestMark = "FL";
@@ -160,7 +175,7 @@ internal static class HudTable
     private static Font Bold(HudPainter p, Font font) => p.BoldOf(font);
 
     public static void ClassFill(HudPainter p, RectangleF row, Color classColor, bool dim) =>
-        p.Fill(row, p.Solid(HudPalette.Deep(classColor, dim ? 0.16f : 0.24f), 235));
+        p.Fill(row, p.Solid(HudPalette.Deep(classColor, (dim ? 0.16f : 0.24f) * p.P.ClassRowDepth), 235));
 
     public static float ClassRadius(HudPainter p) => Math.Min(p.Look.Corner, 6);
 
@@ -205,10 +220,16 @@ internal static class HudTable
         if (emphasis == 1)
         {
             p.Fill(row, p.Solid(HudPalette.Deep(pal.RowTint, 0.25f, 0.8f), 240));
-            if (pal.HighlightEdge is { } edge && classStripe) p.Outline(row, edge);
         }
         else if (alternate) p.Fill(row, HudPalette.Alpha(pal.Heading, 7));
-        if (classStripe) p.Fill(new RectangleF(row.X, row.Y, ClassEdge + 1, row.Height), dim ? HudPalette.Alpha(classColor, 150) : classColor);
+        var stripe = new RectangleF(row.X, row.Y, ClassEdge + 1, row.Height);
+        if (classStripe) p.Fill(stripe, dim ? HudPalette.Alpha(classColor, 150) : classColor);
+        if (emphasis == 1 && pal.HighlightEdge is { } edge && classStripe)
+        {
+            var filled = p.Snap(row);
+            float px = 1 / p.PixelScale;
+            p.Outline(RectangleF.FromLTRB(p.Snap(stripe).Right, filled.Top, filled.Right - px, filled.Bottom - px), edge);
+        }
         Color? over = emphasis == 1 ? pal.PlayerText : tint;
         Color Shade(Color c)
         {
@@ -347,17 +368,18 @@ internal static class HudTable
     private static string[] BadgeSamples(string letters, params string[] numbers) =>
         letters.Length == 0 ? numbers : letters.SelectMany(l => numbers.Select(n => l + n)).ToArray();
 
-    public static void Badge(HudPainter p, RectangleF box, string license, int? irating, string format, bool dim)
+    public static void Badge(HudPainter p, RectangleF box, string license, int? irating, string format, bool dim, bool mine = false)
     {
         float h = Math.Min(box.Height - 4, p.LineHeight(p.Tiny) + 6), y = box.Y + (box.Height - h) / 2, x = box.X;
         int alpha = dim ? 150 : 255;
+        var ink = p.P.BadgeInk is { } night ? mine ? p.P.PlayerText : night : Color.White;
         if (format != "rating" && license.Length > 0)
         {
             string text = RaceFormat.License(license);
             float w = Math.Max(p.Widest(LicenseSamples, p.Tiny), p.Measure(text, p.Tiny)) + 10;
             var r = new RectangleF(x, y, w, h);
-            p.Fill(r, HudPalette.Alpha(Color.White, dim ? 16 : 26), 2);
-            p.Text(text, p.Tiny, HudPalette.Alpha(Color.White, alpha), r, HAlign.Center, VAlign.Center, false);
+            p.Fill(r, HudPalette.Alpha(ink, dim ? 16 : 26), 2);
+            p.Text(text, p.Tiny, HudPalette.Alpha(ink, alpha), r, HAlign.Center, VAlign.Center, false);
             x = r.Right + 4;
         }
         if (format != "license" && irating is > 0)
@@ -365,8 +387,8 @@ internal static class HudTable
             string text = RaceFormat.IRating(irating);
             float w = Math.Max(p.Widest(RatingSamples, p.Tiny), p.Measure(text, p.Tiny)) + 10;
             var r = new RectangleF(x, y, Math.Min(w, box.Right - x), h);
-            p.Fill(r, HudPalette.Alpha(Color.White, dim ? 16 : 26), 2);
-            p.Text(text, p.Tiny, HudPalette.Alpha(Color.White, alpha), r, HAlign.Center, VAlign.Center, false);
+            p.Fill(r, HudPalette.Alpha(ink, dim ? 16 : 26), 2);
+            p.Text(text, p.Tiny, HudPalette.Alpha(ink, alpha), r, HAlign.Center, VAlign.Center, false);
         }
     }
 
@@ -604,7 +626,7 @@ internal static class FieldColumns
                 return new Column(id, "LICENSE", badgeFormat switch { "license" => "A 4.99", "rating" => "0.0k", _ => "A 4.99 0.0k" }, HAlign.Left,
                     car => D(car) is { } d ? new Cell(RaceFormat.License(d.License), pal.Text) : None)
                 {
-                    Draw = (painter, car, box, dim) => { if (D(car) is { } d) HudTable.Badge(painter, box, d.License, d.IRating, badgeFormat, dim); },
+                    Draw = (painter, car, box, dim) => { if (D(car) is { } d) HudTable.Badge(painter, box, d.License, d.IRating, badgeFormat, dim, car == v.Frame.PlayerCarIdx); },
                 };
             case "avglap":
                 int avgLaps = Int(AvgLaps);
@@ -777,21 +799,19 @@ internal sealed class RelativeWidget : HudWidget
         var fbox = p.Bounds;
         if (footer.Count > 0 && fbox.Height - pad * 2 - (pill + sep) * (header.Count > 0 ? 2 : 1) < minRows) footer = Array.Empty<string>();
         if (header.Count > 0 && fbox.Height - pad * 2 - pill - sep < minRows) header = Array.Empty<string>();
+        var whole = fbox;
+        p.Panel(whole);
+        fbox = HudTable.Blocks(p, v, "relative.blocks", fbox, false, header.Count > 0, footer.Count > 0, pill, sep, out _, out var hr, out var fr);
         if (header.Count > 0)
         {
-            var hr = new RectangleF(fbox.X, fbox.Y, fbox.Width, pill);
-            p.Panel(hr);
             Strips.HeaderLine(p, v, header, hr);
-            fbox = new RectangleF(fbox.X, hr.Bottom + sep, fbox.Width, fbox.Height - pill - sep);
+            HudTable.BlockSeam(p, whole, hr);
         }
         if (footer.Count > 0)
         {
-            var fr = new RectangleF(fbox.X, fbox.Bottom - pill, fbox.Width, pill);
-            p.Panel(fr);
             Strips.FooterLine(p, v, footer, fr);
-            fbox = new RectangleF(fbox.X, fbox.Y, fbox.Width, fbox.Height - pill - sep);
+            HudTable.BlockSeam(p, whole, fr);
         }
-        p.Panel(fbox);
         var area = fbox.Inflated(-pad, -pad);
         var font = p.Body;
         float rowH = p.LineHeight(font) * 1.42f * p.Density;
@@ -998,36 +1018,36 @@ internal sealed class StandingsWidget : HudWidget
         float pad = 6 * p.Density, sep = p.PieceGap, pill = p.PillHeight;
         float minRows = p.LineHeight(p.Body) * 1.38f * p.Density * 4;
         var box = p.Bounds;
-        bool Room() => box.Height - pill - sep - pad * 2 > minRows;
-        if (o.Bool("title"))
+        bool proAm = FieldColumns.ProAmOn(v);
+        bool split = o.Bool("group") && (f.Session.NumCarClasses > 1 || proAm);
+        var headerItems = o.Columns("header");
+        var footerItems = o.Columns("footer");
+        bool titleShown = o.Bool("title");
+        float belowTitle = box.Height - (titleShown ? pill + sep : 0);
+        bool headerShown = headerItems.Count > 0 && belowTitle - pill - sep - pad * 2 > minRows;
+        float belowHeader = belowTitle - (headerShown ? pill + sep : 0);
+        bool footShown = footerItems.Count > 0 && belowHeader - pill - sep - pad * 2 > minRows;
+        var whole = box;
+        p.Panel(whole);
+        box = HudTable.Blocks(p, v, "standings.blocks", box, titleShown, headerShown, footShown, pill, sep, out var tr, out var headRow, out var footRow);
+        if (titleShown)
         {
-            var tr = new RectangleF(box.X, box.Y, box.Width, pill);
-            p.TitleBar(tr, v.Race.SessionLabel, RelativeWidget.Remaining(v));
+            p.TitleText(tr, v.Race.SessionLabel, RelativeWidget.Remaining(v));
+            HudTable.BlockSeam(p, whole, tr);
             p.Region("title", tr);
             if (o.Bool("progress") && Progress(f) is { } done)
                 p.Bar(new RectangleF(tr.X + 8 * p.Density, tr.Bottom - 5 * p.Density, tr.Width - 16 * p.Density, 3 * p.Density), done, p.P.Accent, HudPalette.Alpha(p.P.LineStrong, 90));
-            box = new RectangleF(box.X, tr.Bottom + sep, box.Width, box.Height - pill - sep);
         }
-        var headerItems = o.Columns("header");
-        if (headerItems.Count > 0 && Room())
+        if (headerShown)
         {
-            var hr = new RectangleF(box.X, box.Y, box.Width, pill);
-            p.Panel(hr);
-            Strips.HeaderLine(p, v, headerItems, hr);
-            box = new RectangleF(box.X, hr.Bottom + sep, box.Width, box.Height - pill - sep);
+            Strips.HeaderLine(p, v, headerItems, headRow);
+            HudTable.BlockSeam(p, whole, headRow);
         }
-        var footerItems = o.Columns("footer");
-        bool footShown = footerItems.Count > 0 && Room();
         if (footShown)
         {
-            var fr = new RectangleF(box.X, box.Bottom - pill, box.Width, pill);
-            p.Panel(fr);
-            Strips.FooterLine(p, v, footerItems, fr);
-            box = new RectangleF(box.X, box.Y, box.Width, box.Height - pill - sep);
+            Strips.FooterLine(p, v, footerItems, footRow);
+            HudTable.BlockSeam(p, whole, footRow);
         }
-        bool proAm = FieldColumns.ProAmOn(v);
-        bool split = o.Bool("group") && (f.Session.NumCarClasses > 1 || proAm);
-        if (!split) p.Panel(box);
         var area = split ? new RectangleF(box.X + pad, box.Y, box.Width - pad * 2, box.Height) : box.Inflated(-pad, -pad);
         bool race = f.SessionKind == SessionKind.Race;
         bool multi = f.Session.NumCarClasses > 1;
@@ -1153,7 +1173,7 @@ internal sealed class StandingsWidget : HudWidget
                 }
                 rowsH = Math.Min(rowsH, area.Bottom - y - classHead - underHead - blockPad * 2);
                 var panel = new RectangleF(box.X, y, box.Width, classHead + underHead + rowsH + blockPad * 2);
-                p.Panel(panel);
+                if (!firstBlock) p.Seam(whole, y);
                 if (classBorder) HudTable.ClassOutline(p, panel, cc, p.Look.Corner);
                 y += blockPad;
                 if (firstBlock && headH > 0)
@@ -1220,7 +1240,6 @@ internal sealed class StandingsWidget : HudWidget
         _runs.Outline(p);
         float footH = footShown ? pill + sep : 0;
         p.Need(natural + pad * 2, y + (group ? 0 : pad) + footH);
-        if (group && y < box.Bottom - 1) p.Panel(RectangleF.FromLTRB(box.X, y, box.Right, box.Bottom));
         HudTable.Track(p, fitted, RectangleF.FromLTRB(area.X, area.Y, area.Right, Math.Max(y, area.Y + rowH)));
         if (o.Bool("flagEdge")) HudTable.FlagEdge(p, f, o.Int("flagWidth"));
     }

@@ -8,6 +8,7 @@ using Core.Controls;
 using Core.Fans;
 using Core.Hardware;
 using Core.Services;
+using Core.SimRacing.Race;
 using Core.Theme;
 
 namespace Core.Views.Pages;
@@ -22,7 +23,17 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     private readonly Tile _presetBar = new();
     private readonly ContentControl _fanTools = new() { Focusable = false };
     private Tile? _curvesCard;
-    private readonly PanelGrid _fanGrid;
+    private readonly ReorderGrid _fanList = new() { MaxColumns = 1, MinCellWidth = 200, Gap = 0 };
+    private readonly ContentControl _fanDetail = new() { Focusable = false };
+    private Tile _fansCard = null!;
+    private string? _selectedFan;
+    private readonly List<string> _listOrder = new();
+    private readonly Dictionary<string, FanRowParts> _rows = new();
+
+    private sealed record FanRowParts(TextBlock Percent, TextBlock Temp, FanSpinner Spinner)
+    {
+        public bool Fresh { get; set; } = true;
+    }
     private readonly ContentControl _fanMessage = new() { Focusable = false };
     private readonly StackPanel _hiddenPanel = new();
     private readonly StackPanel _curveList = new();
@@ -36,7 +47,6 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     private (TextBlock Text, FanCurve Curve)? _liveMix;
     private double? _liveStep;
     private const double PingStep = 5;
-    private readonly List<Action> _openLimits = new();
     private Tile? _detecting;
     private bool _showHidden;
     private bool _lastEmergency;
@@ -48,6 +58,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         public required FanSpinner Spinner;
         public required TextBlock Rpm;
         public required TextBlock Output;
+        public TextBlock? Temp;
         public required SegmentMeter Bar;
         public CurvePreview? Curve;
         public bool Fresh = true;
@@ -73,8 +84,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     {
         _app = app;
         _window = window;
-        _fanGrid = new PanelGrid(_app.Config.Fans.Layout, _app.Save) { Margin = new Thickness(0, 0, 0, 3), RowHeight = 1, Gap = 0, PanelSpacing = Ui.PanelSpacing, TwoColumnsFrom = Ui.TwoCardsFrom, ColumnGap = Ui.PanelSpacing, InRows = true };
-        Grid.SetIsSharedSizeScope(_fanGrid, true);
+        _fanList.Moved += MoveFan;
         _master = Ui.Switch(_app.Config.Fans.Enabled, on => _app.SetFanControlEnabled(on));
         Content = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = Ui.PageFrame(_body) };
         BuildPage();
@@ -96,27 +106,9 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     {
         _app.Tick -= Tick;
         _app.FansChanged -= OnFansChanged;
-        SetRearranging(false);
     }
 
-    private EditUndo? _undo;
-
-    private void SetRearranging(bool on)
-    {
-        if (on == _fanGrid.Editing) return;
-        _undo = on ? new EditUndo().Slots(Fans.Layout) : null;
-        _fanGrid.Editing = on;
-        BuildPresetBar();
-    }
-
-    public bool CancelEdit()
-    {
-        if (!_fanGrid.Editing) return false;
-        var undo = _undo;
-        SetRearranging(false);
-        if (undo?.Restore(_app) == true) _fanGrid.InvalidateMeasure();
-        return true;
-    }
+    public bool CancelEdit() => false;
 
     private void OnFansChanged()
     {
@@ -149,41 +141,58 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         _tabs = Ui.PageTabs(new[] { "Fans", "Curves" }, 0, SwitchTab, "fantabs");
         _fanTools.HorizontalAlignment = HorizontalAlignment.Right;
         _fanTools.VerticalAlignment = VerticalAlignment.Center;
-        _fanTools.Margin = new Thickness(0, 0, 0, 3);
-        var tabRow = new Grid { Margin = Ui.TabRowMargin, Children = { _tabs, _fanTools } };
-        _body.Children.Add(tabRow);
+        _fanTools.Margin = new Thickness(13, 0, 0, 0);
 
         var emergencyTitle = Ui.Text("Emergency temperature", "H3");
-        emergencyTitle.VerticalAlignment = VerticalAlignment.Center;
-        emergencyTitle.Margin = new Thickness(0, 0, 13, 0);
+        emergencyTitle.Margin = new Thickness(0, 0, 0, 6);
         Ui.AddInfo(emergencyTitle, "At this temperature every controlled fan runs at 100% until it's 5 °C cooler. Watches the CPU, the GPU and every curve's sensor.");
-        var emergencySlider = Ui.SliderWithValue(70, 105, _app.Config.Fans.EmergencyTempC, "{0:0} °C", v => { _app.Config.Fans.EmergencyTempC = (int)v; _app.FanSettingsChanged(); }, 220);
-        emergencySlider.VerticalAlignment = VerticalAlignment.Center;
+        var emergencySlider = Ui.SliderWithValue(70, 105, _app.Config.Fans.EmergencyTempC, "{0:0} °C", v => { _app.Config.Fans.EmergencyTempC = (int)v; _app.FanSettingsChanged(); }, 208);
         System.Windows.Automation.AutomationProperties.SetName(emergencySlider, "Emergency temperature");
-        var emergencyRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { emergencyTitle, emergencySlider } };
+        var emergencyRow = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 19, 0, 0), Children = { emergencyTitle, emergencySlider } };
         Ui.Anchor(emergencyRow, "fans.failsafe");
-        var presetLine = Hairline.Rule(new Border { Margin = new Thickness(24, 10, 24, 10) }, Orientation.Vertical);
+
+        var presetLine = Hairline.Rule(new Border { Margin = new Thickness(19, 10, 19, 10) }, Orientation.Vertical);
         presetLine.SetResourceReference(Border.BackgroundProperty, "Line");
         _presetBar.VerticalAlignment = VerticalAlignment.Center;
-        var masterRow = new Grid { Height = 46 };
-        masterRow.SizeChanged += (_, e) => { if (e.WidthChanged) _fitPresets?.Invoke(); };
-        masterRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        masterRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        masterRow.ColumnDefinitions.Add(new ColumnDefinition());
-        masterRow.Children.Add(emergencyRow);
+        var barRow = new Grid();
+        barRow.SizeChanged += (_, e) => { if (e.WidthChanged) _fitPresets?.Invoke(); };
+        barRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        barRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        barRow.ColumnDefinitions.Add(new ColumnDefinition());
+        barRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        barRow.Children.Add(_tabs);
         Grid.SetColumn(presetLine, 1);
-        masterRow.Children.Add(presetLine);
+        barRow.Children.Add(presetLine);
         Grid.SetColumn(_presetBar, 2);
-        masterRow.Children.Add(_presetBar);
-        var masterBox = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Padding = new Thickness(16, 0, 16, 0), Child = masterRow };
-        _body.Children.Add(masterBox);
+        barRow.Children.Add(_presetBar);
+        Grid.SetColumn(_fanTools, 3);
+        barRow.Children.Add(_fanTools);
+        var topBar = Ui.TabBar(_tabs, barRow);
 
+        _body.Children.Add(topBar);
         _body.Children.Add(_banners);
         _body.Children.Add(_fansView);
         _fansView.Children.Add(_fanMessage);
-        _fansView.Children.Add(_fanGrid);
+        var fansGrid = new Grid();
+        fansGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(250) });
+        fansGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Ui.PanelSpacing) });
+        fansGrid.ColumnDefinitions.Add(new ColumnDefinition());
+        var listTop = new StackPanel();
+        listTop.Children.Add(Ui.Text("Fans", "H2"));
+        listTop.Children.Add(new Border { Height = 10 });
+        listTop.Children.Add(_fanList);
+        listTop.Children.Add(new TextBlock { Text = "Drag to reorder", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 8, 0, 0) });
+        var listSide = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(emergencyRow, Dock.Bottom);
+        listSide.Children.Add(emergencyRow);
+        listSide.Children.Add(listTop);
+        fansGrid.Children.Add(listSide);
+        Grid.SetColumn(_fanDetail, 2);
+        fansGrid.Children.Add(_fanDetail);
+        _fansCard = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = fansGrid };
+        _fansView.Children.Add(_fansCard);
         Ui.Anchor(_presetBar, "fans.presets");
-        Ui.Anchor(_fanGrid, "fans.fans");
+        Ui.Anchor(_fansCard, "fans.fans");
         Ui.Anchor(_fanTools, "fans.actions");
 
         _fansView.Children.Add(_hiddenPanel);
@@ -207,7 +216,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         curves.Children.Add(left);
         Grid.SetColumn(_curveEditorHost, 2);
         curves.Children.Add(_curveEditorHost);
-        _curvesCard = new Tile { Style = Ui.Res<Style>("Card"), Child = curves, Visibility = Visibility.Collapsed };
+        _curvesCard = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = curves, Visibility = Visibility.Collapsed };
         Ui.Anchor(_curvesCard, "fans.curves");
         _body.Children.Add(_curvesCard);
     }
@@ -286,7 +295,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
 
     private void BuildPresetBar()
     {
-        string signature = string.Join("\n", Fans.Presets.Select(p => p.Name)) + "|" + Fans.ActivePreset + "|" + _fanGrid.Editing;
+        string signature = string.Join("\n", Fans.Presets.Select(p => p.Name)) + "|" + Fans.ActivePreset;
         if (signature == _presetSignature)
             return;
         _presetSignature = signature;
@@ -352,18 +361,15 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         _uncalibrated.VerticalAlignment = VerticalAlignment.Center;
         _uncalibrated.Margin = new Thickness(0, 0, 13, 0);
         tools.Children.Add(_uncalibrated);
-        var gridTools = _fanGrid.TakeEditTools();
-        gridTools.Margin = new Thickness(0, 0, 6, 0);
-        tools.Children.Add(gridTools);
-        var arrange = Ui.LabeledButton("I.Move", _fanGrid.Editing ? "Done" : "Arrange", () => SetRearranging(!_fanGrid.Editing),
-            _fanGrid.Editing ? "PrimaryButton" : "GhostButton");
-        arrange.ToolTip = "Drag fans up or down to reorder them";
-        tools.Children.Add(arrange);
         var calibrateAll = Ui.LabeledButton("I.Target", "Calibrate all", () => _ = CalibrateAllAsync(), "GhostButton");
         calibrateAll.ToolTip = "Measures every fan that reports its speed, one after another";
-        calibrateAll.Margin = new Thickness(6, 0, 0, 0);
+        calibrateAll.Margin = new Thickness(0);
         ShowUncalibrated();
         tools.Children.Add(calibrateAll);
+        var coolingTest = Ui.LabeledButton("I.Thermometer", "Cooling test", () => _ = CoolingTestAsync(), "GhostButton");
+        coolingTest.ToolTip = "Measures how much each fan group actually lowers the temperatures and suggests curves";
+        coolingTest.Margin = new Thickness(6, 0, 0, 0);
+        tools.Children.Add(coolingTest);
         var resetAll = Ui.LabeledButton("I.Undo", "Reset all", () => _ = ResetAllFansAsync(), "GhostButton");
         resetAll.ToolTip = "Every fan back to its default name, limits and Auto in every preset (calibration is kept)";
         resetAll.Margin = new Thickness(6, 0, 0, 0);
@@ -454,7 +460,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         var catalog = _app.Hardware.Catalog;
         if (catalog is null)
         {
-            if (!_fanGrid.Ids.Any())
+            if (_rows.Count == 0)
             {
                 _fanMessage.Content = _detecting ??= new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = Ui.Text("Detecting fans…", "Muted") };
                 _fanSignature = "";
@@ -482,14 +488,17 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
             _fanShape = shapeHash;
             _fanSignature = "built";
             BuildBanners();
-            BuildFanCards(visible.ToList());
+            BuildFanList(visible.ToList());
             ShowUncalibrated();
             BuildHidden(catalog.Fans.Where(f => Fans.HardwareFor(f.ControlId).Hidden).ToList());
             BuildCurveEditor();
         }
 
         foreach (var fan in visible)
+        {
             if (_cards.TryGetValue(fan.ControlId, out var parts)) ShowLive(fan, parts);
+            if (_rows.TryGetValue(fan.ControlId, out var row)) ShowRow(fan, row);
+        }
 
         foreach (var (id, parts) in _cards)
             if (parts.Curve is { } preview) UpdateCurvePreview(id, preview, catalog);
@@ -521,6 +530,19 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     {
         TextCase.Set(parts.Rpm, (fan.Rpm is { } r ? $"{r:N0} RPM" : "– RPM") + (fan.Percent is not null && !fan.Controlled ? " · auto" : ""));
         TextCase.Set(parts.Output, fan.Percent is { } p ? $"{p:0}" : "–");
+        if (parts.Temp is { } tempText)
+        {
+            var followed = FollowedTemp(fan.ControlId);
+            string widest = followed is { } w ? $"{w.Label} 100 °C" : "";
+            if (!Equals(tempText.Tag, widest))
+            {
+                tempText.Tag = widest;
+                tempText.MinWidth = widest.Length == 0 ? 0 : TextWidth(tempText, widest);
+            }
+            TextCase.Set(tempText, followed is { } f ? $"{f.Label} {f.Value:0} °C" : "");
+            string? tip = followed is { } t ? $"Its curve follows {t.Full}" : null;
+            if (!Equals(tempText.ToolTip, tip)) tempText.ToolTip = tip;
+        }
         var cal = Fans.HardwareFor(fan.ControlId).Calibration;
         parts.Spinner.SetSpeed(fan.Percent, fan.Rpm, cal?.MaxRpm ?? 0, Motion.Enabled && !parts.Fresh);
         double level = fan.Percent is { } pp ? pp / 100 : cal?.MaxRpm > 0 && fan.Rpm is { } rr ? rr / cal.MaxRpm : 0;
@@ -530,27 +552,190 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         parts.Fresh = false;
     }
 
-    private void BuildFanCards(List<FanInfo> visible)
+    private static double TextWidth(TextBlock block, string sample) => TextWidth(new Typeface(block.FontFamily, block.FontStyle, block.FontWeight, block.FontStretch), block.FontSize, sample);
+
+    private static double TextWidth(Control control, string sample) => TextWidth(new Typeface(control.FontFamily, control.FontStyle, control.FontWeight, control.FontStretch), control.FontSize, sample);
+
+    private static double TextWidth(Typeface face, double size, string sample)
     {
-        _fanGrid.Clear();
-        _fanMessage.Content = null;
+        var text = new FormattedText(sample, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, face, size, Brushes.Transparent, 1.0);
+        return Math.Ceiling(text.WidthIncludingTrailingWhitespace) + 1;
+    }
+
+    private static void HoldWidth(TextBlock block, string widest)
+    {
+        block.TextAlignment = TextAlignment.Right;
+        block.MinWidth = TextWidth(block, widest);
+        block.Loaded += (_, _) => block.MinWidth = TextWidth(block, widest);
+    }
+
+    private (string Label, string Full, float Value)? FollowedTemp(string controlId)
+    {
+        var entry = Fans.Active?.Fans.Find(e => e.ControlId == controlId);
+        if (!Fans.Enabled || entry is not { Mode: FanMode.Curve, CurveName: { } name }) return null;
+        var live = _app.Hardware.Catalog?.Curves;
+        if (live is null) return null;
+        var graph = Driving(name, live, 0);
+        if (graph is null || !live.TryGetValue(graph.Name, out var l) || l.Temp is not { } value) return null;
+        string sensor = graph.SensorName ?? graph.Name;
+        string label = graph.SensorId is { } id && CoolingTest.IsGpu(id)
+            ? (sensor == "GPU Core" ? "GPU" : sensor)
+            : sensor.StartsWith("Core", StringComparison.Ordinal) || sensor.StartsWith("CPU", StringComparison.Ordinal) ? "CPU" : sensor;
+        return (label, sensor, value);
+    }
+
+    private FanCurve? Driving(string name, IReadOnlyDictionary<string, CurveLive> live, int depth)
+    {
+        var curve = Fans.Curves.Find(c => c.Name == name);
+        if (curve is null || depth > 8) return null;
+        if (curve.Type == FanCurveType.Graph) return curve;
+        if (curve.Type != FanCurveType.Mix) return null;
+        FanCurve? best = null;
+        float bestOutput = 0;
+        foreach (var part in curve.MixOf)
+        {
+            if (!live.TryGetValue(part, out var pl) || pl.Output is not { } output) continue;
+            bool better = best is null || (curve.Function == MixFunction.Min ? output < bestOutput : output > bestOutput);
+            if (!better) continue;
+            if (Driving(part, live, depth + 1) is { } g)
+            {
+                best = g;
+                bestOutput = output;
+            }
+        }
+        return best;
+    }
+
+    private void BuildFanList(List<FanInfo> visible)
+    {
+        _fanList.Children.Clear();
+        _rows.Clear();
         _cards.Clear();
-        _openLimits.Clear();
-        _openCurves.Clear();
+        _listOrder.Clear();
+        _fanMessage.Content = null;
+        _fanDetail.Content = null;
         if (visible.Count == 0)
         {
             var text = _app.Hardware.Catalog?.Fans.Count > 0
                 ? "Every fan is hidden. Use “Hidden fans” below to bring some back."
                 : "No fans were detected. Motherboard fan headers need the PawnIO driver (Settings → Hardware access); some boards and newer graphics cards don't expose fan control at all.";
             _fanMessage.Content = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = Ui.Text(text, "Muted") };
+            _fansCard.Visibility = Visibility.Collapsed;
             return;
         }
-        var order = DefaultOrder(visible.Select(_app.FanName).ToList());
-        foreach (int i in Enumerable.Range(0, visible.Count).OrderBy(k => order[k]))
+        _fansCard.Visibility = Visibility.Visible;
+        var ordered = Ordered(visible);
+        if (_selectedFan is null || ordered.All(f => f.ControlId != _selectedFan)) _selectedFan = ordered[0].ControlId;
+        foreach (var fan in ordered)
         {
-            var f = visible[i];
-            _fanGrid.Add(new PanelDef(f.ControlId, _app.FanName(f), () => FanCard(f)) { Order = order[i], FullWidthWhen = () => _expanded.Contains(f.ControlId) });
+            _listOrder.Add(fan.ControlId);
+            _fanList.Children.Add(FanRow(fan));
         }
+        ShowSelected(animate: false);
+    }
+
+    private List<FanInfo> Ordered(List<FanInfo> visible)
+    {
+        var rank = new Dictionary<string, int>(StringComparer.Ordinal);
+        int r = 0;
+        foreach (var slot in Fans.Layout.Select((slot, i) => (slot, i)).OrderBy(x => x.slot.Row ?? int.MaxValue).ThenBy(x => x.slot.Col ?? 0).ThenBy(x => x.i))
+            rank.TryAdd(slot.slot.Id, r++);
+        var fallback = DefaultOrder(visible.Select(_app.FanName).ToList());
+        return Enumerable.Range(0, visible.Count)
+            .OrderBy(i => rank.TryGetValue(visible[i].ControlId, out int k) ? k : 100_000 + fallback[i])
+            .Select(i => visible[i])
+            .ToList();
+    }
+
+    private void MoveFan(int from, int to)
+    {
+        if (from < 0 || to < 0 || from >= _listOrder.Count || to >= _listOrder.Count) return;
+        var id = _listOrder[from];
+        _listOrder.RemoveAt(from);
+        _listOrder.Insert(to, id);
+        Fans.Layout.RemoveAll(slot => _listOrder.Contains(slot.Id));
+        for (int i = 0; i < _listOrder.Count; i++) Fans.Layout.Add(new PanelSlot { Id = _listOrder[i], Row = i, Col = 0 });
+        _app.Save();
+    }
+
+    private RadioButton FanRow(FanInfo fan)
+    {
+        var hw = Fans.HardwareFor(fan.ControlId);
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.RowDefinitions.Add(new RowDefinition());
+        var spinner = hw.IsPump
+            ? FanSpinner.Pump(Ui.Res<Brush>("IconInk"), Ui.Res<Brush>("TextFaint"), 16)
+            : new FanSpinner(Ui.Res<Geometry>("I.Fan"), Ui.Res<Brush>("IconInk"), 16);
+        spinner.VerticalAlignment = VerticalAlignment.Center;
+        spinner.Margin = new Thickness(2, 0, 9, 0);
+        Grid.SetRowSpan(spinner, 2);
+        grid.Children.Add(spinner);
+        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = _app.FanName(fan), FontSize = 13, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+        name.SetResourceReference(TextBlock.ForegroundProperty, "Text");
+        Grid.SetColumn(name, 1);
+        grid.Children.Add(name);
+        var percent = new TextBlock { FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 2, 0) };
+        System.Windows.Documents.Typography.SetNumeralAlignment(percent, FontNumeralAlignment.Tabular);
+        HoldWidth(percent, "100%");
+        Grid.SetColumn(percent, 2);
+        grid.Children.Add(percent);
+        var temp = new TextBlock { Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.Normal, Margin = new Thickness(0, 2, 0, 0) };
+        temp.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
+        System.Windows.Documents.Typography.SetNumeralAlignment(temp, FontNumeralAlignment.Tabular);
+        Grid.SetRow(temp, 1);
+        Grid.SetColumn(temp, 1);
+        Grid.SetColumnSpan(temp, 2);
+        grid.Children.Add(temp);
+        var row = new RadioButton
+        {
+            Style = Ui.Res<Style>("NavItem"),
+            GroupName = "FanList",
+            Content = grid,
+            IsChecked = fan.ControlId == _selectedFan,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Padding = new Thickness(0, 3, 0, 3),
+        };
+        string id = fan.ControlId;
+        row.Checked += (_, _) =>
+        {
+            if (_selectedFan == id) return;
+            _selectedFan = id;
+            ShowSelected(animate: true);
+        };
+        _rows[id] = new FanRowParts(percent, temp, spinner);
+        ShowRow(_app.Hardware.Catalog?.Fans.FirstOrDefault(f => f.ControlId == id) ?? fan, _rows[id]);
+        return row;
+    }
+
+    private void ShowRow(FanInfo fan, FanRowParts row)
+    {
+        var cal = Fans.HardwareFor(fan.ControlId).Calibration;
+        row.Spinner.SetSpeed(fan.Percent, fan.Rpm, cal?.MaxRpm ?? 0, Motion.Enabled && !row.Fresh);
+        row.Fresh = false;
+        TextCase.Set(row.Percent, fan.Percent is { } p ? $"{p:0}%" : RaceFormat.Missing);
+        string detail = FollowedTemp(fan.ControlId) is { } t ? $"{t.Label} {t.Value:0} °C"
+            : fan.Rpm is { } rpm ? $"{rpm:N0} RPM" + (fan.Percent is not null && !fan.Controlled ? " · auto" : "")
+            : "";
+        TextCase.Set(row.Temp, detail);
+    }
+
+    private void ShowSelected(bool animate)
+    {
+        _cards.Clear();
+        var catalog = _app.Hardware.Catalog;
+        var fan = catalog?.Fans.FirstOrDefault(f => f.ControlId == _selectedFan);
+        if (fan is null)
+        {
+            _fanDetail.Content = null;
+            return;
+        }
+        var detail = FanDetail(fan);
+        _fanDetail.Content = detail;
+        if (animate) Motion.FadeIn(detail);
     }
 
     internal static int[] DefaultOrder(IReadOnlyList<string> names)
@@ -570,10 +755,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         return order;
     }
 
-    private readonly HashSet<string> _expanded = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<Action> _openCurves = new();
-
-    private Border FanCard(FanInfo fan)
+    private FrameworkElement FanDetail(FanInfo fan)
     {
         var hw = Fans.HardwareFor(fan.ControlId);
         var entry = Fans.Active?.EntryFor(fan.ControlId);
@@ -604,10 +786,17 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         rpm.VerticalAlignment = VerticalAlignment.Bottom;
         rpm.Margin = new Thickness(0, 0, 0, 6);
         System.Windows.Documents.Typography.SetNumeralAlignment(rpm, FontNumeralAlignment.Tabular);
-        var readout = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Children = { output, percent, rpm } };
+        var temp = RaceParts.Big("", 13, "Text", heavy: false);
+        temp.VerticalAlignment = VerticalAlignment.Bottom;
+        temp.Margin = new Thickness(0, 0, 14, 6);
+        System.Windows.Documents.Typography.SetNumeralAlignment(temp, FontNumeralAlignment.Tabular);
+        HoldWidth(output, "100");
+        HoldWidth(rpm, "8,888 RPM");
+        temp.TextAlignment = TextAlignment.Right;
+        var readout = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Children = { temp, output, percent, rpm } };
         Grid.SetColumn(readout, 2);
         left.Children.Add(readout);
-        var parts = _cards[fan.ControlId] = new FanCardParts { Spinner = spinner, Rpm = rpm, Output = output, Bar = bar };
+        var parts = _cards[fan.ControlId] = new FanCardParts { Spinner = spinner, Rpm = rpm, Output = output, Bar = bar, Temp = temp };
         ShowLive(_app.Hardware.Catalog?.Fans.FirstOrDefault(f => f.ControlId == fan.ControlId) ?? fan, parts);
 
         var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -615,7 +804,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
 
         if (fan.Controllable && entry is not null)
         {
-            var modeHost = new ContentControl { Focusable = false, Width = 105, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+            var modeHost = new ContentControl { Focusable = false, MinWidth = 105, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
             void BuildMode()
             {
                 modeHost.Content = null;
@@ -623,7 +812,12 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
                 if (_cards.TryGetValue(fan.ControlId, out var parts)) parts.Curve = null;
                 if (entry.Mode == FanMode.Curve)
                 {
-                    var combo = new ComboBox { Width = 105, ToolTip = "The curve this fan follows (Curves tab)" };
+                    var combo = new ComboBox { MinWidth = 105, ToolTip = "The curve this fan follows (Curves tab)" };
+                    combo.Loaded += (_, _) =>
+                    {
+                        double widest = Fans.Curves.Select(c => TextWidth(combo, c.Name)).DefaultIfEmpty(0).Max();
+                        combo.Width = Math.Clamp(widest + 44, 105, 230);
+                    };
                     foreach (var c in Fans.Curves) combo.Items.Add(c.Name);
                     if (Fans.Curves.Count == 0) combo.Items.Add("(create a curve below)");
                     combo.SelectedItem = entry.CurveName is not null && Fans.Curves.Any(c => c.Name == entry.CurveName) ? entry.CurveName : null;
@@ -652,9 +846,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
             void ShowCurve()
             {
                 expandHost.Content = null;
-                _fanGrid.InvalidateMeasure();
                 if (_cards.TryGetValue(fan.ControlId, out var parts)) parts.Curve = null;
-                if (!_expanded.Contains(fan.ControlId)) return;
                 var line = Hairline.Rule(new Border { Margin = new Thickness(0, 11, 0, 11) });
                 line.SetResourceReference(Border.BackgroundProperty, "Line");
                 var limits = Limits(fan, hw);
@@ -705,18 +897,6 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
             seg.VerticalAlignment = VerticalAlignment.Center;
             right.Children.Add(seg);
             right.Children.Add(modeHost);
-            void Toggle()
-            {
-                if (!_expanded.Remove(fan.ControlId)) _expanded.Add(fan.ControlId);
-                ShowCurve();
-            }
-            left.Cursor = System.Windows.Input.Cursors.Hand;
-            left.Background = Brushes.Transparent;
-            left.ToolTip = "Click to show or hide the curve and limits";
-            left.MouseLeftButtonUp += (_, e) => { if (!_fanGrid.Editing) { Toggle(); e.Handled = true; } };
-            void Open() { if (_expanded.Add(fan.ControlId)) ShowCurve(); }
-            _openCurves.Add(Open);
-            _openLimits.Add(Open);
             BuildMode();
         }
 
@@ -746,7 +926,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         root.Children.Add(Ui.SplitRow(bar, right, 0, stackLeft: true));
         ((FrameworkElement)root.Children[^1]).Margin = new Thickness(FanTextIndent, 0, 0, 0);
         root.Children.Add(expandHost);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(14, 12, 13, 9), Child = root };
+        return root;
     }
 
     private const double FanTextIndent = 56;
@@ -1021,6 +1201,23 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         BuildCurves();
     }
 
+    private CoolingTestDialog? _shotCooling;
+
+    private async Task CoolingTestAsync(bool showLast = true)
+    {
+        if (_app.Hardware.Catalog is null)
+        {
+            _app.Notify("Sensors aren't ready", "Wait a moment for the fans to be detected.", NoticeKind.Info);
+            return;
+        }
+        var dialog = new CoolingTestDialog(_app, _window, showLast);
+        await _window.ShowModal(dialog.Card);
+        dialog.Cancel();
+        _fanSignature = "";
+        Tick();
+        BuildCurves();
+    }
+
     private void BuildCurves()
     {
         _curveList.Children.Clear();
@@ -1107,6 +1304,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
             var row = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
             row.Children.Add(Labeled("Temperature from", sensor));
             stack.Children.Add(row);
+            if (LearnedNotice(curve) is { } learned) stack.Children.Add(learned);
 
             var editor = new CurveEditor { Height = 235, Margin = new Thickness(0, 10, 0, 0) };
             editor.SetPoints(curve.Points);
@@ -1179,6 +1377,41 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
 
         _curveEditorHost.Content = stack;
         Motion.FadeIn(stack);
+    }
+
+    private FrameworkElement? LearnedNotice(FanCurve curve)
+    {
+        var test = Fans.CoolingTest;
+        var group = test?.Groups.FirstOrDefault(g => string.Equals(g.CurveName, curve.Name, StringComparison.OrdinalIgnoreCase));
+        if (test is null || group is null || _app.FanLearning is not { } learning) return null;
+        var insight = learning.Insight(curve.Name);
+        if (insight is null)
+            return new TextBlock
+            {
+                Text = $"Learning from everyday use: {learning.Count(curve.Name)} of {CoolingLearner.MinSamples} steady readings under load",
+                Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 8, 0, 0),
+            };
+        if (Math.Abs(insight.Error) < CoolingLearner.MeaningfulErrorC) return null;
+        if (CoolingAnalysis.Suggest(test, group, curve, Fans.CoolingGoal, insight.Error) is not { } suggestion || CoolingApply.Same(curve.Points, suggestion.Points)) return null;
+        bool hotter = insight.Error > 0;
+        var notice = Ui.Notice(hotter ? "Apricot" : "Sage", "I.Thermometer",
+            $"The {insight.SensorName} runs {Math.Abs(insight.Error):0.0} °C {(hotter ? "hotter" : "cooler")} in everyday use than the cooling test predicted",
+            $"Measured over {RaceFormat.Count(insight.Count, "steady reading")} under load. Adjust moves this curve so the fans still settle near {suggestion.Knee}%.",
+            ("Adjust", () =>
+            {
+                var old = curve.Points;
+                curve.Points = suggestion.Points.Select(p => new CurvePoint { Temp = p.Temp, Percent = p.Percent }).ToList();
+                _app.FanSettingsChanged();
+                _app.Notify("Curve adjusted", $"“{curve.Name}”", NoticeKind.Success, action: new NoticeAction("Undo", () =>
+                {
+                    curve.Points = old;
+                    _app.FanSettingsChanged();
+                    BuildCurves();
+                }));
+                BuildCurves();
+            }));
+        notice.Margin = new Thickness(0, 10, 0, 0);
+        return notice;
     }
 
     private static readonly string[] MixNames = { "Max", "Min", "Average", "Sum", "Subtract" };
@@ -1299,31 +1532,24 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
 
     public IEnumerable<(string Name, Func<Task> Enter)> ScreenshotStates()
     {
-        yield return ("rearrange", () =>
+        yield return ("second-fan", () =>
         {
-            SetRearranging(true);
+            if (_listOrder.Count > 1 && _fanList.Children.Count > 1 && _fanList.Children[1] is RadioButton second) second.IsChecked = true;
             return Task.CompletedTask;
         });
         yield return ("hidden-and-limits", () =>
         {
-            SetRearranging(false);
             _showHidden = true;
             _fanSignature = "";
             Tick();
             return Task.CompletedTask;
         });
-        yield return ("limits-open", () =>
+        yield return ("pump", () =>
         {
             _showHidden = false;
+            _selectedFan = _app.Hardware.Catalog?.Fans.FirstOrDefault(f => Fans.HardwareFor(f.ControlId).IsPump)?.ControlId ?? _selectedFan;
             _fanSignature = "";
             Tick();
-            UpdateLayout();
-            _openLimits.FirstOrDefault()?.Invoke();
-            return Task.CompletedTask;
-        });
-        yield return ("curves-open", () =>
-        {
-            foreach (var open in _openCurves.ToList()) open();
             return Task.CompletedTask;
         });
         yield return ("curves-tab", () =>
@@ -1342,7 +1568,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         {
             ShowTab(0);
             var fans = _app.Hardware.Catalog?.Fans;
-            var fan = fans?.FirstOrDefault(f => _expanded.Contains(f.ControlId) && f.HasRpm) ?? fans?.FirstOrDefault(f => f.ControlId == "/lpc/nct6798d/control/3");
+            var fan = fans?.FirstOrDefault(f => f.ControlId == _selectedFan && f.HasRpm) ?? fans?.FirstOrDefault(f => f.ControlId == "/lpc/nct6798d/control/3");
             if (fan is null) return;
             var dialog = new CalibrationDialog(_app, _window, fan);
             _ = _window.ShowModal(dialog.Card);
@@ -1356,6 +1582,36 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         yield return ("closed", () =>
         {
             _window.CloseModal(false);
+            return Task.CompletedTask;
+        });
+        yield return ("cooling-intro", () =>
+        {
+            _ = _window.ShowModal(new CoolingTestDialog(_app, _window, showLast: false).Card);
+            return Task.CompletedTask;
+        });
+        yield return ("cooling-running", async () =>
+        {
+            _window.CloseModal(false);
+            var dialog = new CoolingTestDialog(_app, _window, showLast: false);
+            _ = _window.ShowModal(dialog.Card);
+            dialog.Start();
+            _shotCooling = dialog;
+            await Task.Delay(9000);
+        });
+        yield return ("cooling-result", async () =>
+        {
+            _shotCooling?.Cancel();
+            await Task.Delay(800);
+            _window.CloseModal(false);
+            _ = _window.ShowModal(new CoolingTestDialog(_app, _window, showLast: true).Card);
+        });
+        yield return ("cooling-learned", () =>
+        {
+            _shotCooling?.Cancel();
+            _window.CloseModal(false);
+            ShowTab(1);
+            _selectedCurve = "CPU";
+            BuildCurves();
             return Task.CompletedTask;
         });
     }

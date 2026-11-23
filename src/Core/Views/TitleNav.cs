@@ -140,7 +140,7 @@ internal sealed class TitleNav : Grid
         Children.Add(_end);
         AutomationProperties.SetName(this, "Tools");
         _drag = new DragList(_groups, keys => GroupsMoved?.Invoke(keys), across: true);
-        _back = Ui.LabeledButton("I.ChevronLeft", "Back", () => _backAction?.Invoke());
+        _back = Ui.LabeledButton("I.ChevronLeft", "Back", () => _backAction?.Invoke(), "PrimaryButton");
         _back.ToolTip = "Back (Esc)";
         _back.VerticalAlignment = VerticalAlignment.Center;
         _back.Margin = new Thickness(PartGap * 3, 0, 0, 0);

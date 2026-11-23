@@ -12,26 +12,27 @@ namespace Core.Views.Pages;
 
 internal sealed class WindowProfileEditor
 {
-    private const double LabelWidth = 138;
+    private const double LeftLabel = 100, RightLabel = 118;
     private readonly AppServices _app;
     private readonly WindowProfile _profile;
     private readonly TextBox _name = new() { MaxLength = Ui.NameLength, Tag = "e.g. RaceRoom on triples" };
     private readonly TextBox _process = new() { Tag = "e.g. RRRE64.exe" };
-    private readonly HotkeyBox _hotkey = new();
-    private readonly TextBlock _shared = Ui.FieldHint("", LabelWidth);
-    private readonly TextBlock _offScreen = Ui.FieldHint("", LabelWidth);
-    private readonly TextBlock _error = new() { Visibility = Visibility.Collapsed };
+    private readonly TextBlock _offScreen = Ui.FieldHint("", RightLabel);
     private readonly NumberBox _width, _height, _x, _y, _delay;
     private readonly CheckBox _keepSize = new() { Content = "Keep the size the program sets" };
     private readonly CheckBox _borders, _titleBar, _auto;
-    private readonly MonitorLayoutView _preview = new() { Height = 97 };
     private readonly List<MonitorInfo> _monitors;
     private string? _groupId;
+    private readonly HotkeyBox _hotkey = new() { Width = 211, HorizontalAlignment = HorizontalAlignment.Left };
     private bool _nameTouched;
 
-    public Border Card { get; }
+    public Grid Columns { get; }
 
-    public WindowProfileEditor(AppServices app, MainWindow window, WindowProfile profile, bool isNew, Action? onDelete = null)
+    public MonitorLayoutView Preview { get; } = new();
+
+    public event Action? Edited;
+
+    public WindowProfileEditor(AppServices app, WindowProfile profile, bool isNew)
     {
         _app = app;
         _profile = profile;
@@ -54,8 +55,7 @@ internal sealed class WindowProfileEditor
         {
             if (ProgramPicker.BrowseExe("Programs (*.exe)|*.exe") is { } path) _process.Text = Path.GetFileName(path);
         });
-        var pick = Ui.LabeledButton("I.AppWindow", "Running", () => { }, "GhostButton");
-        pick.ToolTip = "Pick from the programs running now";
+        var pick = Ui.IconButton("I.AppWindow", "Pick from the programs running now", () => { });
         pick.Click += (_, _) => ShowPrograms(pick, all: false);
         foreach (var b in new[] { browse, pick })
         {
@@ -66,19 +66,18 @@ internal sealed class WindowProfileEditor
         program.Children.Add(_process);
 
         var stack = new StackPanel();
-        stack.Children.Add(Ui.FieldRow("Program", program, LabelWidth));
+        stack.Children.Add(ListDetail.Section("Program", first: true));
+        stack.Children.Add(Ui.FieldRow("Program", program, LeftLabel));
         program.HorizontalAlignment = HorizontalAlignment.Stretch;
-        stack.Children.Add(Ui.FieldRow("Name", _name, LabelWidth));
+        if (isNew) stack.Children.Add(Ui.FieldRow("Name", _name, LeftLabel));
         if (settings.Groups.Count > 0)
         {
             var groups = new[] { new Choice(null, "No group") }.Concat(settings.Groups.Select(g => new Choice(g.Id, g.Name))).ToList();
-            stack.Children.Add(Ui.FieldRow("Group", Ui.Combo(groups, _groupId, c => _groupId = c.Id, 211), LabelWidth));
+            stack.Children.Add(Ui.FieldRow("Group", Ui.Combo(groups, _groupId, c => _groupId = c.Id, 211), LeftLabel));
         }
 
         var right = new StackPanel();
-        var placeHead = Ui.EditorSection("Size and position");
-        placeHead.Margin = new Thickness(0, 0, 0, placeHead.Margin.Bottom);
-        right.Children.Add(placeHead);
+        right.Children.Add(ListDetail.Section("Size and position", first: true));
         var presets = PresetBox();
         var current = Ui.LabeledButton("I.Target", "Where it is now", ReadCurrent, "GhostButton");
         current.ToolTip = "Copy the size and spot of the program's window as it is right now";
@@ -88,7 +87,7 @@ internal sealed class WindowProfileEditor
         presetRow.Children.Add(current);
         presets.MinWidth = 0;
         presetRow.Children.Add(presets);
-        right.Children.Add(Ui.FieldRow("Copy values from", presetRow, LabelWidth));
+        right.Children.Add(Ui.FieldRow("Copy from", presetRow, RightLabel));
 
         var screen = Span();
         _width = new NumberBox(profile.Width ?? screen.Width, "px", 68) { Minimum = 100, Maximum = 32000 };
@@ -99,17 +98,17 @@ internal sealed class WindowProfileEditor
         _keepSize.IsChecked = profile.Width is null;
         _keepSize.ToolTip = "Only move the window; leave its size as the program sets it";
         _keepSize.Click += (_, _) => SizeChanged();
-        foreach (var box in new[] { _width, _height, _x, _y }) box.ValueChanged += _ => SizeChanged();
-        right.Children.Add(Ui.FieldRow("Size", Pair("W", _width, "H", _height), LabelWidth));
-        right.Children.Add(Ui.FieldRow("", _keepSize, LabelWidth));
-        right.Children.Add(Ui.FieldRow("Position", Pair("X", _x, "Y", _y), LabelWidth,
-            "Desktop pixels: 0, 0 is the main display's top left, so screens to its left are negative."));
-        right.Children.Add(new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(6), Margin = new Thickness(LabelWidth, 6, 0, 4), MinWidth = Ui.FieldWidth, HorizontalAlignment = HorizontalAlignment.Stretch, Child = _preview });
+        foreach (var box in new[] { _width, _height, _x, _y }) box.ValueChanged += _ => { SizeChanged(); Edited?.Invoke(); };
+        right.Children.Add(Ui.FieldRow("Size", Pair("W", _width, "H", _height), RightLabel));
+        right.Children.Add(Ui.FieldRow("", _keepSize, RightLabel));
+        var position = Ui.FieldRow("Position", Pair("X", _x, "Y", _y), RightLabel);
+        position.ToolTip = "Desktop pixels: 0, 0 is the main display's top left, so screens to its left are negative";
+        right.Children.Add(position);
         _offScreen.Foreground = Ui.Res<System.Windows.Media.Brush>("WarnDeep");
-        _offScreen.Margin = new Thickness(LabelWidth, 2, 0, 6);
+        _offScreen.Margin = new Thickness(RightLabel, 4, 0, 6);
         right.Children.Add(_offScreen);
 
-        stack.Children.Add(Ui.EditorSection("Window"));
+        stack.Children.Add(ListDetail.Section("Window"));
         _borders = new CheckBox { Content = "Remove borders", IsChecked = profile.RemoveBorders, ToolTip = "Strips the frame and title bar. Only for games without a borderless option of their own." };
         _titleBar = new CheckBox { Content = "Hide the title bar of Store / Xbox games", IsChecked = profile.HideTitleBar, Margin = new Thickness(0, 6, 0, 0),
             ToolTip = "Needs Remove borders. For Store / Xbox app games (e.g. Forza Horizon 4) that keep a title bar after removing borders: pushes it above the screen. Does nothing for other programs." };
@@ -121,43 +120,33 @@ internal sealed class WindowProfileEditor
         var look = new StackPanel();
         look.Children.Add(_borders);
         look.Children.Add(_titleBar);
-        stack.Children.Add(Ui.FieldRow("Style", look, LabelWidth));
+        stack.Children.Add(Ui.FieldRow("Style", look, LeftLabel));
 
-        stack.Children.Add(Ui.EditorSection("Applying"));
-        _auto = ToggleCards.FromBox(new CheckBox { Content = "When the program starts", IsChecked = profile.Auto });
-        _delay = new NumberBox(profile.DelayMs / 1000.0, Units.S, 78) { Minimum = 0, Maximum = WindowProfileSettings.MaxDelayMs / 1000.0, Step = 0.5, Decimals = 1 };
-        _delay.ToolTip = "Needs When the program starts. For about 35 s after that, Tecnica moves the window back if the game resizes it.";
+        stack.Children.Add(ListDetail.Section("Applying"));
+        _auto = ToggleCards.FromBox(new CheckBox { Content = "When it starts, after", IsChecked = profile.Auto });
+        _delay = new NumberBox(profile.DelayMs / 1000.0, Units.S, 60) { Minimum = 0, Maximum = WindowProfileSettings.MaxDelayMs / 1000.0, Step = 0.5, Decimals = 1 };
+        _delay.ToolTip = "Waits this long after the program starts. For about 35 s after that, Tecnica moves the window back if the game resizes it.";
+        _delay.Margin = new Thickness(10, 0, 0, 0);
+        _delay.ValueChanged += _ => Edited?.Invoke();
         _auto.Click += (_, _) => _delay.IsEnabled = _auto.IsChecked == true;
         _delay.IsEnabled = profile.Auto;
-        stack.Children.Add(Ui.FieldRow("Automatically", _auto, LabelWidth));
+        var auto = new StackPanel { Orientation = Orientation.Horizontal };
+        _auto.VerticalAlignment = VerticalAlignment.Center;
+        _delay.VerticalAlignment = VerticalAlignment.Center;
+        auto.Children.Add(_auto);
+        auto.Children.Add(_delay);
+        stack.Children.Add(Ui.FieldRow("Automatically", auto, LeftLabel));
+        _hotkey.SetHotkey(profile.Hotkey);
+        _hotkey.HotkeyChanged += _ => Edited?.Invoke();
+        stack.Children.Add(Ui.FieldRow("By keybind", _hotkey, LeftLabel));
         if (!settings.AutoApply)
         {
-            var off = Ui.FieldHint("Applying automatically is off for every profile (switch at the top of the page).", LabelWidth);
+            var off = Ui.FieldHint("Applying automatically is off for every placement (tick box at the top of the page).", LeftLabel);
             off.Foreground = Ui.Res<System.Windows.Media.Brush>("WarnDeep");
             stack.Children.Add(off);
         }
-        stack.Children.Add(Ui.FieldRow("Delay", _delay, LabelWidth, "Waits this long after the program starts."));
-        _hotkey.SetHotkey(profile.Hotkey);
-        _hotkey.HotkeyChanged += _ => UpdateShared();
-        stack.Children.Add(Ui.FieldRow("Keybind", _hotkey, LabelWidth));
-        stack.Children.Add(_shared);
-        UpdateShared();
         SizeChanged();
-
-        var buttons = Ui.DialogButtons(window, isNew ? "Save profile" : "Save changes", Save);
-        var test = Ui.LabeledButton("I.Play", "Try it now", TryNow, "GhostButton");
-        test.ToolTip = "Move the program's window with these values now, without saving";
-        test.Margin = new Thickness(0, 0, Ui.GroupGap, 0);
-        buttons.Children.Insert(0, test);
-        var delete = onDelete is null ? null : Ui.LabeledButton("I.Trash", "Delete profile", onDelete, "DangerButton");
-        var columns = new Grid();
-        columns.ColumnDefinitions.Add(new ColumnDefinition());
-        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Ui.PanelSpacing * 2) });
-        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.25, GridUnitType.Star) });
-        Grid.SetColumn(right, 2);
-        columns.Children.Add(stack);
-        columns.Children.Add(right);
-        Card = Ui.Dialog(window, isNew ? "New window profile" : $"Edit “{profile.Name}”", "", columns, buttons, _error, 1080, delete);
+        Columns = ListDetail.Columns(stack, right, 0.85);
     }
 
     private static List<MonitorInfo> Monitors(AppServices app)
@@ -218,29 +207,39 @@ internal sealed class WindowProfileEditor
     {
         bool keep = _keepSize.IsChecked == true;
         _width.IsEnabled = _height.IsEnabled = !keep;
-        _preview.SetTiles(_monitors.OrderBy(m => m.X).Select(m => new LayoutTile(m.X, m.Y, m.Width, m.Height, m.Number > 0 ? m.Number.ToString() : m.Name, $"{m.Width}×{m.Height}", m.Primary)).ToList());
-        _preview.SetTarget(keep ? null : new Rect(_x.Value, _y.Value, _width.Value, _height.Value));
-        string? off = keep || _monitors.Count == 0 || WindowPresets.Covers(Screens(), (int)_x.Value, (int)_y.Value, (int)_width.Value, (int)_height.Value) ? null
-            : FitsProfile((int)_x.Value, (int)_y.Value, (int)_width.Value, (int)_height.Value) is { } fits
-                ? $"Part of the window is off the displays that are on now. It fits your “{fits}” display profile."
+        int x = (int)_x.Value, y = (int)_y.Value, w = (int)_width.Value, h = (int)_height.Value;
+        bool fitsNow = keep || _monitors.Count == 0 || WindowPresets.Covers(Screens(), x, y, w, h);
+        var fits = fitsNow ? null : FitsSetup(x, y, w, h);
+        Preview.SetTiles(fits?.Tiles ?? _monitors.OrderBy(m => m.X).Select(m => new LayoutTile(m.X, m.Y, m.Width, m.Height, m.Number > 0 ? m.Number.ToString() : m.Name, $"{m.Width}×{m.Height}", m.Primary)).ToList());
+        Preview.SetTarget(keep ? null : new Rect(x, y, w, h));
+        string? off = fitsNow ? null
+            : fits is { } setup
+                ? $"Part of the window is off the displays that are on now. It fits your “{setup.Name}” display setup."
                 : "Part of the window is off every display.";
         _offScreen.Text = off ?? "";
         _offScreen.Visibility = off is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    private string? FitsProfile(int x, int y, int width, int height)
+    public IReadOnlyList<LayoutTile> ScreensFor(WindowProfile p)
     {
-        foreach (var profile in _app.Config.Displays.Profiles)
+        var current = _monitors.OrderBy(m => m.X).Select(m => new LayoutTile(m.X, m.Y, m.Width, m.Height, m.Number > 0 ? m.Number.ToString() : "", "", m.Primary)).ToList();
+        if (p.Width is not { } w || p.Height is not { } h || _monitors.Count == 0 || WindowPresets.Covers(Screens(), p.X, p.Y, w, h)) return current;
+        return FitsSetup(p.X, p.Y, w, h)?.Tiles ?? current;
+    }
+
+    private (string Name, List<LayoutTile> Tiles)? FitsSetup(int x, int y, int width, int height)
+    {
+        foreach (var setup in _app.Config.Displays.Profiles)
         {
-            if (profile.Layout is null || profile.Name.Length == 0) continue;
-            List<ScreenArea> screens;
-            try
-            {
-                screens = _app.Displays.Describe(profile.Layout).Where(m => m.Width > 0 && m.Height > 0)
-                    .Select(m => new ScreenArea(m.Name, m.X, m.Y, m.Width, m.Height, m.Primary)).ToList();
-            }
+            if (setup.Layout is null || setup.Name.Length == 0) continue;
+            List<SnapshotMonitor> monitors;
+            try { monitors = _app.Displays.Describe(setup.Layout).Where(m => m.Width > 0 && m.Height > 0).ToList(); }
             catch { continue; }
-            if (screens.Count > 0 && WindowPresets.Covers(screens, x, y, width, height)) return profile.Name;
+            var screens = monitors.Select(m => new ScreenArea(m.Name, m.X, m.Y, m.Width, m.Height, m.Primary)).ToList();
+            if (screens.Count == 0 || !WindowPresets.Covers(screens, x, y, width, height)) continue;
+            var tiles = monitors.DistinctBy(m => (m.X, m.Y, m.Width, m.Height)).OrderBy(m => m.X).ThenBy(m => m.Y)
+                .Select((m, i) => new LayoutTile(m.X, m.Y, m.Width, m.Height, _monitors.FirstOrDefault(c => c.Key == m.Key) is { Number: > 0 } on ? on.Number.ToString() : (i + 1).ToString(), "", m.Primary)).ToList();
+            return (setup.Name, tiles);
         }
         return null;
     }
@@ -286,17 +285,6 @@ internal sealed class WindowProfileEditor
         menu.IsOpen = true;
     }
 
-    private void UpdateShared()
-    {
-        var s = _app.Config.WindowProfiles;
-        var hk = _hotkey.Hotkey;
-        var others = string.IsNullOrWhiteSpace(hk) ? new List<string>()
-            : s.Profiles.Where(p => p != _profile && Hotkeys.Hotkey.SameKey(p.Hotkey, hk)).Select(p => $"“{p.Name}”")
-                .Concat(s.Groups.Where(g => Hotkeys.Hotkey.SameKey(g.Hotkey, hk)).Select(g => $"the group “{g.Name}”")).ToList();
-        _shared.Text = others.Count == 0 ? "" : $"Also used by {string.Join(", ", others)}: pressing it moves whichever of their programs are running.";
-        _shared.Visibility = others.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-    }
-
     private WindowProfile Values()
     {
         var p = _profile.Copy();
@@ -311,7 +299,6 @@ internal sealed class WindowProfileEditor
         p.HideTitleBar = p.RemoveBorders && _titleBar.IsChecked == true;
         p.Auto = _auto.IsChecked == true;
         p.DelayMs = (int)Math.Round(_delay.Value * 1000);
-        p.Hotkey = _hotkey.Hotkey;
         p.GroupId = _groupId;
         if (p.Name.Length == 0) p.Name = WindowPresets.FriendlyName(p.ProcessName);
         if (p.Name.Length > Ui.NameLength) p.Name = p.Name[..Ui.NameLength].TrimEnd();
@@ -325,27 +312,22 @@ internal sealed class WindowProfileEditor
         return name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name : name + ".exe";
     }
 
-    private void TryNow()
+    public string? TryNow()
     {
         var p = Values();
-        if (p.ProcessName.Length == 0) { Show("Choose the program first."); return; }
+        if (p.ProcessName.Length == 0) return "Choose the program first.";
         _ = _app.WindowProfiles.ApplyAsync(p, retry: false, watch: false);
+        return null;
     }
 
-    private void Show(string? problem)
-    {
-        _error.Text = problem ?? "";
-        _error.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
-    }
-
-    private bool Save()
+    public string? Save()
     {
         var p = Values();
-        string? problem = p.ProcessName.Length == 0 ? "Choose the program whose window this profile moves."
+        string? problem = p.ProcessName.Length == 0 ? "Choose the program whose window this placement moves."
             : _app.Config.WindowProfiles.NameProblem(p.Name, _profile)
-            ?? _app.Hotkeys.Clash(p.Hotkey, _profile);
-        Show(problem);
-        if (problem is not null) return false;
+            ?? _app.Hotkeys.Clash(_hotkey.Hotkey, _profile);
+        if (problem is not null) return problem;
+        _profile.Hotkey = _hotkey.Hotkey;
         _profile.Name = p.Name;
         _profile.ProcessName = p.ProcessName;
         _profile.Width = p.Width;
@@ -356,45 +338,7 @@ internal sealed class WindowProfileEditor
         _profile.HideTitleBar = p.HideTitleBar;
         _profile.Auto = p.Auto;
         _profile.DelayMs = p.DelayMs;
-        _profile.Hotkey = p.Hotkey;
         _profile.GroupId = p.GroupId;
-        return true;
-    }
-}
-
-internal sealed class WindowGroupEditor
-{
-    private readonly AppServices _app;
-    private readonly WindowGroup _group;
-    private readonly TextBox _name = new() { MaxLength = Ui.NameLength, Tag = "e.g. Rig screens" };
-    private readonly HotkeyBox _hotkey = new();
-    private readonly TextBlock _error = new() { Visibility = Visibility.Collapsed };
-
-    public Border Card { get; }
-
-    public WindowGroupEditor(AppServices app, MainWindow window, WindowGroup group, bool isNew, Action? onDelete = null)
-    {
-        _app = app;
-        _group = group;
-        _name.Text = group.Name;
-        _hotkey.SetHotkey(group.Hotkey);
-        var stack = new StackPanel();
-        stack.Children.Add(Ui.FieldRow("Name", _name, 97));
-        stack.Children.Add(Ui.FieldRow("Keybind", _hotkey, 97, "Moves every running program in the group."));
-        var delete = onDelete is null ? null : Ui.LabeledButton("I.Trash", "Delete group", onDelete, "DangerButton");
-        Card = Ui.Dialog(window, isNew ? "New group" : "Edit group", "Its profiles move together.", stack,
-            Ui.DialogButtons(window, isNew ? "Save group" : "Save changes", Save), _error, 480, delete);
-    }
-
-    private bool Save()
-    {
-        string name = _name.Text.Trim();
-        string? problem = _app.Config.WindowProfiles.NameProblem(name, _group) ?? _app.Hotkeys.Clash(_hotkey.Hotkey, _group);
-        _error.Text = problem ?? "";
-        _error.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
-        if (problem is not null) return false;
-        _group.Name = name;
-        _group.Hotkey = _hotkey.Hotkey;
-        return true;
+        return null;
     }
 }

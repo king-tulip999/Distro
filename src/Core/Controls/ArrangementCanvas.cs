@@ -56,6 +56,14 @@ public sealed class ArrangementCanvas : Canvas
         };
     }
 
+    public void LimitHeight(double max)
+    {
+        max = Math.Max(MinFitHeight, Math.Floor(max));
+        if (Math.Abs(max - MaxFitHeight) < 0.5) return;
+        MaxFitHeight = max;
+        FitHeight();
+    }
+
     private void FitHeight()
     {
         if (_tiles.Count == 0 || ActualWidth <= 0) return;

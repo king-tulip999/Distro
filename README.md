@@ -44,7 +44,7 @@ For racing in iRacing
 <h3>Tecnica</h3>
 For setting up the PC
 <br><br>
-<sub>Displays · Window Profiles · FPS overlay · Fan control</sub>
+<sub>Displays · Window placement · FPS overlay · Fan control</sub>
 <br><br>
 </td>
 </tr>
@@ -69,7 +69,8 @@ Two separate apps: take one or both. Neither needs the other.
 | **Strategy** | Fuel saving to skip a stop |
 | **Track notes** | Notes per corner, track limits and a race result card |
 | **VR** | Any widget in your headset through SteamVR or OpenXR, fixed in the cockpit or following your head, placed per widget or matched to the monitor |
-| **Widget editor** | Click any part of a widget to change it, drag columns into your own order, and pick when it shows |
+| **Widget editor** | Click any part of a widget to change it, drag its parts and columns into your own order, and pick when it shows |
+| **Night mode** | Black widgets in one color for night racing, switched on at sunset in iRacing or by keybind |
 | **Alerts** | Fuel, pit speed, traffic, flags, incidents, track limits and weather, each with its own threshold |
 | **Fuel** | Your reserve, margin and pit stop time, with every number's working shown |
 
@@ -92,6 +93,17 @@ Your iRacing history, kept on your PC: result cards, ratings, personal bests, an
 | **iRacing settings** | Every iRacing setting in plain language, searchable, with what you changed from the defaults and one-click undo |
 | **iRacing keybinds** | Every in-sim keybind per profile, with what's set, missing or changed |
 | **Trading Paints and Garage 61** | Start them with Velocita or when iRacing starts, and see your own paint on car pictures across the app |
+
+### Livery Shop (beta)
+
+Paint your iRacing car, helmet and suit, saved straight into iRacing. Off unless you turn it on.
+
+| Feature | What it does |
+| --- | --- |
+| **Painting** | Shapes, stripes, numbers, text, logos, brush, eraser and pen, over iRacing's car template, with team colors that update everything painted in them |
+| **Import** | PNG, JPG, SVG, TGA or a Photoshop file with every layer kept, by button, drag and drop or Ctrl+V |
+| **Versions** | Save, rename, duplicate, export and import versions of a design, each a file you can open from Velocita |
+| **Live preview** | The car drawn by iRacing, updated each time your paint saves |
 
 ### GRR League
 
@@ -124,20 +136,21 @@ Measured with all six apps running side by side in the same live iRacing session
 
 | Feature | What it does |
 | --- | --- |
-| **Displays** | Monitors, resolution, HDR, wallpapers and audio saved as profiles. Switch from desk to rig with one keybind |
-| **Display profile editor** | Layout, HDR, taskbar, audio devices, volume and a wallpaper per monitor |
-| **Window Profiles** | Any program at an exact size and spot, borderless, applied the moment it starts. Great for stretching a game across triples |
-| **Window profile editor** | Size, position, borders, a start delay and a keybind, with a picture of where the window lands |
+| **Displays** | Monitors, resolution, HDR, wallpapers and audio saved as setups. Switch from desk to rig with one keybind |
+| **Display setups** | Layout, HDR, taskbar, audio devices, volume and a wallpaper per monitor, edited right under the setup's preview |
+| **Window placement** | Any program at an exact size and spot, borderless, applied the moment it starts. Great for stretching a game across triples |
+| **Placement settings** | Size, position, borders, a start delay and a keybind, with a picture of where the window lands |
 | **Performance Overlay** | FPS, 1% lows, temperatures and usage over your game, in whatever order you like |
 | **Fan Control** | Curves, per-fan limits, presets and a failsafe that hands the fans back to the BIOS if anything goes wrong |
+| **Cooling test** | Measures how much each fan group actually lowers your temperatures and suggests quiet, balanced or cool curves |
 
 <br>
 
 ## Getting started
 
-1. **[Download](https://github.com/king-tulip999/Distro/releases/latest)** `Velocita.exe`, `Tecnica.exe` or both, and put them somewhere they can stay.
+1. **[Download](https://github.com/king-tulip999/Distro/releases/latest)** `Velocita.exe`, `Tecnica.exe` or both.
 2. Run it. Windows will say it protected your PC: click **More info → Run anyway**.
-3. Pick a few options on the setup screen and click **Get started**.
+3. Pick a few options on the setup screen and click **Get started**. If it runs from Downloads, the setup screen offers to move it to its own install folder.
 
 > [!TIP]
 > Tecnica asks for administrator rights (sensors, fans and displays need them). Velocita doesn't.
@@ -176,7 +189,7 @@ An optional free, signed driver Tecnica can use for CPU temperatures and motherb
 <summary><b>What does it send online?</b></summary>
 <br>
 
-An update check against GitHub releases (if you leave it on), a small ping for Tecnica's network readout, and the GRR feed if you show that page. No accounts, no telemetry. Your stats stay on your PC.
+An update check against GitHub releases (if you leave it on), a small ping for Tecnica's network readout, the GRR feed if you show that page, and iRacing's car templates when you load one in the Livery Shop. No accounts, no telemetry. Your stats stay on your PC.
 </details>
 
 <details>
@@ -215,12 +228,14 @@ Each app checks for updates in Settings → Application → About and updates. *
 | [Saira](https://github.com/Omnibus-Type/Saira) by Omnibus-Type | The app font, wordmark and the iRacing Overlay's numbers | SIL Open Font License 1.1 |
 | [SIMRacingApps](https://github.com/SIMRacingApps/SIMRacingAppsServer) by Jeffrey Gilliam | Track centerline and pit lane routes for Session Stats' track maps | Apache 2.0 |
 | Track map drawings by [iRacing](https://www.iracing.com), collected in [racing-track-maps-vector](https://github.com/meowmachine/racing-track-maps-vector) by meowmachine | Track maps for Session Stats and the iRacing Overlay | © iRacing.com Motorsport Simulations, LLC |
+| [ag-psd](https://github.com/Agamnentzar/ag-psd) by Agamnentzar | Photoshop file import in the Livery Shop | MIT |
+| [Google Fonts](https://fonts.google.com): Anton, Archivo Black, Barlow, Barlow Condensed, Bebas Neue, Kanit, Orbitron, Oswald, Racing Sans One, Russo One, Teko | Text in the Livery Shop | SIL Open Font License 1.1 |
 | [PawnIO](https://pawnio.eu) | Optional driver for CPU and motherboard sensors (not bundled; installed separately) | See its site |
 
 **Inspired by** (no code or assets from these are used):
 
 - [Fan Control](https://github.com/Rem0o/FanControl.Releases) by Rem0o: the Fan Control page
-- [Resize Raccoon](https://github.com/mistenkt/resize-raccoon) by mistenkt and its fork [Resize Rabbit](https://github.com/rosscarlson/resize-rabbit) by rosscarlson: Window Profiles
+- [Resize Raccoon](https://github.com/mistenkt/resize-raccoon) by mistenkt and its fork [Resize Rabbit](https://github.com/rosscarlson/resize-rabbit) by rosscarlson: Window placement
 
 Full license texts ship with the components (for example `NOTICES.md` inside the track map library and `Saira-OFL.txt` beside the fonts). Thanks to the [GRR League](https://www.grassrootsracing.org) for letting Velocita use its site data and logo.
 </details>

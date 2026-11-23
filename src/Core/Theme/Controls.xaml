@@ -528,7 +528,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <c:Tile x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="3,0,0,0" CornerRadius="{DynamicResource R.Control}"
+                    <c:Tile x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="3,0,0,0" CornerRadius="0"
                             Padding="3,4,6,4" RenderTransformOrigin="0.5,0.5">
                         <c:Tile.RenderTransform><ScaleTransform /></c:Tile.RenderTransform>
                         <DockPanel VerticalAlignment="Center">
@@ -699,8 +699,8 @@
     </Style>
     <Style x:Key="PageTab" TargetType="RadioButton">
         <Setter Property="ContentTemplateSelector" Value="{StaticResource CasedContent}" />
-        <Setter Property="Foreground" Value="{DynamicResource Text}" />
-        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+        <Setter Property="FontSize" Value="15.5" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Padding" Value="18,0" />
         <Setter Property="Height" Value="34" />
@@ -721,7 +721,7 @@
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Mark" Property="Background" Value="{DynamicResource AccentText}" />
-                            <Setter Property="Foreground" Value="{DynamicResource Heading}" />
+                            <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />

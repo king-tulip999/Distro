@@ -525,11 +525,11 @@ internal sealed class KeybindsBoard : StackPanel
         }
         if (blocks.Count > 0)
         {
-            var columns = new MasonryPanel { MinColumnWidth = 340, MaxColumns = 2, Gap = 28, Stable = true };
+            var columns = new MasonryPanel { MinColumnWidth = 340, MaxColumns = 2, Gap = 18, Stable = true, Margin = new Thickness(0, 12, 0, 0) };
             bool titled = blocks.Count > 1 && blocks.Any(b => b.Title is not null);
             foreach (var (title, items) in blocks)
             {
-                var block = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
+                var block = new StackPanel();
                 if (title is not null) block.Children.Add(SectionHead(title));
                 else if (titled) block.Children.Add(SectionHead(""));
                 foreach (var e in items) block.Children.Add(Row(e));

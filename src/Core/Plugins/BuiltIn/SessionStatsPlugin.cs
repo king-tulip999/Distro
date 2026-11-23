@@ -12,6 +12,7 @@ internal sealed class SessionStatsPlugin : Plugin
     public override string Id => PluginIds.SessionStats;
     public override AppKind App => AppKind.Velocita;
     public override string Name => "Session Stats";
+    public override bool ShowsPages(AppServices app) => app.Config.SessionStats.ShowPage;
     public override string Description => "Your iRacing history: personal bests, races, incidents and lap analysis.";
     public override string Icon => "I.Candles";
     public override (string Soft, string Deep) Colors => ("Tool7Soft", "Tool7Deep");

@@ -483,17 +483,18 @@ internal sealed partial class IracingControllerSection
 
         private static TextBlock Number(string brush)
         {
-            var number = RaceParts.LiveFigure("", 26, brush, heavy: false);
-            number.HorizontalAlignment = HorizontalAlignment.Left;
+            var number = RaceParts.LiveFigure("", 20, brush, heavy: false);
+            number.VerticalAlignment = VerticalAlignment.Center;
             return number;
         }
 
         public AreaBand()
         {
             Style = Ui.Res<Style>("Card");
-            Padding = new Thickness(16, 11, 16, 11);
-            Margin = new Thickness(0, 0, 0, 16);
-            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            Padding = new Thickness(16, 0, 16, 0);
+            MinHeight = 40;
+            Margin = new Thickness(0, 0, 0, 10);
+            var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             row.Children.Add(Cell(_total, "settings here"));
             row.Children.Add(Cell(_changed, "changed from default"));
             row.Children.Add(Cell(_unsaved, "not written yet"));
@@ -502,9 +503,9 @@ internal sealed partial class IracingControllerSection
 
         private static StackPanel Cell(FrameworkElement value, string caption)
         {
-            var cell = new StackPanel { Margin = new Thickness(0, 0, 34, 0), VerticalAlignment = VerticalAlignment.Bottom };
+            var cell = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 22, 0) };
             cell.Children.Add(value);
-            cell.Children.Add(new TextBlock { Text = caption, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 3, 0, 0) });
+            cell.Children.Add(new TextBlock { Text = caption, Style = Ui.Res<Style>("Muted"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 0, 0) });
             return cell;
         }
 

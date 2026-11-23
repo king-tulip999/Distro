@@ -156,7 +156,7 @@ internal sealed class DisplayProfileService
         if (!quiet)
         {
             if (problems.Count == 0)
-                _app.Notify("Display profile applied", profile.Name, NoticeKind.Success);
+                _app.Notify("Display setup applied", profile.Name, NoticeKind.Success);
             else
                 _app.Notify($"{profile.Name}: some settings weren't applied", string.Join("\n", problems), NoticeKind.Warning, important: true);
         }
@@ -251,7 +251,7 @@ internal sealed class DisplayProfileService
         if (name.Length == 0)
             return "Give the profile a name.";
         if (Profiles.Any(p => p != self && string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
-            return $"There's already a display profile named “{name}”.";
+            return $"There's already a display setup named “{name}”.";
         return _app.Hotkeys.Clash(hotkey, except: self);
     }
 

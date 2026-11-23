@@ -1,5 +1,20 @@
 namespace Core.Config;
 
+public enum HudNightMode
+{
+    Off,
+    Auto,
+    On,
+}
+
+public enum HudNightColor
+{
+    Red,
+    Blue,
+    Purple,
+    Orange,
+}
+
 public enum HudShowWhen
 {
     Driving,
@@ -18,6 +33,8 @@ public enum HudVrPlacement { Off, Cockpit, Head }
 
 public sealed class RaceHudSettings
 {
+    public bool ShowPage { get; set; } = true;
+
     public const int CurrentVersion = 8;
 
     public int Version { get; set; }
@@ -60,6 +77,12 @@ public sealed class RaceHudSettings
     public bool VrEditButton { get; set; }
 
     public bool VrEditorIntroDone { get; set; }
+
+    public HudNightMode NightMode { get; set; } = HudNightMode.Off;
+
+    public HudNightColor NightColor { get; set; } = HudNightColor.Red;
+
+    public string? NightHotkey { get; set; }
 
     public const int MinVrBrightness = 20;
 
@@ -163,6 +186,8 @@ public sealed class RaceHudSettings
     public string? VrRightHotkey { get; set; } = VrRightDefault;
     public string? VrUpHotkey { get; set; } = VrUpDefault;
     public string? VrDownHotkey { get; set; } = VrDownDefault;
+    public string? VrBrighterHotkey { get; set; }
+    public string? VrDimmerHotkey { get; set; }
     public const string VrAdjustDefault = "Ctrl+Alt+V", VrRecenterDefault = "Ctrl+Alt+C", VrNextDefault = "Ctrl+Alt+N", VrSettingDefault = "Ctrl+Alt+M",
         VrLeftDefault = "Ctrl+Alt+Left", VrRightDefault = "Ctrl+Alt+Right", VrUpDefault = "Ctrl+Alt+Up", VrDownDefault = "Ctrl+Alt+Down";
 

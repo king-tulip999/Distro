@@ -108,6 +108,8 @@ internal sealed class AlertsWidget : HudWidget
 
     private static float ChipRowHeight(HudPainter p) => 30 * p.Density;
 
+    private static readonly string[] HeadlineParts = { "top", "others" };
+
     private float DrawHeadline(HudPainter p, HudView v, RectangleF area, IReadOnlyList<HudAlert> list, int max, bool measure)
     {
         float d = p.Density;
@@ -118,15 +120,24 @@ internal sealed class AlertsWidget : HudWidget
         float used = heroH + (chips ? ChipRowHeight(p) : 0);
         if (measure) return used;
         var hero = new RectangleF(area.X, area.Y, area.Width, heroH);
+        float chipTop = hero.Bottom;
+        if (chips)
+        {
+            Span<RectangleF> boxes = stackalloc RectangleF[2];
+            p.Arrange(v, "alerts.headline", new RectangleF(area.X, area.Y, area.Width, used), false, 0, HeadlineParts, stackalloc float[] { heroH, ChipRowHeight(p) }, boxes);
+            hero = boxes[0];
+            chipTop = boxes[1].Y;
+        }
         var (edge, text) = Level(p, top.Level);
         _fade = Entrance(p, v, top);
-        p.Fill(hero, F(Tint(p, edge, 0.26)), Round(p, 6));
+        p.Fill(hero, F(Tint(p, edge, p.P.Night ? 0.1 : 0.26)), Round(p, 6));
         if (Remaining(v, top) is { } left)
         {
             var clip = p.ClipEnds(hero, Round(p, 6), false, true);
             p.Fill(new RectangleF(hero.X, hero.Bottom - 3 * d, hero.Width * (float)left, 3 * d), F(edge));
             p.Unclip(clip);
         }
+        if (p.P.Night) p.Outline(new RectangleF(hero.X + 0.5f, hero.Y + 0.5f, hero.Width - 1, hero.Height - 1), F(HudPalette.Alpha(edge, 200)), 1, Round(p, 6));
         float icon = 30 * d;
         AlertIcons.Level(p, top.Level, new RectangleF(hero.X + 12 * d, hero.Y + (hero.Height - icon) / 2, icon, icon), F(edge), 2.2f);
         float x = hero.X + 12 * d + icon + 12 * d, w = Math.Max(0, hero.Right - 12 * d - x);
@@ -139,7 +150,7 @@ internal sealed class AlertsWidget : HudWidget
         if (detail) p.Text(top.Detail!, DetailFont(p), F(text), new RectangleF(x, y + cap + 4 * d, w, p.LineHeight(DetailFont(p))), HAlign.Left, VAlign.Top);
         if (!chips) return used;
         var chipFont = p.Font(12f, true);
-        float cx = area.X, cy = hero.Bottom + 6 * d, ch = 24 * d;
+        float cx = area.X, cy = chipTop + 6 * d, ch = 24 * d;
         for (int i = 1; i < list.Count && i < max; i++)
         {
             var a = list[i];

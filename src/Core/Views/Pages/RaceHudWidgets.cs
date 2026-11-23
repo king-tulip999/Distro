@@ -33,6 +33,7 @@ internal sealed partial class RaceHudWidgets
     private bool _dragging;
     private Border? _previewWell;
     private TextBlock? _previewNote;
+    private TextBlock? _previewTip;
     private FrameworkElement? _previewHidden;
     private FrameworkElement? _pickedCard;
     private string? _selected;
@@ -49,9 +50,15 @@ internal sealed partial class RaceHudWidgets
         Fill();
     }
 
-    private void ReleaseNative()
+    private void StopPreview()
     {
         _previewTimer?.Stop();
+        if (Host is { } host) host.PagePreviewHz = 0;
+    }
+
+    private void ReleaseNative()
+    {
+        StopPreview();
         _painter.ReleaseText();
         _picturePainter.ReleaseText();
         _previewBitmap?.Dispose();
@@ -154,7 +161,7 @@ internal sealed partial class RaceHudWidgets
         w.Vr = HudVrPlacement.Cockpit;
         if (w.VrWidth <= 0) PlaceInVr(w);
         _selected = w.Id;
-        _tab = AppIdentity.SimHub ? VrTab : PlacementTab;
+        _tab = WhenTab;
         Fill();
         _list.Dispatcher.BeginInvoke(() => { if (PageOf(_pickedCard) is { } page) page.ScrollToEnd(); }, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
@@ -191,6 +198,7 @@ internal sealed partial class RaceHudWidgets
         if (_preview is null || Selected() is not { } w) return;
         int hz = Math.Clamp(w.UpdateHz > 0 ? w.UpdateHz : HudCatalog.Find(w.Kind) is { } def ? def.Hz(new HudOptions(def, w)) : 10, 1, 60);
         var interval = TimeSpan.FromMilliseconds(1000.0 / hz);
+        if (Host is { } host) host.PagePreviewHz = hz;
         if (_previewTimer is null)
         {
             _previewTimer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render);
@@ -202,7 +210,7 @@ internal sealed partial class RaceHudWidgets
 
     private void PreviewFrame()
     {
-        if (Environment.TickCount64 - _heartbeat > 800 || !Root.IsLoaded) { _previewTimer!.Stop(); return; }
+        if (Environment.TickCount64 - _heartbeat > 800 || !Root.IsLoaded) { StopPreview(); return; }
         if (_dragging) return;
         if (_preview is null || Selected() is not { } w) return;
         _section.Preview.Advance(Host);
@@ -256,7 +264,7 @@ internal sealed partial class RaceHudWidgets
 
     private PanelTarget? _pendingTarget;
 
-    private const string LookTab = "Look", WhenTab = "When shown", PlacementTab = "Placement", VrTab = "VR";
+    private const string LookTab = "Look", WhenTab = "When shown", PlacementTab = "Placement";
 
     private const double ComboWidth = 194;
 
@@ -265,14 +273,10 @@ internal sealed partial class RaceHudWidgets
         var groups = new List<(string Tab, string Title, Func<List<FrameworkElement>> Rows)>();
         groups.Add((LookTab, "Panel and redraw", () => LookRows(w, def)));
         groups.Add((WhenTab, "When shown", () => WhenRows(w, def)));
-        if (AppIdentity.SimHub)
-        {
-            groups.Add((VrTab, "VR", () => VrRows(w)));
-            return groups;
-        }
+        groups.Add((WhenTab, "VR", () => VrRows(w)));
+        if (AppIdentity.SimHub) return groups;
         groups.Add((PlacementTab, "Placement", () => PlaceRows(w)));
         groups.Add((PlacementTab, "Browser source", () => BrowserSourceRows(w)));
-        groups.Add((PlacementTab, "VR", () => VrRows(w)));
         return groups;
     }
 
@@ -383,18 +387,18 @@ internal sealed partial class RaceHudWidgets
                 Host?.SyncVr();
                 _app.Hotkeys.RegisterAll();
                 _app.Notify("VR widgets turned on", AppIdentity.SimHub
-                    ? "They were off in Overlay settings. Keep them on in only one of Velocita and Velocita for SimHub."
-                    : "They were off in Overlay settings.", NoticeKind.Success);
+                    ? "They were off in VR settings. Keep them on in only one of Velocita and Velocita for SimHub."
+                    : "They were off in VR settings.", NoticeKind.Success);
             }
             _list.Dispatcher.BeginInvoke(Fill, System.Windows.Threading.DispatcherPriority.Background);
         }, ComboWidth)));
         if (w.Vr == HudVrPlacement.Off) return rows;
         if (!S.VrOverlays)
         {
-            var off = Ui.LabeledButton("I.Settings", "Overlay settings", () => _section.ShowSettings(RaceHudSection.VrAnchor), "GhostButton");
+            var off = Ui.LabeledButton("I.Settings", "VR settings", () => _section.ShowSettings(RaceHudSection.VrAnchor), "GhostButton");
             off.HorizontalAlignment = HorizontalAlignment.Left;
             off.Margin = new Thickness(0, 2, 0, 4);
-            rows.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Text = "VR widgets are off in Overlay settings, so this widget won't show in the headset.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 4) });
+            rows.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Text = "VR widgets are off in VR settings, so this widget won't show in the headset.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 4) });
             rows.Add(off);
         }
         FrameworkElement Slider(string label, string? help, double min, double max, double metres, Action<double> set) =>
@@ -447,7 +451,7 @@ internal sealed partial class RaceHudWidgets
         rows.Add(placeButtons);
         rows.Add(SettingRows.Row("Curve around your head", "In OpenXR games only where the headset supports curved panels.", true, Ui.Switch(w.VrCurve, v => { w.VrCurve = v; Changed(); })));
         if (!AppIdentity.SimHub)
-            rows.Add(SettingRows.Row("Hide on the monitor", "Only while the headset shows it. Still shown while arranging.", true, Ui.Switch(w.VrOnly, v => { w.VrOnly = v; Changed(); })));
+            rows.Add(SettingRows.Row("Hide on the monitor", "Still shown while arranging.", true, Ui.Switch(w.VrOnly, v => { w.VrOnly = v; Changed(); })));
         return rows;
     }
 
@@ -728,6 +732,7 @@ internal sealed partial class RaceHudWidgets
         }
         if (_preview is not null) DrawPreview(w);
         RefreshVisibility();
+        RefreshTabs(w, def);
     }
 
     private static string SessionLabel(string kind) => kind switch { "Qualify" => "Qualifying", "TimeTrial" => "Time trial", _ => kind };
@@ -769,6 +774,7 @@ internal sealed partial class RaceHudWidgets
             host.RenderPreview(w, race, _painter, (float)(scale * k), ref _previewBitmap);
             var bitmap = _previewBitmap!;
             _previewScale = scale;
+            ShowPreviewTip(w);
             if (_previewTarget is null || _previewTarget.PixelWidth != bitmap.Width || _previewTarget.PixelHeight != bitmap.Height || Math.Abs(_previewTarget.DpiX - 96 * k) > 0.01)
                 _previewTarget = new System.Windows.Media.Imaging.WriteableBitmap(bitmap.Width, bitmap.Height, 96 * k, 96 * k, PixelFormats.Pbgra32, null);
             var rect = new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height);
@@ -830,9 +836,16 @@ internal sealed partial class RaceHudWidgets
     {
         if (_painter.Items is not { } items) return null;
         var p = PainterPoint(at);
+        (string Key, string Id)? best = null;
+        float bestArea = float.MaxValue;
         for (int i = items.Count - 1; i >= 0; i--)
-            if (items[i].Box.Contains(p) && Drawn(items[i].Key).Count > 1) return (items[i].Key, items[i].Id);
-        return null;
+        {
+            float area = items[i].Box.Width * items[i].Box.Height;
+            if (area >= bestArea || !items[i].Box.Contains(p) || Drawn(items[i].Key).Count < 2) continue;
+            best = (items[i].Key, items[i].Id);
+            bestArea = area;
+        }
+        return best;
     }
 
     private const float MinPreviewScale = 0.5f;
@@ -929,7 +942,7 @@ internal sealed partial class RaceHudWidgets
                 if (_lastHover is { } last && (at - last).Length < 0.5) return;
                 _lastHover = at;
                 var part = PartAt(editor, at);
-                host.Cursor = part is null ? HasParts(editor) ? null : Cursors.Hand : ItemAt(at) is not null ? Cursors.SizeAll : Cursors.Hand;
+                host.Cursor = ItemAt(at) is not null ? Cursors.SizeAll : part is null ? HasParts(editor) ? null : Cursors.Hand : Cursors.Hand;
                 if (part is { } hover) Highlight(hover.Setting, hover.Id is { } hoverId ? (hover.Key, hoverId) : null);
                 else Highlight(_pin.Setting, _pin.Item);
                 return;
@@ -960,7 +973,7 @@ internal sealed partial class RaceHudWidgets
                 return;
             }
             _press = (item.Key, item.Id, at);
-            _dragBefore = w.Options.GetValueOrDefault(item.Key);
+            _dragBefore = w.Options.GetValueOrDefault(HudArrange.StoreKey(item.Key));
             var box = Drawn(item.Key).FirstOrDefault(d => d.Id == item.Id).Box;
             _grab = new System.Windows.Vector(at.X - box.X * _previewScale, at.Y - box.Y * _previewScale);
             host.CaptureMouse();
@@ -984,6 +997,7 @@ internal sealed partial class RaceHudWidgets
             EndDrag(host);
             if (dragged) Commit(w, press.Key);
             else if (editor?.SettingForRegion(press.Key) is { } id) OpenPanel(new PanelTarget(id, press.Key, press.Id));
+            else if (editor is not null && PartAt(editor, at) is { } part) OpenPanel(new PanelTarget(part.Setting, part.Key, part.Id));
         };
         host.LostMouseCapture += (_, _) =>
         {
@@ -991,9 +1005,18 @@ internal sealed partial class RaceHudWidgets
             bool dragged = _dragging;
             EndDrag(host);
             if (!dragged) return;
-            if (_dragBefore is null) w.Options.Remove(press.Key); else w.Options[press.Key] = _dragBefore;
+            string store = HudArrange.StoreKey(press.Key);
+            if (_dragBefore is null) w.Options.Remove(store); else w.Options[store] = _dragBefore;
             DrawPreview(w);
         };
+    }
+
+    private void ShowPreviewTip(HudWidgetConfig w)
+    {
+        if (_previewTip is null || HudCatalog.Find(w.Kind) is not { } def) return;
+        bool canDrag = (_painter.Items ?? new()).GroupBy(i => i.Key).Any(g => g.Count() > 1 && (HudArrange.IsKey(g.Key) || def.Option(g.Key) is { Kind: HudOptionKind.Columns }));
+        string text = canDrag ? "Drag parts to rearrange, click one to edit it" : "Click a part to edit it";
+        if (_previewTip.Text != text) _previewTip.Text = text;
     }
 
     private void EndDrag(FrameworkElement host)
@@ -1007,17 +1030,31 @@ internal sealed partial class RaceHudWidgets
     private void Reorder(HudWidgetConfig w, string key, string id, Point at)
     {
         var def = HudCatalog.Find(w.Kind);
-        if (def?.Option(key) is not { Kind: HudOptionKind.Columns } option) return;
+        bool arranged = HudArrange.IsKey(key);
+        var option = def?.Option(key);
+        if (def is null || !arranged && option is not { Kind: HudOptionKind.Columns }) return;
         var drawn = Drawn(key);
         if (drawn.Count == 0) return;
         var box = drawn.FirstOrDefault(d => d.Id == id).Box;
         var centre = new System.Drawing.PointF((float)((at.X - _grab.X) / _previewScale + box.Width / 2), (float)((at.Y - _grab.Y) / _previewScale + box.Height / 2));
         var before = HudItemDrag.Before(drawn, id, centre);
         string? last = drawn.Where(d => d.Id != id).Select(d => d.Id).LastOrDefault();
-        var order = new HudOptions(def, w).Columns(key);
+        var defaults = drawn.Select(d => d.Id).ToList();
+        var link = HudArrange.LinkOf(key);
+        string? saved = link is { } l ? HudArrange.LinkedOrder(l, new HudOptions(def, w).Choice(l.Option), defaults) : w.Options.GetValueOrDefault(key);
+        IReadOnlyList<string> order = arranged ? HudArrange.Order(saved, defaults) : new HudOptions(def, w).Columns(key);
         string value = string.Join(",", HudItemDrag.Move(order, id, before, last));
         if (value == string.Join(",", order)) return;
-        if (value == option.Default) w.Options.Remove(key); else w.Options[key] = value;
+        if (link is { } linked)
+        {
+            var moved = HudItemDrag.Move(order, id, before, last);
+            string side = moved[0] == linked.FirstId ? linked.FirstValue : linked.OtherValue;
+            if (side == def.Option(linked.Option)?.Default) w.Options.Remove(linked.Option); else w.Options[linked.Option] = side;
+            DrawPreview(w);
+            return;
+        }
+        string standard = arranged ? string.Join(",", defaults) : option!.Default;
+        if (value == standard) w.Options.Remove(key); else w.Options[key] = value;
         DrawPreview(w);
     }
 
@@ -1073,7 +1110,7 @@ internal sealed partial class RaceHudWidgets
 
     private void Commit(HudWidgetConfig w, string key)
     {
-        string? now = w.Options.GetValueOrDefault(key);
+        string? now = w.Options.GetValueOrDefault(HudArrange.StoreKey(key));
         if (now == _dragBefore) return;
         Changed();
         DrawPreview(w);

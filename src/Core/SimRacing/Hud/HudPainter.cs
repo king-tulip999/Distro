@@ -21,6 +21,9 @@ internal sealed class HudPalette
     public bool Dark;
     public Color Player, PlayerText;
     public Color? Highlight, HighlightEdge;
+    public Color? BadgeInk;
+    public bool Night;
+    public float ClassRowDepth = 1;
     public bool SoftBands;
     public Color RowTint => Player;
     public Color PickTint => Highlight ?? Accent;
@@ -153,6 +156,14 @@ internal sealed class HudPainter : IDisposable
     public List<(string Key, string Id, RectangleF Box)>? Items { get; set; }
 
     public void Item(string key, string id, RectangleF box) => Items?.Add((key, id, new RectangleF(box.X + _inset.X, box.Y + _inset.Y, box.Width, box.Height)));
+
+    public void Arrange(HudView v, string group, RectangleF area, bool row, float gap, string[] ids, ReadOnlySpan<float> sizes, Span<RectangleF> boxes)
+    {
+        HudArrange.Lay(area, row, gap, v.Options.Arranged(group, ids), sizes, boxes);
+        if (Items is null) return;
+        for (int i = 0; i < ids.Length; i++)
+            if (boxes[i].Width > 0 && boxes[i].Height > 0) Item(HudArrange.Prefix + group, ids[i], boxes[i]);
+    }
 
     public List<(string Id, RectangleF Box)>? Regions { get; set; }
 
@@ -857,6 +868,10 @@ internal sealed class HudPainter : IDisposable
         TitleRow(r, title, right, rightColor);
     }
 
+    public void TitleText(RectangleF r, string title, string? right = null, Color? rightColor = null) => TitleRow(r, title, right, rightColor);
+
+    public void Seam(RectangleF panel, float y) => Line(panel.X + 1, y, panel.Right - 1, y, HudPalette.Alpha(P.LineStrong, 160), 1);
+
     private void TitleRow(RectangleF r, string title, string? right, Color? rightColor)
     {
         var inner = r.Inflated(-8 * Density, 0);
@@ -891,7 +906,7 @@ internal sealed class HudPainter : IDisposable
         else Panel(Bounds);
         if (!TitleRowShown) return body;
         TitleRow(new RectangleF(0, 0, Bounds.Width, pillH), title, right, rightColor);
-        Line(1, pillH, Bounds.Width - 1, pillH, HudPalette.Alpha(P.LineStrong, 160), 1);
+        Seam(Bounds, pillH);
         return body;
     }
 

@@ -10,6 +10,7 @@ internal sealed partial class WeatherWidget
     public const float PanelW = 230, PanelH = 370;
 
     private const float DialShare = 0.62f;
+    private static readonly string[] PanelParts = { "wind", "rows", "wetBar" };
     private readonly List<(string Label, string Value, Color Color)> _rows = new();
 
     private void DrawPanel(HudPainter p, HudView v, Func<double?, string> temp)
@@ -25,10 +26,20 @@ internal sealed partial class WeatherWidget
         float listH = rowH * rows.Count;
         float dialRoom = area.Height - listH - wetH;
         double heading = v.Options.Bool("turn") && f.YawNorth is { } yaw ? yaw : 0;
-        if (wind && dialRoom >= 70 * d)
+        bool dial = wind && dialRoom >= 70 * d;
+        float side = dial ? Math.Min(area.Width * DialShare, dialRoom - 8 * d) : 0;
+        float left = area.Height - (dial ? side + 8 * d : 0);
+        float leftover = left - Math.Min(left, listH);
+        bool wet = track && leftover >= wetH * 0.8f;
+        Span<RectangleF> parts = stackalloc RectangleF[3];
+        Span<float> heights = stackalloc float[3];
+        heights[0] = dial ? side + 8 * d : -1;
+        heights[1] = 0;
+        heights[2] = wet ? Math.Min(leftover, wetH) : -1;
+        p.Arrange(v, "weather.panel", area, false, 0, PanelParts, heights, parts);
+        if (dial)
         {
-            float side = Math.Min(area.Width * DialShare, dialRoom - 8 * d);
-            var top = area.Top(side + 8 * d, out area);
+            var top = parts[0];
             var box = new RectangleF(top.X + (top.Width - side) / 2, top.Y + 4 * d, side, side);
             double? toward = f.WindDir is { } from ? from + Math.PI : null;
             WindArrow.Draw(p, box, f.WindSpeed, toward, heading, "headtail", v.Units, true);
@@ -53,7 +64,7 @@ internal sealed partial class WeatherWidget
                     break;
             }
         }
-        var list = area.Top(Math.Min(area.Height, listH), out area);
+        var list = parts[1];
         float y = list.Y;
         for (int i = 0; i < _rows.Count; i++)
         {
@@ -67,7 +78,7 @@ internal sealed partial class WeatherWidget
             p.Item("rows", rows[i], row);
             y += rowH;
         }
-        if (track && area.Height >= wetH * 0.8f) Wetness(p, v, new RectangleF(area.X, area.Bottom - Math.Min(area.Height, wetH), area.Width, Math.Min(area.Height, wetH)));
+        if (wet) Wetness(p, v, parts[2]);
     }
 
     private static string Rubber(string? rubber) => string.IsNullOrEmpty(rubber) ? RaceFormat.Missing

@@ -160,11 +160,11 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         else where.Inlines.Add(TextCase.Verbatim(new System.Windows.Documents.Run(_ws.Folder + " · ")));
         where.Inlines.Add(new System.Windows.Documents.Run($"{Session.Settings.Count} settings in "));
         where.Inlines.Add(TextCase.Verbatim(new System.Windows.Documents.Run(string.Join(", ", Session.FileNames))));
-        var bar = new DockPanel { Margin = Ui.TabRowMargin, LastChildFill = true };
+        var bar = new DockPanel { LastChildFill = true };
         DockPanel.SetDock(tabs, Dock.Left);
         bar.Children.Add(tabs);
         bar.Children.Add(where);
-        Children.Add(bar);
+        Children.Add(Ui.TabBar(tabs, bar));
         _where = where;
 
         Ui.PendingBar(_pending);
@@ -955,7 +955,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
             _fileLine = TextFit.TipWhenTrimmed(new TextBlock
             {
                 Text = $"{(_searching ? _section.Area + " · " : "")}{_section.FileName} [{_section.Section}]",
-                Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 8, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis,
+                Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 4, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis,
             });
             _fileLine.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
             TextCase.SetVerbatim(_fileLine, !_searching);
@@ -972,7 +972,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
             {
                 Style = Ui.Res<Style>("QuietButton"), Content = headStack,
                 HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                Padding = new Thickness(19, 18, 21, 18),
+                Padding = new Thickness(19, 12, 21, 10),
             };
             AutomationProperties.SetName(_header, section.Name);
             ClickGuard.SetAllowRepeat(_header, true);
@@ -1015,7 +1015,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
 
         private StackPanel BuildBody()
         {
-            var body = new StackPanel { Margin = new Thickness(10, 6, 10, 0) };
+            var body = new StackPanel { Margin = new Thickness(10, 0, 10, 0) };
             var groups = _settings.GroupBy(x => _grouped ? x.Def.Group ?? "" : "").Select(g => (Name: g.Key, Settings: g.ToList())).ToList();
             int next = 0;
             void Add(int count)

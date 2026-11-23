@@ -74,8 +74,9 @@ internal static class VrEditorPainter
                     break;
             }
         }
-        string hint = editor.Picked is null ? "Drag a slider, or scroll over it for small steps" : "Drag or scroll over a slider. Face my head undoes a tilt";
-        p.Text(hint, p.Tiny, p.P.Faint, new RectangleF(VrEditor.Pad, b.Bottom - 38, b.Width - VrEditor.Pad * 2, 16));
+        string hint = editor.Picked is null ? "Drag a slider, or scroll over it for small steps" : "Sliders click into line with other widgets. Scroll for exact steps";
+        if (editor.Note is { } note) p.Text(note, p.SmallBold, p.P.Accent, new RectangleF(VrEditor.Pad, b.Bottom - 40, b.Width - VrEditor.Pad * 2, 18));
+        else p.Text(hint, p.Tiny, p.P.Faint, new RectangleF(VrEditor.Pad, b.Bottom - 38, b.Width - VrEditor.Pad * 2, 16));
         p.Text("Right-click or Done gives the mouse back", p.Tiny, p.P.Faint, new RectangleF(VrEditor.Pad, b.Bottom - 22, b.Width - VrEditor.Pad * 2, 16));
         if (editor.CursorShown)
         {

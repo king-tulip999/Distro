@@ -35,6 +35,31 @@ internal sealed class CompanionApp
         _app = app;
         Spec = spec;
         _settings = settings;
+        HoldReleased += OnHoldReleased;
+    }
+
+    private static readonly HashSet<string> Holds = new(StringComparer.OrdinalIgnoreCase);
+    private static event Action<string>? HoldReleased;
+    private bool _skipped;
+
+    public static void Hold(CompanionSpec spec, string by, bool on)
+    {
+        string key = spec.Id + "|" + by;
+        if (on)
+        {
+            Holds.Add(key);
+            return;
+        }
+        if (Holds.Remove(key) && !IsHeld(spec.Id)) HoldReleased?.Invoke(spec.Id);
+    }
+
+    private static bool IsHeld(string id) => Holds.Any(h => h.StartsWith(id + "|", StringComparison.OrdinalIgnoreCase));
+
+    private void OnHoldReleased(string id)
+    {
+        if (id != Spec.Id || !_skipped || _off) return;
+        _skipped = false;
+        Launch(quiet: true);
     }
 
     public CompanionSpec Spec { get; }
@@ -176,6 +201,11 @@ internal sealed class CompanionApp
 
     public string? Launch(bool quiet = false)
     {
+        if (quiet && IsHeld(Spec.Id))
+        {
+            _skipped = true;
+            return null;
+        }
         switch (Status())
         {
             case CompanionStatus.NotInstalled:

@@ -161,6 +161,20 @@ internal sealed class HudOptions
         return o.Default;
     }
 
+    private readonly Dictionary<string, (string? Raw, string[] Defaults, int[] Order)> _arranged = new(StringComparer.Ordinal);
+
+    public IReadOnlyList<int> Arranged(string group, string[] defaults)
+    {
+        string key = HudArrange.Prefix + group;
+        string? raw = HudArrange.LinkOf(key) is { } link ? HudArrange.LinkedOrder(link, Choice(link.Option), defaults) : _config.Options.GetValueOrDefault(key);
+        if (_arranged.TryGetValue(key, out var cached) && cached.Raw == raw && ReferenceEquals(cached.Defaults, defaults)) return cached.Order;
+        var ids = HudArrange.Order(raw, defaults);
+        var order = new int[ids.Count];
+        for (int i = 0; i < ids.Count; i++) order[i] = Array.IndexOf(defaults, ids[i]);
+        _arranged[key] = (raw, defaults, order);
+        return order;
+    }
+
     public IReadOnlyList<string> Columns(string key)
     {
         string raw = Raw(key);

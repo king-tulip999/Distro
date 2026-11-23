@@ -23,7 +23,9 @@ internal static class FlatMapEditor
                 O("lapColors") with { ShowIf = Is(FlatMapWidget.Around) },
                 O("bend") with { ShowIf = Is(FlatMapWidget.Profile) },
                 O("upright") with { ShowIf = Is(FlatMapWidget.Bar) },
-                O("dotSize") with { ShowIf = Is(FlatMapWidget.Bar) }),
+                O("dotSize") with { ShowIf = Is(FlatMapWidget.Bar) },
+                O("myColor"),
+                O("carColor")),
             new("cars", "Classes shown", HudTab.Content, true, new ClassFilterSetting() { ShowIf = Is(FlatMapWidget.Lanes) }),
         },
     };

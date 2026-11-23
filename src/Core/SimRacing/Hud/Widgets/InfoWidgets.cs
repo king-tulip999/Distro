@@ -22,6 +22,7 @@ internal sealed partial class WeatherWidget : HudWidget
     };
 
     private readonly (string Label, string Value)[] _cells = new (string, string)[3];
+    private static readonly string[] StripParts = { "values", "wind" }, StripColumnParts = { "sky", "body" };
 
     public override void Draw(HudPainter p, HudView v)
     {
@@ -42,13 +43,21 @@ internal sealed partial class WeatherWidget : HudWidget
         var bounds = p.Bounds;
         float pill = p.PillHeight + 4 * d;
         var body = bounds;
-        if (bounds.Height >= pill + p.PieceGap + 44 * d)
+        p.Panel(bounds);
+        bool sky = bounds.Height >= pill + p.PieceGap + 44 * d;
         {
-            var hr = new RectangleF(bounds.X, bounds.Y, bounds.Width, pill);
-            Sky(p, v, hr);
-            body = new RectangleF(bounds.X, hr.Bottom + p.PieceGap, bounds.Width, bounds.Height - pill - p.PieceGap);
+            Span<RectangleF> parts = stackalloc RectangleF[2];
+            Span<float> heights = stackalloc float[2];
+            heights[0] = sky ? pill : -1;
+            p.Arrange(v, "weather.strip.column", bounds, false, p.PieceGap, StripColumnParts, heights, parts);
+            body = parts[1];
+            if (sky)
+            {
+                var hr = parts[0];
+                Sky(p, v, hr);
+                p.Seam(bounds, hr.Y <= body.Y ? hr.Bottom : hr.Y);
+            }
         }
-        p.Panel(body);
         var area = body.Inflated(-10 * d, -6 * d);
         _cells[0] = ("AIR", Temp(f.AirTemp));
         _cells[1] = ("TRACK", Temp(f.TrackTemp));
@@ -68,7 +77,14 @@ internal sealed partial class WeatherWidget : HudWidget
         if (shown == 0) return;
         float valuesW = need * shown;
         if (v.Options.Bool("wind") && WindWidth(p, v, area.Height) is var windW && area.Width - valuesW >= windW)
-            Wind(p, v, area.Right(Math.Max(windW, Math.Min(area.Width * 0.47f, area.Width - valuesW)), out area));
+        {
+            Span<RectangleF> boxes = stackalloc RectangleF[2];
+            Span<float> sizes = stackalloc float[2];
+            sizes[1] = Math.Max(windW, Math.Min(area.Width * 0.47f, area.Width - valuesW));
+            p.Arrange(v, "weather.strip", area, true, 0, StripParts, sizes, boxes);
+            Wind(p, v, boxes[1]);
+            area = boxes[0];
+        }
         float cw = area.Width / shown;
         float vh = p.LineHeight(font), lh = p.LineHeight(p.Label);
         float top = area.Y + (area.Height - vh - lh) / 2;
@@ -98,7 +114,6 @@ internal sealed partial class WeatherWidget : HudWidget
     {
         var f = v.Frame;
         float d = p.Density;
-        p.Panel(r);
         var inner = r.Inflated(-10 * d, 0);
         float s = inner.Height * 0.7f;
         var icon = new RectangleF(inner.X, inner.Y + (inner.Height - s) / 2, s * 1.2f, s);
@@ -311,6 +326,7 @@ internal sealed class BlockWidget : HudWidget
     private int _head, _count;
     private double _lastSample;
     private PointF[] _points = Array.Empty<PointF>();
+    private static readonly string[] BlockParts = { "label", "value", "visual" };
 
     public override void Draw(HudPainter p, HudView v)
     {
@@ -334,13 +350,20 @@ internal sealed class BlockWidget : HudWidget
         bool Past(double t) => t != 0 && value is { } vv && (above ? vv >= t : vv <= t);
         var color = Past(crit) ? p.P.DangerText : Past(warn) ? p.P.WarnText : p.P.Heading;
         string labelText = p.LabelText(p.Shortened(label, p.Label, area.Width));
-        var head = area.Top(p.LineHeight(p.Label) + 3, out var body);
-        p.Text(labelText, p.Label, p.LabelColor, head, HAlign.Center, VAlign.Center);
         string visual = o.Choice("visual");
+        float headH = p.LineHeight(p.Label) + 3, bodyH = Math.Max(0, area.Height - headH);
+        Span<RectangleF> parts = stackalloc RectangleF[3];
+        Span<float> heights = stackalloc float[3];
+        heights[0] = headH;
+        heights[1] = visual == "number" ? 0 : Math.Max(bodyH * 0.62f, Math.Min(bodyH, p.LineHeight(p.Big)));
+        heights[2] = visual == "number" ? -1 : 0;
+        p.Arrange(v, "block", area, false, 0, BlockParts, heights, parts);
+        var head = parts[0];
+        var main = parts[1];
+        var lower = parts[2];
+        p.Text(labelText, p.Label, p.LabelColor, head, HAlign.Center, VAlign.Center);
         float minV = (float)o.Number("min"), maxV = (float)o.Number("max");
         double frac = value is { } fv && maxV > minV ? (fv - minV) / (maxV - minV) : 0;
-        var lower = RectangleF.Empty;
-        var main = visual == "number" ? body : body.Top(Math.Max(body.Height * 0.62f, Math.Min(body.Height, p.LineHeight(p.Big))), out lower);
         string shownUnit = unit.Length > 0 && channel.Unit != ChannelUnit.LapTime && channel.Text is null ? unit : "";
         float unitW = shownUnit.Length > 0 ? p.Measure(shownUnit, p.SmallBold) + 4 : 0;
         var font = p.Fitting(text, main.Width - unitW, main.Height + 4, p.Huge, p.Font(26f, true), p.Big, p.Bold);

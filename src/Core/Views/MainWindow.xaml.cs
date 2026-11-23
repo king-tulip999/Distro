@@ -471,7 +471,7 @@ public partial class MainWindow : Window, IModalHost
         }
 
         var order = _app.Config.Ui.NavOrder;
-        foreach (var page in _app.Plugins.Active.Where(p => p.ShowsPages(_app)).SelectMany(p => p.Pages).OrderBy(p => order.IndexOf(p.Key) is var i && i >= 0 ? i : int.MaxValue))
+        foreach (var page in _app.Plugins.Active.SelectMany(p => p.Pages.Where(page => p.ShowsPage(_app, page.Key))).OrderBy(p => order.IndexOf(p.Key) is var i && i >= 0 ? i : int.MaxValue))
         {
             var p = page;
             Item(p.Key, p.Title, () => p.Create(_app, this));
@@ -802,14 +802,6 @@ public partial class MainWindow : Window, IModalHost
         {
             e.Cancel = true;
             Hide();
-            if (!_app.Config.Ui.TrayTipShown)
-            {
-                _app.Config.Ui.TrayTipShown = true;
-                _app.Save();
-                _app.Tray.ShowBalloon($"{AppIdentity.Name} is still running",
-                    $"{(AppIdentity.IsTecnica ? "Keybinds, fan control and the overlay" : "Keybinds and the iRacing overlay")} keep working. Click the {AppIdentity.Name} icon to open it again, or right-click it to quit.",
-                    NoticeKind.Info);
-            }
             return;
         }
 

@@ -952,22 +952,7 @@ internal sealed class SetupManagerSection : StackPanel
         var tagText = RaceParts.Big(car.Class, 12, "OnAccent", heavy: false);
         tagText.Margin = new Thickness(11, 1, 11, 2);
         tag.Children.Add(tagText);
-        var counts = new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 1, 0, 0) };
-        counts.Inlines.Add(new System.Windows.Documents.Run(SetupTree.Plural(car.Root.Files, "setup") + " · " + SetupTree.Plural(car.Root.Folders, "folder")));
-        int fresh = car.Root.NewCount(_store.NewSince);
-        if (fresh > 0)
-        {
-            var news = new System.Windows.Documents.Run($" · {fresh} new in 3 days");
-            news.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "AccentText");
-            counts.Inlines.Add(news);
-        }
-        if (car.Root.Files > 0) counts.Inlines.Add(new System.Windows.Documents.Run(" · changed " + SetupTree.Date(car.Root.Latest)));
-        counts.Inlines.Add(new System.Windows.Documents.InlineUIContainer(HudSettings.HelpTip.For(TreeHelp, car.Name)) { BaselineAlignment = BaselineAlignment.Center });
-        var rename = Ui.IconButton("I.Pencil", "Change the name or class Velocita shows", () => EditCarName(car), "QuietIconButton");
-        rename.VerticalAlignment = VerticalAlignment.Center;
-        rename.ToolTip = $"Change the name or class Velocita shows (the folder on disk stays {car.Dir})";
-        rename.Margin = new Thickness(2, 0, 0, 0);
-        var identity = new TrimRow { VerticalAlignment = VerticalAlignment.Center, Children = { name, tag, counts, rename } };
+        var identity = new TrimRow { VerticalAlignment = VerticalAlignment.Center, Children = { name, tag } };
 
         var lead = new DockPanel { VerticalAlignment = VerticalAlignment.Center, LastChildFill = true };
         var picture = CarPictures.Slotted(car.Dir, CarHeadPicture);
@@ -1039,7 +1024,6 @@ internal sealed class SetupManagerSection : StackPanel
             foreach (FrameworkElement child in actions.Children)
                 child.Margin = new Thickness(child.Margin.Left, 0, child.Margin.Right, under ? ActionLineGap : 0);
             double avail = under ? width : room;
-            if (counts.Visibility != Visibility.Visible) counts.Visibility = Visibility.Visible;
             identity.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             double need = identity.DesiredSize.Width;
             if (picture is not null)
@@ -1048,10 +1032,9 @@ internal sealed class SetupManagerSection : StackPanel
                 var shown = free >= need ? Visibility.Visible : Visibility.Collapsed;
                 if (picture.Visibility != shown) picture.Visibility = shown;
             }
-            if (need > avail) counts.Visibility = Visibility.Collapsed;
         }
         row.SizeChanged += (_, e) => { if (e.WidthChanged) Fit(e.NewSize.Width); };
-        var tile = new Tile { Style = Ui.Res<Style>("Inset"), MinHeight = CarHeadHeight, Padding = new Thickness(4, 6, 8, 6), Child = row };
+        var tile = new Tile { Style = Ui.Res<Style>("Inset"), MinHeight = CarHeadHeight, Padding = new Thickness(14, 6, 8, 6), Child = row };
         tile.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
         return tile;
     }
@@ -1397,41 +1380,6 @@ internal sealed class SetupManagerSection : StackPanel
             return true;
         });
         _ = _window.ShowModal(Ui.Dialog(_window, "Share or export " + SetupTree.Plural(count, "setup"), "From " + car.Name + ". The originals stay where they are.", content, buttons, width: 454));
-    }
-
-    private void EditCarName(SetupCar car)
-    {
-        var content = new StackPanel();
-        var box = new TextBox { Text = car.Name, Margin = new Thickness(0, 3, 0, 0), MaxLength = Ui.NameLength };
-        content.Children.Add(Ui.FieldRow("Name", box, 73));
-        string cls = car.Class;
-        var classes = Ui.Combo(SetupCars.Classes.Select(c => new Choice(c, c)), cls, c => cls = c.Id ?? cls, 162);
-        content.Children.Add(Ui.FieldRow("Class", classes, 73));
-        content.Children.Add(new TextBlock { Text = "The folder on disk stays " + car.Dir + ".", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 6, 0, 0) });
-        var buttons = Ui.DialogButtons(_window, "Save", () =>
-        {
-            if (string.IsNullOrWhiteSpace(box.Text)) return false;
-            S.Names[car.Dir] = new SetupCarName { Name = box.Text.Trim(), Class = cls };
-            _store.Describe();
-            Save();
-            RenderAll();
-            return true;
-        });
-        if (car.Custom)
-        {
-            string back = SetupCars.BuiltInName(car.Dir) ?? car.Dir;
-            var reset = new Button { Content = "Use “" + back + "”", Margin = Ui.AfterButton };
-            reset.Click += (_, _) =>
-            {
-                S.Names.Remove(car.Dir);
-                _store.Describe();
-                Save();
-                _window.CloseModal(true);
-                RenderAll();
-            };
-            buttons.Children.Insert(0, reset);
-        }
-        _ = _window.ShowModal(Ui.Dialog(_window, "Name shown for this car", "Only how Velocita shows it; iRacing finds the car by its folder name.", content, buttons, width: 421));
     }
 
     private void OpenFolder(SetupNode folder)

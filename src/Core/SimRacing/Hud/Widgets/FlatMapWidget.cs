@@ -31,11 +31,12 @@ internal sealed class FlatMapWidget : HudWidget
         HudOption.Bool("positions", "Text on the dots", true),
         HudOption.Choice("dotText", "Text", "position", new HudChoice("position", "Class position"), new HudChoice("number", "Car number")),
         HudOption.Number("dotSize", "Dot size", 100, 50, 300, 10, "%"),
+        HudOption.Color("myColor", "My color", "Until one is picked, the overlay's accent color"),
+        HudOption.Color("carColor", "Other cars' color", "Until one is picked, grey or iRacing's class colors. A picked color is used for every class"),
         HudClassFilter.Scope,
         HudClassFilter.List,
     };
 
-    public static bool Moves(HudOptions o) => o.Choice("style") == Around;
 
     private const float StripDot = 7, AroundDot = 6.5f, LaneDot = 6.5f, ProfileDot = 6, BarDot = 5;
     private const float EdgeWidth = 8, TrackWidth = 6, PitWidth = 3;
@@ -496,7 +497,9 @@ internal sealed class FlatMapWidget : HudWidget
         int me = f.PlayerCarIdx;
         bool lapColors = around && v.Options.Bool("lapColors") && f.SessionKind == SessionKind.Race && me >= 0 && me < TelemetryFrame.MaxCars && f.CarLapDistPct[me] >= 0;
         double myDist = lapColors ? FieldOrder.Distance(f, me) ?? 0 : 0;
-        var others = p.P.MapCars ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.8);
+        var others = v.Options.ColorOf("carColor") ?? p.P.MapCars ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.8);
+        bool oneColor = v.Options.ColorOf("carColor") is not null;
+        var myColor = v.Options.ColorOf("myColor") ?? p.P.Player;
         int n = 0;
         for (int pass = 0; pass < 2; pass++)
             for (int car = 0; car < TelemetryFrame.MaxCars; car++)
@@ -508,7 +511,7 @@ internal sealed class FlatMapWidget : HudWidget
                 bool onPit = f.CarOnPitRoad[car];
                 if (onPit && !mine && _style == Strip && !pitLane) continue;
                 if (!Place(f, car, pct, onPit, pitLane, out float x, out float y)) continue;
-                var color = mine ? p.P.Player : around || !multiclass ? others : p.ClassColor(s, driver.ClassId);
+                var color = mine ? myColor : around || !multiclass || oneColor ? others : p.ClassColor(s, driver.ClassId);
                 if (onPit && !mine) color = HudPalette.Alpha(color, 110);
                 float r = mine ? dot + 2 * d : dot;
                 int laps = lapColors && !mine ? MapWidget.LapDiff(f, car, pct, _myPct, myDist) : 0;

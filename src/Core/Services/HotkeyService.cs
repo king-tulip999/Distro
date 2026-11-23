@@ -41,7 +41,7 @@ internal sealed class HotkeyService : IDisposable
         foreach (var profile in displays ? config.Displays.Profiles : new List<Config.DisplayProfile>())
         {
             var target = profile;
-            Register(profile.Hotkey, () => _ = _app.DisplayProfiles.ApplyAsync(target), "Display profile " + profile.Name);
+            Register(profile.Hotkey, () => _ = _app.DisplayProfiles.ApplyAsync(target), "Display setup " + profile.Name);
         }
         foreach (var hotkey in PluginHotkeys().Where(h => h.Live?.Invoke() != false))
             Register(hotkey.Get(), hotkey.Invoke, hotkey.Label);
@@ -53,7 +53,7 @@ internal sealed class HotkeyService : IDisposable
             foreach (var key in keys)
             {
                 string hotkey = key.First().Hotkey!;
-                Register(hotkey, () => _app.WindowProfiles.ApplyKey(hotkey), "Window profile " + string.Join(", ", key.Select(k => k.Name)));
+                Register(hotkey, () => _app.WindowProfiles.ApplyKey(hotkey), "Window placement " + string.Join(", ", key.Select(k => k.Name)));
             }
         }
         Register(config.Hotkeys.ShowWindow, _app.RequestToggleWindow, $"Show / hide {AppIdentity.Name}");
@@ -63,7 +63,7 @@ internal sealed class HotkeyService : IDisposable
     public static readonly IReadOnlySet<string> SimHubKeybinds = new HashSet<string>
     {
         "hud.toggle", "hud.dismiss", "hud.layout", "hud.layout.previous",
-        "hud.vr.adjust", "hud.vr.recenter", "hud.vr.next", "hud.vr.setting", "hud.vr.left", "hud.vr.right", "hud.vr.up", "hud.vr.down",
+        "hud.vr.adjust", "hud.vr.recenter", "hud.vr.next", "hud.vr.setting", "hud.vr.left", "hud.vr.right", "hud.vr.up", "hud.vr.down", "hud.vr.brighter", "hud.vr.dimmer",
     };
 
     public static bool SimHubKeybind(string id) => SimHubKeybinds.Contains(id) || id.StartsWith("hud.widget:", StringComparison.Ordinal);
@@ -97,7 +97,7 @@ internal sealed class HotkeyService : IDisposable
         var config = _app.Config;
         string shown = Hotkey.Display(hotkey);
         if (config.Displays.Profiles.FirstOrDefault(p => !ReferenceEquals(p, except) && Hotkey.SameKey(p.Hotkey, hotkey)) is { } profile)
-            return $"{shown} is already used by the display profile “{profile.Name}”.";
+            return $"{shown} is already used by the display setup “{profile.Name}”.";
         foreach (var owner in _app.Plugins.All)
             foreach (var plugin in owner.Hotkeys(_app))
             {
@@ -108,9 +108,9 @@ internal sealed class HotkeyService : IDisposable
         {
             var w = config.WindowProfiles;
             if (w.Profiles.FirstOrDefault(p => Hotkey.SameKey(p.Hotkey, hotkey)) is { } windowProfile)
-                return $"{shown} is already used by the window profile “{windowProfile.Name}”.";
+                return $"{shown} is already used by the window placement “{windowProfile.Name}”.";
             if (w.Groups.FirstOrDefault(g => Hotkey.SameKey(g.Hotkey, hotkey)) is { } group)
-                return $"{shown} is already used by the window profile group “{group.Name}”.";
+                return $"{shown} is already used by the window placement group “{group.Name}”.";
         }
         if (!Equals(except, HotkeyCatalog.ShowWindowId) && Hotkey.SameKey(hotkey, config.Hotkeys.ShowWindow))
             return $"{shown} is already used for “Show / hide {AppIdentity.Name}”.";

@@ -8,7 +8,7 @@ namespace Core.SimRacing.Hud.Widgets;
 
 internal sealed partial class InputsWidget : HudWidget
 {
-    public const string Dial = "dial", Bare = "bare";
+    public const string Dial = "dial", Bare = "bare", GearRight = "right", GearLeft = "left";
     private const double TraceSeconds = 6, LimiterHz = 10, AbsHz = 4;
     private const int Capacity = 640;
 
@@ -16,7 +16,8 @@ internal sealed partial class InputsWidget : HudWidget
     {
         HudOption.Choice("style", "Style", Dial,
             new HudChoice(Dial, "Gear dial", "A round gear dial with speed and steering, pedal bars with their numbers and a trace, an RPM bar across the top"),
-            new HudChoice(Bare, "Trace only", "The gear dial and the trace, no pedal bars or RPM bar")),
+            new HudChoice(Bare, "Trace only", "Just the input trace: no gear dial, pedal bars or RPM bar")),
+        HudOption.Choice("gearSide", "Gear dial", GearRight, new HudChoice(GearLeft, "Left"), new HudChoice(GearRight, "Right")),
         HudOption.Set("show", "Shows", "throttle,brake,clutch,steering,gear,speed,rpm,trace,abs", null,
             new HudChoice("throttle", "Throttle"), new HudChoice("brake", "Brake"), new HudChoice("clutch", "Clutch", "Pedal travel: pressed shows full"),
             new HudChoice("steering", "Steering", "A mark on the gear dial that turns with the wheel"), new HudChoice("gear", "Gear"), new HudChoice("speed", "Speed"), new HudChoice("rpm", "RPM", "The RPM bar across the top"),
@@ -195,8 +196,10 @@ internal sealed partial class InputsWidget : HudWidget
     private Color GearColor(HudPainter p, in Live live)
     {
         if (live.Abs) return FlashOn(p, live.Now, AbsHz) ? p.P.AbsInput : p.P.Heading;
-        return live.Limiter ? p.P.Danger : p.P.Heading;
+        return live.Limiter ? ShiftColor(p) : p.P.Heading;
     }
+
+    private static Color ShiftColor(HudPainter p) => p.P.Night ? Color.White : p.P.Danger;
 
     private Color BrakeColor(HudPainter p, in Live live) => live.Abs ? p.P.AbsInput : p.P.BrakeInput;
 
@@ -288,7 +291,7 @@ internal sealed partial class InputsWidget : HudWidget
         int lit = LitLights(live.Rpm, sc.First, sc.Shift, count);
         bool shifting = live.Rpm is { } rpm && rpm >= sc.Shift;
         bool dark = live.Limiter && !FlashOn(p, live.Now, LimiterHz);
-        var on = shifting ? p.P.Danger : p.P.Text;
+        var on = shifting ? ShiftColor(p) : p.P.Text;
         var off = HudPalette.Alpha(p.P.Muted, 31);
         float w = (r.Width - gap * (count - 1)) / count;
         for (int i = 0; i < count; i++)

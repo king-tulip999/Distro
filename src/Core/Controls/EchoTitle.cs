@@ -37,6 +37,12 @@ public sealed class EchoTitle : FrameworkElement
         set => SetValue(StrokeProperty, value);
     }
 
+    public double Size { get; init; } = BodySize;
+
+    public double Crop { get; init; } = TopCrop;
+
+    private double Scale => Size / BodySize;
+
     private Geometry? _ink;
     private Pen? _pen;
     private double _width, _height, _reserve;
@@ -71,13 +77,13 @@ public sealed class EchoTitle : FrameworkElement
         if (_ink is not null) return;
         var typeface = new Typeface(Family, FontStyles.Normal, FontWeights.ExtraBold, FontStretches.Normal);
         double dip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        var body = Formatted(TextCase.Capitals(Text), typeface, BodySize, dip);
+        var body = Formatted(TextCase.Capitals(Text), typeface, Size, dip);
         _height = Math.Ceiling(body.Height);
         _reserve = Math.Ceiling(body.Width);
         double caps = typeface.TryGetGlyphTypeface(out var glyphs) && glyphs.CapsHeight > 0 ? glyphs.CapsHeight : 0.7;
-        double band = _height + BleedTop + BleedBottom;
-        var text = Formatted(TextCase.Capitals(Text), typeface, band / (1 - TopCrop) / caps, dip);
-        double baseline = _height + BleedBottom - 1;
+        double band = _height + (BleedTop + BleedBottom) * Scale;
+        var text = Formatted(TextCase.Capitals(Text), typeface, band / (1 - Crop) / caps, dip);
+        double baseline = _height + BleedBottom * Scale - 1;
         var ink = text.BuildGeometry(new Point(0, baseline - text.Baseline));
         var bounds = ink.Bounds;
         if (bounds.IsEmpty)
@@ -102,7 +108,7 @@ public sealed class EchoTitle : FrameworkElement
     }
 
     protected override Geometry GetLayoutClip(Size layoutSlotSize) =>
-        new RectangleGeometry(new Rect(0, -BleedTop, Math.Max(_width, RenderSize.Width), RenderSize.Height + BleedTop + BleedBottom));
+        new RectangleGeometry(new Rect(0, -BleedTop * Scale, Math.Max(_width, RenderSize.Width), RenderSize.Height + (BleedTop + BleedBottom) * Scale));
 
     protected override void OnRender(DrawingContext dc)
     {

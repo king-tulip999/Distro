@@ -13,6 +13,10 @@ internal sealed class LapsWidget : HudWidget
     private const double Settled = 1000;
     private static readonly string SecondsSuffix = " " + Units.S, BarEnd = "Bar end = +1.5" + SecondsSuffix;
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+    private static readonly string[] BarsParts = { "best", "laps", "stats" };
+    private static readonly string[] TrendParts = { "best", "chart", "laps" };
+    private static readonly string[] LastParts = { "last", "average", "tiles", "earlier", "stats" };
+    private static readonly string[] SectorsParts = { "laps", "optimal", "legend" };
     private readonly List<string> _marks = new(4);
     private readonly string[] _footLabels = new string[4], _footValues = new string[4];
     private readonly float[] _px = new float[64], _py = new float[64];
@@ -216,7 +220,10 @@ internal sealed class LapsWidget : HudWidget
         p.NeedBelow(area, topH + gap + headH + gap + pitch * Math.Min(3, laps.Count) + (stats ? footH : 0));
         area = Head(p, topH + gap + headH + gap + Shown(v) * pitch - gap + (stats ? gap + footH : 0));
 
-        var top = area.Top(topH, out var rest);
+        Span<RectangleF> parts = stackalloc RectangleF[3];
+        p.Arrange(v, "bars", area, false, gap, BarsParts, stackalloc float[] { topH, 0, stats ? footH : -1 }, parts);
+        var top = parts[0];
+        var rest = parts[1];
         float x = Pair(p, top.X, top, "BEST", p.Label, p.P.Faint, RaceFormat.LapTime(s.Best), p.Big, p.P.Fastest, 8 * d);
         if (s.Best is not null)
         {
@@ -232,11 +239,9 @@ internal sealed class LapsWidget : HudWidget
                 PairRight(p, top.Right, top, "OPTIMAL", p.Label, p.P.Faint, ot, p.Bold, p.P.Heading, 8 * d);
         }
 
-        rest = RectangleF.FromLTRB(rest.X, rest.Y + gap, rest.Right, rest.Bottom);
         if (stats)
         {
-            var foot = new RectangleF(rest.X, rest.Bottom - footH, rest.Width, footH);
-            rest = RectangleF.FromLTRB(rest.X, rest.Y, rest.Right, foot.Y - gap);
+            var foot = parts[2];
             _footLabels[0] = "AVG"; _footValues[0] = RaceFormat.LapTime(s.Stats!.Average);
             _footLabels[1] = "SPREAD"; _footValues[1] = PooledText.Number("", s.Stats.Spread, "0.00", CultureInfo.CurrentCulture, SecondsSuffix);
             _footLabels[2] = "σ"; _footValues[2] = PooledText.Number("", s.Stats.StdDev, "0.000", CultureInfo.CurrentCulture);
@@ -318,7 +323,11 @@ internal sealed class LapsWidget : HudWidget
         float chartH = Math.Min(168 * d, Math.Max(100 * d, (area.Height - topH - gap) * 0.45f));
         area = Head(p, topH + gap + chartH + gap + headH + Shown(v) * rowH);
 
-        var top = area.Top(topH, out var rest);
+        Span<RectangleF> parts = stackalloc RectangleF[3];
+        p.Arrange(v, "trend", area, false, gap, TrendParts, stackalloc float[] { topH, chartH, 0 }, parts);
+        var top = parts[0];
+        var chart = parts[1];
+        var rest = parts[2];
         float x = Pair(p, top.X, top, "BEST", p.Tiny, p.P.Faint, RaceFormat.LapTime(s.Best), p.Bold, p.P.Fastest, 5 * d);
         float avgW = 0;
         string avg = stats ? RaceFormat.LapTime(s.Stats!.Average) : "";
@@ -334,11 +343,8 @@ internal sealed class LapsWidget : HudWidget
                 Pair(p, x + 14 * d, top, "OPTIMAL", p.Tiny, p.P.Faint, ot, p.Bold, p.P.Heading, 5 * d);
         }
 
-        rest = RectangleF.FromLTRB(rest.X, rest.Y + gap, rest.Right, rest.Bottom);
-        var chart = rest.Top(chartH, out rest);
         DrawChart(p, v, chart, s, stats);
 
-        rest = RectangleF.FromLTRB(rest.X, rest.Y + gap, rest.Right, rest.Bottom);
         if (rest.Height < headH + rowH) return;
         float lapW = 30 * d, timeW = 74 * d, deltaW = 60 * d, fuelW = 52 * d;
         var hr = rest.Top(headH, out rest);
@@ -475,7 +481,12 @@ internal sealed class LapsWidget : HudWidget
         if (stats) used += gap + footH;
         area = Head(p, used);
 
-        var hero = area.Top(heroH, out var rest);
+        float lineB = p.LineHeight(p.Bold), lineT = p.LineHeight(p.Tiny);
+        Span<RectangleF> parts = stackalloc RectangleF[5];
+        p.Arrange(v, "last", area, false, gap, LastParts, stackalloc float[] { heroH, stats ? lineT + 9 * d : -1, tileH, 0, stats ? footH : -1 }, parts);
+        var hero = parts[0];
+        var tiles = parts[2];
+        var rest = parts[3];
         float ha = In(0, 0.6f);
         hero.Y += 8 * d * (1 - ha);
         string marks = Marks(last, v);
@@ -485,7 +496,7 @@ internal sealed class LapsWidget : HudWidget
         string time = RaceFormat.LapTime(last.Time);
         float tw = p.Measure(time, p.Huge);
         p.Text(time, p.Huge, Fade(TimeColor(p, lastBest, lastFlagged), ha), new RectangleF(big.X, big.Y, tw + 2, big.Height), HAlign.Left, VAlign.Center, false);
-        float side = big.X + tw + 12 * d, lineB = p.LineHeight(p.Bold), lineT = p.LineHeight(p.Tiny);
+        float side = big.X + tw + 12 * d;
         float sideY = big.Bottom - lineB - lineT - 2 * d;
         if (s.Best is { } b)
         {
@@ -501,19 +512,16 @@ internal sealed class LapsWidget : HudWidget
             p.Text("fuel", p.Tiny, Fade(p.P.Faint, ha), fr with { Y = sideY + lineB + 2 * d, Height = lineT }, HAlign.Right, VAlign.Center, false);
         }
 
-        rest = RectangleF.FromLTRB(rest.X, rest.Y + gap, rest.Right, rest.Bottom);
         if (stats)
         {
-            var avgRow = rest.Top(lineT, out rest);
+            var avgRow = new RectangleF(parts[1].X, parts[1].Y, parts[1].Width, lineT);
             p.Text(PooledText.Concat("vs average ", RaceFormat.LapTime(s.Stats!.Average)), p.Tiny, p.P.Faint, avgRow, HAlign.Left, VAlign.Center, false);
             p.Text(RaceFormat.Gap(last.Time - s.Stats.Average, 2), p.Tiny, p.P.Text, avgRow, HAlign.Right, VAlign.Center, false);
-            var bar = new RectangleF(rest.X, rest.Y + 4 * d, rest.Width, 5 * d);
+            var bar = new RectangleF(avgRow.X, avgRow.Bottom + 4 * d, avgRow.Width, 5 * d);
             p.Fill(bar, p.Solid(p.Raised(0.07)), p.CornerRadius(3));
             p.Fill(new RectangleF(bar.X, bar.Y, (float)(bar.Width * AverageShare(last.Time, s.Stats.Average)) * In(0, 1.1f), bar.Height), HudPalette.Alpha(p.P.Text, 140), p.CornerRadius(3));
-            rest = RectangleF.FromLTRB(rest.X, bar.Bottom + gap, rest.Right, rest.Bottom);
         }
 
-        var tiles = rest.Top(tileH, out rest);
         float half = (tiles.Width - 6 * d) / 2, radius = p.CornerRadius(4);
         float ea = In(0.15f, 0.4f), eb = In(0.2f, 0.4f);
         var bestTile = Pop(new RectangleF(tiles.X, tiles.Y, half, tileH), ea, 0.92f);
@@ -527,11 +535,9 @@ internal sealed class LapsWidget : HudWidget
         p.Text("OPTIMAL", p.Label, Fade(p.P.Faint, eb), oi, HAlign.Left, VAlign.Center, false);
         p.Text(RaceFormat.LapTime(s.Optimal), p.Bold, Fade(p.P.Heading, eb), oi, HAlign.Right, VAlign.Center, false);
 
-        rest = RectangleF.FromLTRB(rest.X, rest.Y + gap, rest.Right, rest.Bottom);
         if (stats)
         {
-            var foot = new RectangleF(rest.X, rest.Bottom - footH, rest.Width, footH);
-            rest = RectangleF.FromLTRB(rest.X, rest.Y, rest.Right, foot.Y - gap);
+            var foot = parts[4];
             int clean = 0;
             for (int i = 0; i < laps.Count; i++) if (laps[i].Clean && !laps[i].Caution) clean++;
             _footLabels[0] = "SPREAD"; _footValues[0] = PooledText.Number("", s.Stats!.Spread, "0.00", CultureInfo.CurrentCulture, SecondsSuffix);
@@ -590,7 +596,11 @@ internal sealed class LapsWidget : HudWidget
         var tinyBold = p.Font(9f, true);
         float radius = p.CornerRadius(3);
 
-        var hr = area.Top(headH, out var rest);
+        Span<RectangleF> parts = stackalloc RectangleF[3];
+        p.Arrange(v, "sectors", area, false, 4 * d, SectorsParts, stackalloc float[] { 0, optH, legendH }, parts);
+        var legend = parts[2];
+        var opt = parts[1];
+        var hr = parts[0].Top(headH, out var rest);
         p.Text("LAP", p.Tiny, p.P.Faint, hr.Left(lapW, out hr), HAlign.Left);
         p.Text("TIME", p.Tiny, p.P.Faint, RectangleF.FromLTRB(hr.X, hr.Y, hr.X + timeW - 6 * d, hr.Bottom), HAlign.Right);
         float cx0 = hr.X + timeW + gap;
@@ -598,9 +608,6 @@ internal sealed class LapsWidget : HudWidget
             p.Text(colorOnly ? PooledText.Number("", k + 1) : PooledText.Number("S", k + 1), p.Tiny, p.P.Faint, new RectangleF(cx0 + k * (cellW + gap), hr.Y, cellW, hr.Height), HAlign.Center);
         if (tailW > 0 && !colorOnly) p.Text("FUEL", p.Tiny, p.P.Faint, new RectangleF(hr.Right - tailW, hr.Y, tailW, hr.Height), HAlign.Right);
 
-        var legend = new RectangleF(rest.X, rest.Bottom - legendH, rest.Width, legendH);
-        var opt = new RectangleF(rest.X, legend.Y - 4 * d - optH, rest.Width, optH);
-        rest = RectangleF.FromLTRB(rest.X, rest.Y, rest.Right, opt.Y - 4 * d);
 
         int n = Math.Min(Math.Min(v.Options.Int("count"), laps.Count), Math.Max(1, (int)((rest.Height + 4 * d) / pitch)));
         float y = rest.Y;

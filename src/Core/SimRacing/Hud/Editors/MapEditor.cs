@@ -9,7 +9,7 @@ internal static class MapEditor
         Groups = new HudGroup[]
         {
             new("main", null, HudTab.Layout, true, O("titleRow"), O("zoom"), O("rotate"), O("turns"), O("pit")),
-            new("dots", "Dots", HudTab.Layout, true, O("dotStyle"), O("dotSize"), O("myDotSize"), O("positions"), O("dotText") with { ShowIf = o => o.Bool("positions") },
+            new("dots", "Dots", HudTab.Layout, true, O("dotStyle"), O("dotSize"), O("myDotSize"), O("myColor"), O("carColor"), O("positions"), O("dotText") with { ShowIf = o => o.Bool("positions") },
                 O("spread") with { ShowIf = Badges }, O("maxMove") with { ShowIf = o => Badges(o) && o.Bool("spread") }, O("lapColors")),
         },
     };

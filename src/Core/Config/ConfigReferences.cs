@@ -9,6 +9,9 @@ internal static class ConfigReferences
             e.CurveName = newName;
             if (newName is null && e.Mode == FanMode.Curve) e.Mode = FanMode.Auto;
         }
+        foreach (var group in config.Fans.CoolingTest?.Groups ?? [])
+            if (Same(group.CurveName, oldName))
+                group.CurveName = newName;
         foreach (var mix in config.Fans.Curves)
         {
             for (int i = mix.MixOf.Count - 1; i >= 0; i--)
@@ -34,7 +37,7 @@ internal static class ConfigReferences
         if (presets.Count > 0) Check("active fan preset", config.Fans.ActivePreset, presets);
         var groups = config.WindowProfiles.Groups.Select(g => g.Id).ToList();
         foreach (var w in config.WindowProfiles.Profiles)
-            Check($"window profile “{w.Name}” group", w.GroupId, groups);
+            Check($"window placement “{w.Name}” group", w.GroupId, groups);
         foreach (var p in config.Fans.Presets)
             foreach (var e in p.Fans.Where(e => e.Mode == FanMode.Curve))
                 Check($"fan preset “{p.Name}” fan {e.ControlId} curve", e.CurveName, curves);

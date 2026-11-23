@@ -2,6 +2,8 @@ namespace Core.Config;
 
 public sealed class SessionStatsSettings
 {
+    public bool ShowPage { get; set; } = true;
+
     public bool Imperial { get; set; }
 
     public string? DriverNumber { get; set; }

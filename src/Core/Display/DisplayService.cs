@@ -589,6 +589,7 @@ internal sealed class DisplayService : IDisposable
             new() { Key = "demo-center", Desktop = "demo:demo-center", HardwareName = "LG 27GP850", Number = 1, Active = true, Primary = true, X = 0, Y = 0, Width = 2560, Height = 1440, Hz = 165, Connector = "DisplayPort", Modes = modes, HdrSupported = true, HdrOn = false },
             new() { Key = "demo-right", Desktop = "demo:demo-right", HardwareName = "Dell S2721DGF", Number = 3, Active = true, X = 2560, Y = 0, Width = 2560, Height = 1440, Hz = 165, Connector = "DisplayPort", Modes = modes, HdrSupported = true },
             new() { Key = "demo-tv", HardwareName = "LG TV SSCR2", Active = false, Connector = "HDMI" },
+            new() { Key = "demo-spare", HardwareName = "Dell S2721DGF", Active = false, Connector = "DisplayPort" },
         };
     }
 

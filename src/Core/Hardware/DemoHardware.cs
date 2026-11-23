@@ -22,7 +22,24 @@ internal sealed class DemoHardware
     private readonly Dictionary<string, float> _overrides = new();
     private readonly Dictionary<string, long> _spin = new();
     private readonly Random _random = new(42);
+    private readonly Dictionary<string, float> _lastPercent = new();
     private double _t;
+    private double? _cpuHeat, _gpuHeat;
+
+    public static volatile bool Loaded;
+
+    private float Last(string id) { lock (_overrides) return _lastPercent.TryGetValue(id, out var p) ? p : 40; }
+
+    private (float Cpu, float Gpu) LoadedTemps(float cpuNow, float gpuNow)
+    {
+        double cpuFan = Last("/lpc/nct6798d/control/1"), gpuFan = Last("/gpu-amd/0/control/0");
+        double caseFan = (Last("/lpc/nct6798d/control/2") + Last("/lpc/nct6798d/control/3")) / 2;
+        double cpuTarget = 48 + 48 * (0.62 + 0.38 * Math.Exp(-cpuFan / 26)) - 4.5 * caseFan / 100;
+        double gpuTarget = 50 + 44 * (0.6 + 0.4 * Math.Exp(-gpuFan / 30)) - 6 * caseFan / 100;
+        _cpuHeat = (_cpuHeat ?? cpuNow) + (cpuTarget - (_cpuHeat ?? cpuNow)) * 0.45;
+        _gpuHeat = (_gpuHeat ?? gpuNow) + (gpuTarget - (_gpuHeat ?? gpuNow)) * 0.4;
+        return ((float)(_cpuHeat.Value + 0.15 * Math.Sin(_t)), (float)(_gpuHeat.Value + 0.15 * Math.Cos(_t)));
+    }
 
     public void SetOverride(string id, float percent) { lock (_overrides) _overrides[id] = percent; }
     public void ClearOverride(string id) { lock (_overrides) _overrides.Remove(id); }
@@ -36,17 +53,20 @@ internal sealed class DemoHardware
         bool stress = Services.DemoData.Stress;
         float cpuTemp = (float)(stress ? 104.6 + Wave(9) : 58 + 7 * Wave(37) + 2 * Wave(9, 1));
         float gpuTemp = (float)(stress ? 112.4 + Wave(7) : 64 + 6 * Wave(44, 2) + 1.5 * Wave(7));
+        bool loaded = Loaded && !stress;
+        if (loaded) (cpuTemp, gpuTemp) = LoadedTemps(cpuTemp, gpuTemp);
+        else _cpuHeat = _gpuHeat = null;
         var snapshot = new HardwareSnapshot
         {
             CpuTemp = cpuTemp,
             CpuLoad = (float)(stress ? 100 : 34 + 14 * Wave(23) + 6 * Wave(5, 1)),
             CpuClockMhz = (float)(4870 + 60 * Wave(11)),
-            CpuPower = (float)(88 + 14 * Wave(23)),
+            CpuPower = (float)(loaded ? 118 + Wave(5) : 88 + 14 * Wave(23)),
             GpuTemp = gpuTemp,
             GpuHotSpot = gpuTemp + 14,
             GpuLoad = (float)(stress ? 100 : 91 + 6 * Wave(13)),
             GpuClockMhz = (float)(2480 + 40 * Wave(17)),
-            GpuPower = (float)(318 + 22 * Wave(13)),
+            GpuPower = (float)(loaded ? 352 + 2 * Wave(7) : 318 + 22 * Wave(13)),
             VramUsedMb = 11_900,
             VramTotalMb = 24_560,
             GpuFanRpm = (float)(stress ? 12_345 : 1650 + 120 * Wave(44, 2)),
@@ -117,6 +137,7 @@ internal sealed class DemoHardware
                 }
                 if (_overrides.TryGetValue(fan.Id, out var ov)) percent = ov;
                 if (_spin.TryGetValue(fan.Id, out var until) && Environment.TickCount64 < until) percent = 100;
+                _lastPercent[fan.Id] = percent;
 
                 float? rpm = fan.MaxRpm == 0 ? 0
                     : percent < fan.StallPercent ? 0

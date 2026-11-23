@@ -7,7 +7,7 @@ using Core.Config;
 
 namespace Core.Services;
 
-internal sealed record ReleaseInfo(Version Version, string Tag, string Notes, string PageUrl, string? ExeUrl, long ExeSize, string? ChecksumUrl, DateTime? Published = null, string? SignatureUrl = null, string? Title = null);
+internal sealed record ReleaseInfo(Version Version, string Tag, string Notes, string PageUrl, string? ExeUrl, long ExeSize, string? ChecksumUrl, DateTime? Published = null, string? SignatureUrl = null, string? Title = null, bool SignatureList = false);
 
 internal enum UpdateState { Idle, Checking, UpToDate, Available, Downloading, Failed, NotConfigured }
 
@@ -114,7 +114,7 @@ internal sealed class UpdateService
     public const string StayInTrayArg = "--stay-in-tray";
 
     public bool CanInstallItself(ReleaseInfo release) =>
-        !_app.Demo && CanSelfInstall && release.ExeUrl is not null && release.ChecksumUrl is not null && release.SignatureUrl is not null;
+        !_app.Demo && CanSelfInstall && release.ExeUrl is not null && release.SignatureUrl is not null;
 
     public void AutoInstallChanged()
     {
@@ -122,7 +122,7 @@ internal sealed class UpdateService
         else _autoWait.Stop();
     }
 
-    public string WaitingFor => AppIdentity.IsTecnica ? "a program with an automatic window profile is open" : "iRacing is open";
+    public string WaitingFor => AppIdentity.IsTecnica ? "a program with an automatic window placement is open" : "iRacing is open";
 
     private void TryAutoInstall()
     {
@@ -198,7 +198,7 @@ internal sealed class UpdateService
     public async Task InstallAsync(bool auto = false)
     {
         if (Latest is not { } release || State is UpdateState.Downloading or UpdateState.Checking) return;
-        if (_app.Demo || release.ExeUrl is null || release.ChecksumUrl is null || release.SignatureUrl is null || !CanSelfInstall)
+        if (_app.Demo || release.ExeUrl is null || release.SignatureUrl is null || !CanSelfInstall)
         {
             OpenReleasePage();
             return;
@@ -234,14 +234,10 @@ internal sealed class UpdateService
                     }
                 }
             }
-            var expected = (await Http.GetStringAsync(release.ChecksumUrl)).Trim().Split(' ', '\t')[0];
             byte[] hash;
             await using (var check = File.OpenRead(download))
                 hash = await SHA256.HashDataAsync(check);
-            if (!Convert.ToHexString(hash).Equals(expected, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("The download didn't match the release's checksum, so it wasn't installed.");
-            if (!SignedByRelease(hash, await Http.GetStringAsync(release.SignatureUrl)))
-                throw new InvalidOperationException($"The download isn't signed with {AppIdentity.Name}'s release key, so it wasn't installed.");
+            await VerifyAsync(release, hash);
 
             S.InstalledTag = release.Tag;
             _app.SaveNow();
@@ -265,6 +261,31 @@ internal sealed class UpdateService
     }
 
     internal const string ReleaseKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEkPe9uVC+Yxp3Ybb9OI3KTwO31FqWYIYNlcelxIxeQR14LsmoHUPRFBjKYwhhESQso/8IA2RaIcLqhEedLBW4dw==";
+
+    public const string SignatureListName = "signatures.txt";
+
+    internal static async Task VerifyAsync(ReleaseInfo release, byte[] hash)
+    {
+        if (release.ChecksumUrl is not null)
+        {
+            var expected = (await Http.GetStringAsync(release.ChecksumUrl)).Trim().Split(' ', '\t')[0];
+            if (!Convert.ToHexString(hash).Equals(expected, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("The download didn't match the release's checksum, so it wasn't installed.");
+        }
+        string text = release.SignatureUrl is null ? "" : await Http.GetStringAsync(release.SignatureUrl);
+        if (!SignedByRelease(hash, release.SignatureList ? ListedSignature(text, AssetName) ?? "" : text))
+            throw new InvalidOperationException($"The download isn't signed with {AppIdentity.Name}'s release key, so it wasn't installed.");
+    }
+
+    internal static string? ListedSignature(string list, string asset)
+    {
+        foreach (var line in list.Split('\n'))
+        {
+            var parts = line.Trim().Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 2 && parts[0].Equals(asset, StringComparison.OrdinalIgnoreCase)) return parts[1].Trim();
+        }
+        return null;
+    }
 
     internal static bool SignedByRelease(byte[] hash, string signature, string publicKey = ReleaseKey)
     {
@@ -371,6 +392,7 @@ internal sealed class UpdateService
         var tag = tagName.GetString() ?? "";
         if (!TryVersion(tag, out var version)) return null;
         string? exe = null, checksum = null, signature = null;
+        bool listed = false;
         long size = 0;
         if (root.TryGetProperty("assets", out var assets) && assets.ValueKind == JsonValueKind.Array)
         {
@@ -385,13 +407,18 @@ internal sealed class UpdateService
                 size = pick.Size;
                 checksum = list.FirstOrDefault(a => a.Name.Equals(pick.Name + ".sha256", StringComparison.OrdinalIgnoreCase)).Url;
                 signature = list.FirstOrDefault(a => a.Name.Equals(pick.Name + ".sig", StringComparison.OrdinalIgnoreCase)).Url;
+                if (signature is null)
+                {
+                    signature = list.FirstOrDefault(a => a.Name.Equals(SignatureListName, StringComparison.OrdinalIgnoreCase)).Url;
+                    listed = signature is not null;
+                }
             }
         }
         DateTime? published = root.TryGetProperty("published_at", out var at) && at.ValueKind == JsonValueKind.String && at.TryGetDateTime(out var when) ? when : null;
         string? title = root.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String ? name.GetString()?.Trim() : null;
         if (string.IsNullOrEmpty(title) || string.Equals(title, tag, StringComparison.OrdinalIgnoreCase)) title = null;
         return new ReleaseInfo(version, tag, root.TryGetProperty("body", out var body) && body.ValueKind == JsonValueKind.String ? body.GetString() ?? "" : "",
-            TrustedPage(root.TryGetProperty("html_url", out var page) && page.ValueKind == JsonValueKind.String ? page.GetString() : null), exe, size, checksum, published, signature, title);
+            TrustedPage(root.TryGetProperty("html_url", out var page) && page.ValueKind == JsonValueKind.String ? page.GetString() : null), exe, size, checksum, published, signature, title, listed);
     }
 
     public const string SimHubZip = "Velocita-SimHub.zip";

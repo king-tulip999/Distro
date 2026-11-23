@@ -734,7 +734,7 @@ internal static class Ui
     public static Border PageTabs(IReadOnlyList<string> options, int selected, Action<int> onChange, string group, bool compact = false)
     {
         string name = group + "-" + Guid.NewGuid().ToString("N");
-        var panel = new WrapPanel();
+        var panel = new TabRow();
         for (int i = 0; i < options.Count; i++)
         {
             int index = i;
@@ -743,12 +743,28 @@ internal static class Ui
             {
                 rb.Padding = new Thickness(9, 0, 9, 0);
                 rb.Height = 28;
+                rb.FontSize = 14;
             }
             AutomationProperties.SetName(rb, options[i] + " tab");
             rb.Checked += (_, _) => onChange(index);
             panel.Children.Add(rb);
         }
         return new Tile { Style = Res<Style>("PageTabStrip"), Child = panel };
+    }
+
+    public const double TabBarHeight = 46;
+
+    public static Tile TabBar(Border tabs, FrameworkElement row)
+    {
+        tabs.BorderThickness = new Thickness(0);
+        tabs.VerticalAlignment = VerticalAlignment.Bottom;
+        if (tabs.Child is Panel panel)
+            foreach (var tab in panel.Children.OfType<RadioButton>())
+            {
+                tab.Height = TabBarHeight;
+                tab.Margin = new Thickness(0);
+            }
+        return new Tile { Style = Res<Style>("Card"), Margin = new Thickness(0, 0, 0, PanelSpacing), Padding = new Thickness(16, 0, 16, 0), Child = row };
     }
 
     public static void SetSegment(FrameworkElement segmented, int index)
@@ -787,6 +803,8 @@ internal static class Ui
 
     public const double SettingLabelMax = 260;
 
+    public const double SettingRowGap = 4;
+
     public const double SettingControlLane = 190;
 
     private const string SettingLaneGroup = "SettingLane";
@@ -804,7 +822,7 @@ internal static class Ui
     public static Grid SettingRow(string title, string? description, UIElement control, SettingDefault? fallback = null, string? more = null)
     {
         if (ToggleCards.IsSwitch(control)) return SwitchRow(title, description, (CheckBox)control, fallback, more);
-        var grid = new SettingRowGrid { Margin = new Thickness(0, 8, 0, 8) };
+        var grid = new SettingRowGrid { Margin = new Thickness(0, SettingRowGap, 0, SettingRowGap) };
         NameFor(control, title);
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3000, GridUnitType.Star), MaxWidth = SettingLabelMax });
         var lane = new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MaxWidth = SettingControlLane };
@@ -881,6 +899,8 @@ internal static class Ui
             bool stack = (bool)grid.GetValue(ControlBelowProperty) || StacksSettingControl(room, natural, titleWidth, longest, titleOnly: text.Children.Count == 1);
             double laneMin = stack ? 0 : spare ? Math.Max(SettingControlLane, fe.DesiredSize.Width) : fe.DesiredSize.Width;
             if (lane.MinWidth != laneMin) lane.MinWidth = laneMin;
+            double laneMax = fill || spare ? double.PositiveInfinity : stack ? SettingControlLane : Math.Max(1, fe.DesiredSize.Width);
+            if (lane.MaxWidth != laneMax) lane.MaxWidth = laneMax;
             if (stack == stacked) return;
             stacked = stack;
             Grid.SetRow(fe, stack ? 1 : 0);
@@ -899,7 +919,7 @@ internal static class Ui
 
     private static SettingRowGrid SwitchRow(string title, string? description, CheckBox toggle, SettingDefault? fallback, string? more)
     {
-        var grid = new SettingRowGrid { Margin = new Thickness(0, 8, 0, 8) };
+        var grid = new SettingRowGrid { Margin = new Thickness(0, SettingRowGap, 0, SettingRowGap) };
         NameFor(toggle, title);
         var heading = ToggleCards.RowTitle(title);
         if (more is not null) AddInfo(heading, more);

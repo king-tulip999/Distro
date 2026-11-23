@@ -482,6 +482,31 @@ internal static class HudSheet
             foreach (var (at, lap, sector, points) in new[] { (380.2, 3, 1, 1), (742.6, 6, 2, 2), (1105.9, 9, 0, 4), (1310.4, 11, 2, 1) })
                 race.AddIncident(new IncidentRecord(at, lap, sector, points, 0));
         using var painter = new HudPainter();
+        foreach (var tint in Enum.GetValues<HudNightColor>())
+        {
+            string dir = Path.Combine(folder, "Night-" + tint);
+            Directory.CreateDirectory(dir);
+            foreach (var def in HudCatalog.All)
+            {
+                var config = new HudWidgetConfig { Id = "night-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
+                using var surface = new Core.Overlay.DibSurface();
+                var g = surface.Ensure(new Size((int)Math.Round(def.W), (int)Math.Round(def.H)));
+                painter.Simulated = true;
+                painter.IsPreview = true;
+                painter.Begin(g, 1, new SizeF((float)def.W, (float)def.H), HudNight.Palette(tint), HudNight.Look(settings.Appearance));
+                def.Create().Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = new HudOptions(def, config), Def = def });
+                painter.FinishPanels();
+                painter.End(surface.Dc, surface.Size);
+                surface.Bitmap!.Save(Path.Combine(dir, def.Kind + ".png"));
+                if (def.Kind is not ("standings" or "relative")) continue;
+                config.Options["classRows"] = "true";
+                painter.Begin(g, 1, new SizeF((float)def.W, (float)def.H), HudNight.Palette(tint), HudNight.Look(settings.Appearance));
+                def.Create().Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = new HudOptions(def, config), Def = def });
+                painter.FinishPanels();
+                painter.End(surface.Dc, surface.Size);
+                surface.Bitmap!.Save(Path.Combine(dir, def.Kind + "-classrows.png"));
+            }
+        }
         foreach (var name in new[] { "Default" })
         {
             var palette = HudPalette.Of(settings.Appearance);
@@ -534,6 +559,8 @@ internal static class HudSheet
             var dialExtras = new HudWidgetConfig { Options = { ["extras"] = "position,lapNumber,fuelPct,last,best,air,bias,tc" } };
             var dialSize = inputs.Natural!(new HudOptions(inputs, dialExtras));
             Save(inputs, dialSize.Width, dialSize.Height, Path.Combine(dir, "inputs-extras.png"), 1, ("extras", "position,lapNumber,fuelPct,last,best,air,bias,tc"));
+            Save(inputs, dialSize.Width, dialSize.Height, Path.Combine(dir, "inputs-extras-gear-left.png"), 1, ("extras", "position,lapNumber,fuelPct,last,best,air,bias,tc"), ("gearSide", "left"));
+            Save(inputs, inputs.W, inputs.H, Path.Combine(dir, "inputs-gear-left.png"), 1, ("gearSide", "left"));
             var timing = HudCatalog.Find("timing")!;
             var map = HudCatalog.Find("map")!;
             Save(map, map.W, map.H, Path.Combine(dir, "map-dots.png"), 1, ("dotSize", "200"), ("myDotSize", "150"), ("dotText", "number"), ("lapColors", "true"));

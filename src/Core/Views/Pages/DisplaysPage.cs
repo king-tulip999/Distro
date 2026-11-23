@@ -10,7 +10,7 @@ using Core.Theme;
 
 namespace Core.Views.Pages;
 
-internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
+internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates, IShowAnchor
 {
     private readonly AppServices _app;
     private readonly MainWindow _window;
@@ -23,7 +23,11 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
     private FrameworkElement _pendingFrame = null!;
     private static readonly Thickness BodyMargin = new(23, 0, 23, 23);
     private readonly TextBlock _pendingText = new() { VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold };
-    private readonly DisplayProfilesView _profiles;
+    private readonly ListDetail _split = new();
+    private readonly StackPanel _currentView = new();
+    private DisplayProfile? _selectedSetup;
+    private bool _onCurrent, _picked;
+    private DisplaySetupDetail? _setupDetail;
 
     private List<MonitorInfo> _monitors = new();
     private List<MonitorEdit> _edits = new();
@@ -36,6 +40,10 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         _app = app;
         _window = window;
         var scroll = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = Ui.PageFrame(_body), Focusable = false };
+        scroll.ScrollChanged += (_, e) =>
+        {
+            if (e.ExtentHeightChange != 0 || e.ViewportHeightChange != 0) FitCanvas(scroll);
+        };
         _floating.RowDefinitions.Add(new RowDefinition());
         _floating.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _floating.Children.Add(scroll);
@@ -70,7 +78,6 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         buttons.Children.Add(apply);
         Grid.SetColumn(buttons, 2);
         bar.Children.Add(buttons);
-        _profiles = new DisplayProfilesView(app, window, () => HasPending);
         _pendingBar = Ui.PendingBar(new Tile { Child = bar });
         var barHolder = new Border { Padding = new Thickness(23, 8, 23, 16), Child = _pendingBar };
         barHolder.SetResourceReference(Border.BackgroundProperty, "Bg");
@@ -83,6 +90,15 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         BuildPage();
     }
 
+    private const double CanvasMaxHeight = 356;
+
+    private void FitCanvas(ScrollViewer scroll)
+    {
+        if (!_canvas.IsVisible || scroll.ViewportHeight <= 0) return;
+        double rest = scroll.ExtentHeight - _canvas.ActualHeight;
+        _canvas.LimitHeight(Math.Min(CanvasMaxHeight, scroll.ViewportHeight - rest));
+    }
+
     private bool _shown, _reloadQueued, _profilesQueued;
 
     public void OnShown()
@@ -92,7 +108,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             Reload();
         else if (ChangedUnderneath())
             ClearStaleEdits();
-        _profiles.Refresh();
+        RefreshSetups(animate: false);
         _app.Displays.Changed += OnDisplaysChanged;
         _app.DisplayProfiles.Changed += QueueProfiles;
     }
@@ -139,7 +155,111 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
     {
         if (_profilesQueued) return;
         _profilesQueued = true;
-        Later(() => { _profilesQueued = false; if (_shown) _profiles.Refresh(); });
+        Later(() => { _profilesQueued = false; if (_shown) RefreshSetups(animate: false); });
+    }
+
+    private DisplayProfile? DefaultSetup() => _app.DisplayProfiles.Active ?? _app.Config.Displays.Profiles.FirstOrDefault();
+
+    private void RefreshSetups(bool animate)
+    {
+        var setups = _app.Config.Displays.Profiles;
+        if (_selectedSetup is not null && !setups.Contains(_selectedSetup)) { _selectedSetup = null; _picked = false; }
+        if (!_picked)
+        {
+            _selectedSetup = DefaultSetup();
+            _onCurrent = _selectedSetup is null;
+        }
+        else if (!_onCurrent && _selectedSetup is null)
+            _onCurrent = true;
+        BuildSetupList();
+        if (_onCurrent || _setupDetail is not { Dirty: true } || _setupDetail.Setup != _selectedSetup)
+            ShowDetail(animate);
+    }
+
+    private void BuildSetupList()
+    {
+        var list = _split.List;
+        list.Children.Clear();
+        var setups = _app.Config.Displays.Profiles;
+        var active = _app.DisplayProfiles.Active;
+        list.Children.Add(ListDetail.Heading("Setups", first: true));
+        if (setups.Count == 0)
+            list.Children.Add(ListDetail.Note("Set your monitors up the way you like, then Save current setup. One for each: desk, triples, TV…"));
+        else
+        {
+            var rows = ListDetail.Reorder();
+            foreach (var setup in setups)
+            {
+                var s = setup;
+                string? keys = s.Hotkey is { } hk ? Core.Hotkeys.Hotkey.Display(hk) : null;
+                rows.Children.Add(ListDetail.Row(ListDetail.RowFace(s.Name, keys, s == active ? "Accent" : null), "DisplaySetups", !_onCurrent && s == _selectedSetup, () => Pick(s)));
+            }
+            rows.Moved += MoveSetup;
+            list.Children.Add(rows);
+            if (setups.Count > 1) list.Children.Add(ListDetail.DragHint());
+        }
+        list.Children.Add(ListDetail.Rule());
+        list.Children.Add(ListDetail.Heading("This PC"));
+        int on = _monitors.Count(m => m.Active), off = _monitors.Count - on;
+        list.Children.Add(ListDetail.Row(ListDetail.RowFace("Current setup", off > 0 ? $"{on} on · {off} off" : $"{on} on"), "DisplaySetups", _onCurrent, () => Pick(null)));
+    }
+
+    private void MoveSetup(int from, int to)
+    {
+        var setups = _app.Config.Displays.Profiles;
+        if (from < 0 || to < 0 || from >= setups.Count || to >= setups.Count) return;
+        var moved = setups[from];
+        setups.RemoveAt(from);
+        setups.Insert(to, moved);
+        _app.Save();
+        _app.DisplayProfiles.RaiseChanged();
+    }
+
+    private void Pick(DisplayProfile? setup)
+    {
+        if (setup is null ? _onCurrent : !_onCurrent && setup == _selectedSetup) return;
+        _picked = true;
+        _onCurrent = setup is null;
+        if (setup is not null) _selectedSetup = setup;
+        ShowDetail(animate: true);
+        Dispatcher.BeginInvoke(BuildSetupList, DispatcherPriority.Background);
+    }
+
+    private void ShowDetail(bool animate)
+    {
+        if (_currentView.Parent is ContentControl holder) holder.Content = null;
+        if (_onCurrent || _selectedSetup is null)
+        {
+            _setupDetail = null;
+            _split.ListFooter.Content = null;
+            _split.Show(_currentView, animate);
+            return;
+        }
+        _setupDetail = new DisplaySetupDetail(_app, _window, _selectedSetup, _selectedSetup == _app.DisplayProfiles.Active, () => HasPending, () => ShowDetail(animate: false), SaveCurrentButton("GhostButton"));
+        _split.Show(_setupDetail, animate);
+        _split.ListFooter.Content = _setupDetail.Changes;
+        if (animate && _setupDetail.Changes is { } changes) Motion.FadeIn(changes);
+    }
+
+    private Button SaveCurrentButton(string style) => Ui.LabeledButton("I.Save", "Save current setup", SaveCurrent, style);
+
+    private void SaveCurrent()
+    {
+        if (HasPending)
+        {
+            _app.Notify("Apply your changes first", "Setups save what's actually on.", NoticeKind.Info, important: true);
+            return;
+        }
+        int n = _app.Config.Displays.Profiles.Count + 1;
+        string name = $"Setup {n}";
+        while (_app.DisplayProfiles.Find(name) is not null) name = $"Setup {++n}";
+        var setup = _app.DisplayProfiles.CaptureCurrent(name);
+        _app.Config.Displays.Profiles.Add(setup);
+        _picked = true;
+        _onCurrent = false;
+        _selectedSetup = setup;
+        _app.DisplayProfiles.RaiseChanged();
+        _app.Notify("Setup saved", $"“{name}” holds what's on now. Rename it with the pencil next to its name.", NoticeKind.Success);
     }
 
     private void Later(Action work) => Dispatcher.InvokeAsync(work, DispatcherPriority.Background);
@@ -147,48 +267,36 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
     private void BuildPage()
     {
         var header = new Grid { Margin = Ui.HeaderMargin };
-        header.ColumnDefinitions.Add(new ColumnDefinition());
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.Children.Add(Ui.PageTitle("Displays"));
-        _profiles.SaveCurrent.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(_profiles.SaveCurrent, 1);
-        header.Children.Add(_profiles.SaveCurrent);
         _body.Children.Add(header);
-        _body.Children.Add(_profiles);
+        _body.Children.Add(_split.Card);
+        Ui.Anchor(_split.List, "displays.profiles");
 
-        var arrange = new StackPanel();
-        var arrangeHead = new DockPanel { LastChildFill = false };
-        var title = Ui.Text("Arrangement", "H2");
-        title.VerticalAlignment = VerticalAlignment.Center;
-        arrangeHead.Children.Add(title);
+        var arrange = _currentView;
         var identify = Ui.LabeledButton("I.Hash", "Identify", () => IdentifyDisplays.Show(_app), "GhostButton");
-        identify.Margin = new Thickness(11, 0, 0, 0);
-        arrangeHead.Children.Add(identify);
         var refresh = Ui.IconButton("I.Refresh", "Re-read displays", Reload);
-        refresh.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
-        arrangeHead.Children.Add(refresh);
         var open = Ui.LabeledButton("I.Settings", "Windows display settings", () => Ui.OpenUrl("ms-settings:display"), "GhostButton");
         open.ToolTip = "Text and app scaling (100%, 125%, 150%…) has no supported Windows API, so it stays in Windows Settings. Night light and color profiles live there too.";
-        open.Margin = new Thickness(10, 0, 0, 0);
-        DockPanel.SetDock(open, Dock.Right);
-        arrangeHead.Children.Add(open);
-        arrange.Children.Add(arrangeHead);
+        arrange.Children.Add(ListDetail.Head("Current setup", null, Array.Empty<FrameworkElement>(), new FrameworkElement[] { SaveCurrentButton("PrimaryButton"), identify, refresh, open }));
         var canvasArea = new Grid();
         var canvasStack = new StackPanel();
         canvasStack.Children.Add(_canvas);
         canvasStack.Children.Add(_offMonitors);
         canvasArea.Children.Add(canvasStack);
         canvasArea.Children.Add(new TextBlock { Text = "Drag to arrange: monitors snap together edge to edge", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(11, 8, 11, 0), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false });
-        var canvasBox = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0), Margin = new Thickness(0, 10, 0, 0), Child = canvasArea, ClipToBounds = true };
+        var canvasBox = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0), Child = canvasArea, ClipToBounds = true };
         canvasBox.Background = Ui.Res<Brush>("SurfaceAlt");
         arrange.Children.Add(canvasBox);
         _details.Margin = new Thickness(0, 15, 0, 0);
         Ui.Anchor(_details, "displays.details");
         arrange.Children.Add(_details);
-        var arrangeCard = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = arrange };
-        Ui.Anchor(arrangeCard, "displays.arrange");
+        Ui.Anchor(arrange, "displays.arrange");
+    }
 
-        _body.Children.Add(arrangeCard);
+    public void ShowAnchor(DependencyObject target)
+    {
+        for (DependencyObject? node = target; node is not null; node = System.Windows.Media.VisualTreeHelper.GetParent(node) ?? LogicalTreeHelper.GetParent(node))
+            if (node == _currentView) { Pick(null); return; }
     }
 
     private bool HasPending => _edits.Any(IsEdited) || _pendingHdr.Count > 0 || _pendingShow is not null;
@@ -242,6 +350,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         BuildOffMonitors();
         BuildDetails();
         UpdatePending();
+        if (_split.List.Children.Count > 0) BuildSetupList();
     }
 
     private string? TileKey(string? monitor) => monitor is not null && _tileOf.TryGetValue(monitor, out var tile) ? tile : monitor;
@@ -255,9 +364,9 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         _offMonitors.Visibility = off.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         foreach (var m in off)
         {
-            var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 8, 10, 8) };
+            var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 8, 10, 8) };
             stack.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = m.Name, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }));
-            var state = new TextBlock { Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 6) };
+            var state = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 6), TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
             state.Inlines.Add(new System.Windows.Documents.Run("Connected but off"));
             if (m.Connector.Length > 0) state.Inlines.Add(new System.Windows.Documents.Run(" · " + m.Connector));
             stack.Children.Add(state);
@@ -267,7 +376,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             stack.Children.Add(on);
             var outline = new System.Windows.Shapes.Rectangle { StrokeThickness = 1.22, StrokeDashArray = new DoubleCollection { 4, 3 }, SnapsToDevicePixels = true };
             outline.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "LineStrong");
-            var ghost = new Grid { Width = 162, Margin = new Thickness(0, 0, 8, 8), ToolTip = "This display is connected but off" };
+            var ghost = new Grid { Width = 196, Margin = new Thickness(0, 0, 8, 8), ToolTip = "This display is connected but off" };
             ghost.Children.Add(outline);
             ghost.Children.Add(stack);
             _offMonitors.Children.Add(ghost);
@@ -381,9 +490,9 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             Margin = new Thickness(0, 5, 0, 0),
             Children =
             {
-                new StackPanel { Children = { Ui.SubHeader("Picture", first: true), picture } },
+                new StackPanel { Children = { ListDetail.Section("Picture", first: true), picture } },
                 rule,
-                new StackPanel { Children = { Ui.SubHeader("Desktop", first: true), desktop } },
+                new StackPanel { Children = { ListDetail.Section("Desktop", first: true), desktop } },
             },
         });
 
@@ -709,6 +818,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
     {
         yield return ("edited", () =>
         {
+            Pick(null);
             var right = _edits.OrderByDescending(e => e.X).FirstOrDefault();
             if (right is not null)
             {
@@ -749,29 +859,24 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             }
             return Task.CompletedTask;
         });
-        yield return ("profile-editor", () =>
+        yield return ("setup", () =>
         {
-            _profiles.OpenEditor(0);
+            if (_app.Config.Displays.Profiles.FirstOrDefault() is { } first) Pick(first);
             return Task.CompletedTask;
         });
-        yield return ("profile-editor-bottom", () =>
+        yield return ("setup-edited", () =>
         {
-            if (_window.FindModalScroll() is { } sv) sv.ScrollToEnd();
+            if (_app.Config.Displays.Profiles.Skip(1).FirstOrDefault() is { } second)
+            {
+                Pick(second);
+                _setupDetail?.MarkEdited();
+            }
             return Task.CompletedTask;
         });
-        yield return ("profile-editor-closed", () =>
+        yield return ("setup-saved", () =>
         {
-            _window.CloseModal(false);
-            return Task.CompletedTask;
-        });
-        yield return ("profile-new", () =>
-        {
-            _profiles.OpenNew();
-            return Task.CompletedTask;
-        });
-        yield return ("profile-new-closed", () =>
-        {
-            _window.CloseModal(false);
+            Pick(null);
+            SaveCurrent();
             return Task.CompletedTask;
         });
     }

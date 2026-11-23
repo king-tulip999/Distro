@@ -169,6 +169,8 @@ internal sealed class HudWebRenderer : IDisposable
 
     public Func<HudWidgetConfig, RaceState, SizeF>? SizeOf { get; init; }
 
+    public HudAppearance? Look { get; set; }
+
     public int Render(IReadOnlyList<HudWebClient> clients, TelemetryFrame frame, RaceState race, RaceHudSettings settings, HudLayout? layout, HudPalette palette, bool dirty)
     {
         int fastest = 0;
@@ -303,7 +305,7 @@ internal sealed class HudWebRenderer : IDisposable
         var g = t.Surface.Ensure(size);
         var p = t.Painter;
         p.Simulated = frame.Simulated;
-        p.Begin(g, scale, layout, palette, settings.Appearance);
+        p.Begin(g, scale, layout, palette, Look ?? settings.Appearance);
         p.Background = config.Background;
         t.Widget!.Paint(p, view);
         p.FinishPanels();

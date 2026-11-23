@@ -27,7 +27,7 @@ internal static class DisplayManager
         var paths = FromBase64<PathInfo>(snapshot.Paths);
         var modes = FromBase64<ModeInfo>(snapshot.Modes);
         if (paths.Length == 0)
-            throw new InvalidOperationException("This display profile has no saved layout. Save it again from the Displays page.");
+            throw new InvalidOperationException("This display setup has no saved layout. Save it again from the Displays page.");
 
         RemapToCurrentHardware(snapshot, paths, modes);
 
@@ -53,7 +53,7 @@ internal static class DisplayManager
         if (err == ERROR_SUCCESS)
             return;
 
-        string message = $"Windows rejected the saved layout ({new Win32Exception(err).Message}). Try “Update to current” on this display profile.";
+        string message = $"Windows rejected the saved layout ({new Win32Exception(err).Message}). Try “Overwrite with current” on this display setup.";
         if (topologyErr != ERROR_SUCCESS)
             throw new LayoutApplyException(err, message, restored: true);
 
@@ -200,7 +200,7 @@ internal static class DisplayManager
         return string.Join(" · ", parts);
     }
 
-    private static string ToBase64<T>(T[] items) where T : unmanaged =>
+    internal static string ToBase64<T>(T[] items) where T : unmanaged =>
         Convert.ToBase64String(MemoryMarshal.AsBytes(items.AsSpan()));
 
     internal static T[] FromBase64<T>(string data) where T : unmanaged
@@ -210,7 +210,7 @@ internal static class DisplayManager
 
         var bytes = Convert.FromBase64String(data);
         if (bytes.Length % Marshal.SizeOf<T>() != 0)
-            throw new InvalidOperationException("The saved display layout is damaged. Save the display profile again from the Displays page.");
+            throw new InvalidOperationException("The saved display layout is damaged. Save the display setup again from the Displays page.");
         return MemoryMarshal.Cast<byte, T>(bytes).ToArray();
     }
 }

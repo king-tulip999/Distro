@@ -16,7 +16,7 @@ internal static class SettingsIndex
         "settings.sensorrate", "settings.background", "settings.access", "settings.pawnio", "settings.rescan",
     };
 
-    private static readonly HashSet<string> VelocitaOnly = new(StringComparer.Ordinal) { "settings.grr", "settings.storage", "settings.theme", "settings.customcolors" };
+    private static readonly HashSet<string> VelocitaOnly = new(StringComparer.Ordinal) { "settings.grr", "settings.livery", "settings.simtools", "settings.overlaypage", "settings.statspage", "settings.storage", "settings.theme", "settings.customcolors" };
 
     public static IReadOnlyList<SearchEntry> All => AppIdentity.IsTecnica
         ? _tecnica ??= Entries.Where(e => e.Anchor is null || !VelocitaOnly.Contains(e.Anchor)).ToArray()
@@ -34,10 +34,10 @@ internal static class SettingsIndex
         new("Main display", "Which monitor has the taskbar and new windows.", "Displays", "displays", "displays.details", "primary"),
         new("Duplicate displays", "Show the same picture on two monitors, or give one its own desktop again.", "Displays", "displays", "displays.details", "duplicate clone mirror extend same picture"),
         new("Arrangement", "Drag monitors into place.", "Displays", "displays", "displays.arrange", "layout position triples"),
-        new("Display profiles", "Saved monitor + audio setups with their own keybind (desk, sim rig…), applied in one click.", "Displays", "displays", "displays.profiles", "profile layout hotkey keybind preset"),
-        new("Taskbar on one display", "A display profile can show the taskbar on the main display only.", "Displays", "displays", "displays.profiles", "taskbar multiple monitors main only hide"),
-        new("Per-monitor wallpaper", "A display profile can set each monitor's wallpaper.", "Displays", "displays", "displays.profiles", "background wallpaper image"),
-        new("Display profile audio", "A display profile can switch the speakers / headset, microphone and volume.", "Displays", "displays", "displays.profiles", "audio sound speaker headphones microphone volume profile"),
+        new("Display setups", "Saved monitor + audio setups with their own keybind (desk, sim rig…), applied in one click.", "Displays", "displays", "displays.profiles", "profile layout hotkey keybind preset"),
+        new("Taskbar on one display", "A display setup can show the taskbar on the main display only.", "Displays", "displays", "displays.profiles", "taskbar multiple monitors main only hide"),
+        new("Per-monitor wallpaper", "A display setup can set each monitor's wallpaper.", "Displays", "displays", "displays.profiles", "background wallpaper image"),
+        new("Display setup audio", "A display setup can switch the speakers / headset, microphone and volume.", "Displays", "displays", "displays.profiles", "audio sound speaker headphones microphone volume profile"),
 
         new("Fan control", $"Master switch: {AppIdentity.Name} drives your fans, or the BIOS / driver does.", "Fans", "fans", "fans.master", "fan enable on off"),
         new("Fan presets", "Named sets of fan settings (Default, Quiet, Race…).", "Fans", "fans", "fans.presets", "fan profile silent quiet max cooling"),
@@ -102,6 +102,10 @@ internal static class SettingsIndex
         new("Accent color", $"The accent of the {AppIdentity.Name} theme: pink, violet, blue, cyan, teal, mint or lime. The gain green and practice blue move aside when the accent comes close.", "Settings", "settings", "settings.accent", "accent color colour highlight pink violet purple blue cyan teal mint lime green"),
         new("Hardware access", "Admin rights and sensor driver status.", "Settings", "settings", "settings.access", "admin driver"),
         new("GRR League page", "Show or hide the GRR League page in the title bar.", "Settings", "settings", "settings.grr", "grr league page show hide standings schedule results"),
+        new("Livery Shop page", "Show or hide the Livery Shop paint editor in the title bar.", "Settings", "settings", "settings.livery", "livery shop paint painter editor page show hide tga spec"),
+        new("Sim Racing Tools page", "Show or hide the Sim Racing Tools page in the title bar.", "Settings", "settings", "settings.simtools", "sim racing tools fov controls setups page show hide"),
+        new("iRacing Overlay page", "Show or hide the iRacing Overlay page in the title bar.", "Settings", "settings", "settings.overlaypage", "iracing overlay hud widgets page show hide"),
+        new("Session Stats page", "Show or hide the Session Stats page in the title bar.", "Settings", "settings", "settings.statspage", "session stats laps pace page show hide"),
     };
 
     public static IEnumerable<SearchEntry> With(IEnumerable<Plugins.Plugin> active) =>

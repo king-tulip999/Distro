@@ -119,7 +119,7 @@ internal static class DiagnosticReport
         sb.AppendLine($"- Sensor update rate {Rate(c.Performance)}, background usage {c.Performance.Background}");
         sb.AppendLine($"- Fan control {(c.Fans.Enabled ? "on" : "off")}{(app.FanControlAvailable ? "" : " (plugin off)")}, failsafe {c.Fans.EmergencyTempC} °C, {c.Fans.Presets.Count} presets, {c.Fans.Curves.Count} curves, {c.Fans.Hardware.Count} fans set up");
         sb.AppendLine($"- Overlay {(c.Overlay.Visible ? "shown" : "hidden")}, {c.Overlay.Layouts.Count} layouts, updates every {c.Overlay.UpdateIntervalMs} ms");
-        sb.AppendLine($"- {c.WindowProfiles.Profiles.Count} window profiles ({c.WindowProfiles.Profiles.Count(p => p.Auto)} automatic, applying automatically {(c.WindowProfiles.AutoApply ? "on" : "off")}), {c.WindowProfiles.Groups.Count} groups, {c.Displays.Profiles.Count} display profiles");
+        sb.AppendLine($"- {c.WindowProfiles.Profiles.Count} window placements ({c.WindowProfiles.Profiles.Count(p => p.Auto)} automatic, applying automatically {(c.WindowProfiles.AutoApply ? "on" : "off")}), {c.WindowProfiles.Groups.Count} groups, {c.Displays.Profiles.Count} display setups");
         sb.AppendLine($"- {ConfigTransfer.Keybinds(c)} keybinds");
         sb.AppendLine($"- Close in background {(c.Ui.CloseToTray ? "on" : "off")}, start in background {(c.Ui.StartMinimized ? "on" : "off")}, auto-install updates {(c.Updates.AutoInstall ? "on" : "off")}");
         sb.AppendLine();

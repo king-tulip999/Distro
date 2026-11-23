@@ -116,6 +116,17 @@ public static class ConfigStore
         }
     }
 
+    private static readonly Dictionary<string, string> RenamedKeybindParts = new(StringComparer.Ordinal)
+    {
+        ["Window Profiles"] = "Window placement",
+        ["group:Window Profiles"] = "group:Window placement",
+        ["Apply a profile"] = "Apply a placement",
+        ["Apply a display profile"] = "Apply a display setup",
+    };
+
+    internal static string RenamedKeybindPath(string path) =>
+        string.Join("/", path.Split('/').Select(part => RenamedKeybindParts.TryGetValue(part, out var renamed) ? renamed : part));
+
     public static AppConfig Normalize(AppConfig config)
     {
         RemoveNullItems(config);
@@ -164,6 +175,8 @@ public static class ConfigStore
         }
         config.Performance.CustomMs = Math.Clamp(config.Performance.CustomMs, PerformanceSettings.MinMs, PerformanceSettings.MaxMs);
         config.Ui.KeybindsFolded.RemoveAll(path => path is null);
+        config.Ui.KeybindsFolded = config.Ui.KeybindsFolded.Select(RenamedKeybindPath).Distinct(StringComparer.Ordinal).ToList();
+        config.Ui.KeybindOrder = config.Ui.KeybindOrder.Where(id => id is not null).Select(RenamedKeybindPath).Distinct(StringComparer.Ordinal).ToList();
         config.Ui.KeybindOrder.RemoveAll(id => !Services.HotkeyCatalog.IsCategoryKey(id));
         config.Hotkeys ??= new();
         config.SimRacing.AssignCompareColors();

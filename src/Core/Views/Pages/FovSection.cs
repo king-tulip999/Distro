@@ -592,7 +592,7 @@ internal sealed class FovSection : StackPanel
             var idle = edit is null ? Ui.Res<Brush>("AccentSoft") : Ui.Res<Brush>("Surface");
             var band = new Tile
             {
-                Background = idle, CornerRadius = ThemeManager.Round(8), Margin = new Thickness(-8, 3, 0, 3),
+                Background = idle, CornerRadius = ThemeManager.Round(8), Margin = new Thickness(-8, 2, 0, 2),
                 BorderThickness = edit is null ? new Thickness(3, 0, 0, 0) : Hairline.Edges(), BorderBrush = Ui.Res<Brush>(edit is null ? "Accent" : "LineStrong"),
                 Cursor = edit is null ? null : System.Windows.Input.Cursors.Hand,
                 ToolTip = edit is null ? "The setup you're editing" : "Click to edit this setup (the one you're editing now joins the comparison)",
@@ -608,7 +608,7 @@ internal sealed class FovSection : StackPanel
             Grid.SetColumnSpan(band, 7);
             table.Children.Add(band);
             int firstCell = table.Children.Count;
-            var who = new DockPanel { Margin = new Thickness(16, 10, 6, 10) };
+            var who = new DockPanel { Margin = new Thickness(16, 5, 6, 5) };
             var detail = $"{(setup.Triple ? "3 × " : "")}{Describe(setup.Centre)} · {Len(setup.DistanceCm, 0)}";
             var label = new StackPanel { VerticalAlignment = VerticalAlignment.Center, ToolTip = $"{setup.Name}\n{detail}" };
             label.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = setup.Name, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis }));

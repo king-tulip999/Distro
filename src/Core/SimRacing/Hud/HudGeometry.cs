@@ -5,6 +5,8 @@ namespace Core.SimRacing.Hud;
 
 internal sealed record HudMonitor(string Id, RectangleF Bounds, float Scale, bool Primary);
 
+internal readonly record struct HudGuide(PointF From, PointF To, bool Gap);
+
 internal static class HudGeometry
 {
     private static (float Fx, float Fy) Fraction(HudAnchor a) => a switch
@@ -105,6 +107,7 @@ internal static class HudGeometry
 
     public static RectangleF Snap(RectangleF r, IEnumerable<RectangleF> others, RectangleF monitor, float grid, float threshold, bool resizing)
     {
+        if (!resizing) return Align(r, others.ToList(), monitor, grid, threshold, null);
         var xs = new List<float> { monitor.Left, monitor.Right };
         var ys = new List<float> { monitor.Top, monitor.Bottom };
         foreach (var o in others)
@@ -112,25 +115,95 @@ internal static class HudGeometry
             xs.Add(o.Left); xs.Add(o.Right);
             ys.Add(o.Top); ys.Add(o.Bottom);
         }
-        float SnapTo(float v, List<float> lines, float origin, out bool hit)
+        float SnapTo(float v, List<float> lines, float origin)
         {
             float best = v, bestD = threshold + 0.001f;
             foreach (var l in lines)
                 if (Math.Abs(l - v) < bestD) { best = l; bestD = Math.Abs(l - v); }
-            hit = bestD <= threshold;
-            if (hit) return best;
+            if (bestD <= threshold) return best;
             return grid > 1 ? origin + MathF.Round((v - origin) / grid) * grid : v;
         }
-        if (resizing)
-        {
-            float right = SnapTo(r.Right, xs, monitor.Left, out _), bottom = SnapTo(r.Bottom, ys, monitor.Top, out _);
-            return RectangleF.FromLTRB(r.Left, r.Top, Math.Max(r.Left + 20, right), Math.Max(r.Top + 20, bottom));
-        }
-        float left = SnapTo(r.Left, xs, monitor.Left, out bool hitL), rightEdge = SnapTo(r.Right, xs, monitor.Left, out bool hitR);
-        float top = SnapTo(r.Top, ys, monitor.Top, out bool hitT), bottomEdge = SnapTo(r.Bottom, ys, monitor.Top, out bool hitB);
-        float x = hitL || !hitR ? left : rightEdge - r.Width;
-        float y = hitT || !hitB ? top : bottomEdge - r.Height;
+        float right = SnapTo(r.Right, xs, monitor.Left), bottom = SnapTo(r.Bottom, ys, monitor.Top);
+        return RectangleF.FromLTRB(r.Left, r.Top, Math.Max(r.Left + 20, right), Math.Max(r.Top + 20, bottom));
+    }
+
+    public static RectangleF Align(RectangleF r, IReadOnlyList<RectangleF> others, RectangleF monitor, float grid, float threshold, List<HudGuide>? guides, bool alongX = true, bool alongY = true)
+    {
+        var marks = guides is null ? null : new List<Mark>();
+        var xSpans = others.Select(o => new Span(o.Left, o.Right, o.Top, o.Bottom)).ToList();
+        float x = alongX ? AlignAxis(new Span(r.Left, r.Right, r.Top, r.Bottom), monitor.Left, monitor.Right, monitor.Top, monitor.Bottom, xSpans, grid, threshold, marks) : r.Left;
+        if (marks is not null) foreach (var m in marks) guides!.Add(m.Line ? new HudGuide(new PointF(m.At, m.From), new PointF(m.At, m.To), false) : new HudGuide(new PointF(m.From, m.At), new PointF(m.To, m.At), true));
+        marks?.Clear();
+        var ySpans = others.Select(o => new Span(o.Top, o.Bottom, o.Left, o.Right)).ToList();
+        float y = alongY ? AlignAxis(new Span(r.Top, r.Bottom, x, x + r.Width), monitor.Top, monitor.Bottom, monitor.Left, monitor.Right, ySpans, grid, threshold, marks) : r.Top;
+        if (marks is not null) foreach (var m in marks) guides!.Add(m.Line ? new HudGuide(new PointF(m.From, m.At), new PointF(m.To, m.At), false) : new HudGuide(new PointF(m.At, m.From), new PointF(m.At, m.To), true));
         return new RectangleF(x, y, r.Width, r.Height);
+    }
+
+    private readonly record struct Span(float Lo, float Hi, float CLo, float CHi)
+    {
+        public float Mid => (Lo + Hi) / 2;
+        public bool Faces(Span o) => Math.Min(CHi, o.CHi) - Math.Max(CLo, o.CLo) > 0.5f;
+        public float SharedMid(Span o) => (Math.Max(CLo, o.CLo) + Math.Min(CHi, o.CHi)) / 2;
+    }
+
+    private readonly record struct Mark(bool Line, float At, float From, float To);
+
+    private static float AlignAxis(Span r, float monLo, float monHi, float monCLo, float monCHi, IReadOnlyList<Span> others, float grid, float threshold, List<Mark>? marks)
+    {
+        float size = r.Hi - r.Lo;
+        var found = new List<(float Start, Mark[] Marks)>
+        {
+            (monLo, Array.Empty<Mark>()),
+            (monHi - size, Array.Empty<Mark>()),
+            ((monLo + monHi - size) / 2, new[] { new Mark(true, (monLo + monHi) / 2, monCLo, monCHi) }),
+        };
+        foreach (var o in others)
+        {
+            float from = Math.Min(o.CLo, r.CLo), to = Math.Max(o.CHi, r.CHi);
+            found.Add((o.Lo, new[] { new Mark(true, o.Lo, from, to) }));
+            found.Add((o.Hi, new[] { new Mark(true, o.Hi, from, to) }));
+            found.Add((o.Lo - size, new[] { new Mark(true, o.Lo, from, to) }));
+            found.Add((o.Hi - size, new[] { new Mark(true, o.Hi, from, to) }));
+            found.Add((o.Mid - size / 2, new[] { new Mark(true, o.Mid, from, to) }));
+        }
+        float maxGap = (monHi - monLo) / 3;
+        foreach (var a in others)
+            foreach (var b in others)
+            {
+                float gap = b.Lo - a.Hi;
+                if (gap < 1 || gap > maxGap || !a.Faces(b)) continue;
+                if (r.Faces(a) && r.Faces(b))
+                {
+                    if (gap > size + 2)
+                    {
+                        float mid = (a.Hi + b.Lo - size) / 2;
+                        found.Add((mid, new[] { new Mark(false, r.SharedMid(a), a.Hi, mid), new Mark(false, r.SharedMid(b), mid + size, b.Lo) }));
+                    }
+                    if (r.Hi > a.Hi && r.Lo < b.Lo) continue;
+                }
+                var reference = new Mark(false, a.SharedMid(b), a.Hi, b.Lo);
+                foreach (var o in others)
+                {
+                    if (!r.Faces(o)) continue;
+                    float level = r.SharedMid(o);
+                    if (o != a) found.Add((o.Hi + gap, new[] { reference, new Mark(false, level, o.Hi, o.Hi + gap) }));
+                    if (o != b) found.Add((o.Lo - gap - size, new[] { reference, new Mark(false, level, o.Lo - gap, o.Lo) }));
+                }
+            }
+        float best = r.Lo, bestD = threshold + 0.001f;
+        foreach (var (start, _) in found)
+        {
+            float d = Math.Abs(start - r.Lo);
+            if (d < bestD) { best = start; bestD = d; }
+        }
+        if (bestD > threshold) return grid > 1 ? monLo + MathF.Round((r.Lo - monLo) / grid) * grid : r.Lo;
+        if (marks is not null)
+            foreach (var (start, list) in found)
+                if (Math.Abs(start - best) < 0.5f)
+                    foreach (var m in list)
+                        if (!marks.Contains(m)) marks.Add(m);
+        return best;
     }
 
     public static void SnapAll(IEnumerable<HudWidgetConfig> widgets, IReadOnlyList<HudMonitor> monitors, float grid, Func<HudWidgetConfig, SizeF>? sizeOf = null)

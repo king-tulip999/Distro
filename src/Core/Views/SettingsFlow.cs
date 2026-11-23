@@ -26,6 +26,8 @@ internal sealed class SettingsFlow : StackPanel
 
     private const double RuleSpace = 4;
 
+    internal const double AlignWithin = 10;
+
     private readonly List<(UIElement Child, Rect Place)> _places = new();
     private readonly List<Rect> _rules = new();
     private readonly List<(double X, double Top, double Bottom)> _columnRules = new();
@@ -68,15 +70,10 @@ internal sealed class SettingsFlow : StackPanel
             int share = cols;
             double cell = (width - ColumnGap * (share - 1)) / share, top = y;
             var bottoms = new double[cols];
+            Array.Fill(bottoms, top);
             for (int r = 0; r < rows; r++)
             {
                 var line = run.Skip(r * cols).Take(cols).ToList();
-                if (r > 0)
-                {
-                    for (int c = 0; c < line.Count; c++)
-                        _rules.Add(new Rect(c * (cell + ColumnGap), y + 2, line[c] is FrameworkElement { MaxWidth: < double.PositiveInfinity } capped ? Math.Min(cell, capped.MaxWidth) : cell, 1));
-                    y += RuleSpace;
-                }
                 double height = 0;
                 foreach (var child in line)
                 {
@@ -84,13 +81,20 @@ internal sealed class SettingsFlow : StackPanel
                     height = Math.Max(height, child.DesiredSize.Height);
                 }
                 for (int c = 0; c < line.Count; c++)
-                    _places.Add((line[c], new Rect(c * (cell + ColumnGap), y, cell, line[c].DesiredSize.Height)));
-                y += height;
-                for (int c = 0; c < line.Count; c++)
-                    bottoms[c] = y;
+                {
+                    if (r > 0)
+                    {
+                        _rules.Add(new Rect(c * (cell + ColumnGap), bottoms[c] + 2, line[c] is FrameworkElement { MaxWidth: < double.PositiveInfinity } capped ? Math.Min(cell, capped.MaxWidth) : cell, 1));
+                        bottoms[c] += RuleSpace;
+                    }
+                    double own = line[c].DesiredSize.Height;
+                    _places.Add((line[c], new Rect(c * (cell + ColumnGap), bottoms[c], cell, own)));
+                    bottoms[c] += height - own <= AlignWithin ? height : own;
+                }
             }
+            y = bottoms.Max();
             for (int c = 1; c < cols; c++)
-                _columnRules.Add((Math.Floor(c * (cell + ColumnGap) - ColumnGap / 2), top, bottoms[c]));
+                _columnRules.Add((Math.Floor(c * (cell + ColumnGap) - ColumnGap / 2), top, Math.Max(bottoms[c - 1], bottoms[c])));
             run.Clear();
         }
 

@@ -11,6 +11,8 @@ internal sealed class SimRacingPlugin : Plugin
     public override string Id => PluginIds.SimRacing;
     public override AppKind App => AppKind.Velocita;
     public override string Name => "Sim Racing Tools";
+    public override bool ShowsPage(AppServices app, string key) =>
+        key == PluginIds.RaceOverlayPage ? app.Config.SimRacing.Hud.ShowPage : app.Config.SimRacing.ShowPage;
     public override string Description => "iRacing overlay, setups, fuel, FOV and iRacing settings.";
     public override string Icon => "I.FormulaWheel";
     public override (string Soft, string Deep) Colors => ("CoralSoft", "CoralDeep");
@@ -47,13 +49,15 @@ internal sealed class SimRacingPlugin : Plugin
         }, "iRacing Overlay", Config.RaceHudSettings.QuickEditDefault, OverlayPage);
         yield return new PluginHotkey("hud.layout", "Next iRacing Overlay layout", () => h.NextLayoutHotkey, k => h.NextLayoutHotkey = k, () => Hud?.NextLayout(), "iRacing Overlay", Page: OverlayPage);
         yield return new PluginHotkey("hud.layout.previous", "Previous iRacing Overlay layout", () => h.PreviousLayoutHotkey, k => h.PreviousLayoutHotkey = k, () => Hud?.PreviousLayout(), "iRacing Overlay", Page: OverlayPage);
+        yield return new PluginHotkey("hud.night", "Night mode on / off", () => h.NightHotkey, k => h.NightHotkey = k, () => Hud?.ToggleNight(), "iRacing Overlay", Page: OverlayPage);
         yield return new PluginHotkey("hud.dismiss", "Dismiss iRacing Overlay alerts", () => h.DismissHotkey, k => h.DismissHotkey = k, () => Hud?.DismissAlerts(), "iRacing Overlay", Page: OverlayPage);
-        if (h.VrOverlays)
         {
             const string vr = "iRacing Overlay in VR";
-            bool Adjusting() => Hud?.VrAdjusting == true;
-            yield return new PluginHotkey("hud.vr.adjust", "Edit VR widgets in the headset", () => h.VrAdjustHotkey, k => h.VrAdjustHotkey = k, () => Hud?.ToggleVrAdjust(), vr, Config.RaceHudSettings.VrAdjustDefault, OverlayPage);
-            yield return new PluginHotkey("hud.vr.recenter", "Recenter VR widgets", () => h.VrRecenterHotkey, k => h.VrRecenterHotkey = k, () => Hud?.RecenterVr(), vr, Config.RaceHudSettings.VrRecenterDefault, OverlayPage);
+            bool Adjusting() => h.VrOverlays && Hud?.VrAdjusting == true;
+            yield return new PluginHotkey("hud.vr.adjust", "Edit VR widgets in the headset", () => h.VrAdjustHotkey, k => h.VrAdjustHotkey = k, () => Hud?.ToggleVrAdjust(), vr, Config.RaceHudSettings.VrAdjustDefault, OverlayPage, () => h.VrOverlays);
+            yield return new PluginHotkey("hud.vr.recenter", "Recenter VR widgets", () => h.VrRecenterHotkey, k => h.VrRecenterHotkey = k, () => Hud?.RecenterVr(), vr, Config.RaceHudSettings.VrRecenterDefault, OverlayPage, () => h.VrOverlays);
+            yield return new PluginHotkey("hud.vr.brighter", "VR widgets brighter", () => h.VrBrighterHotkey, k => h.VrBrighterHotkey = k, () => Hud?.StepVrBrightness(1), vr, null, OverlayPage, () => h.VrOverlays);
+            yield return new PluginHotkey("hud.vr.dimmer", "VR widgets dimmer", () => h.VrDimmerHotkey, k => h.VrDimmerHotkey = k, () => Hud?.StepVrBrightness(-1), vr, null, OverlayPage, () => h.VrOverlays);
             yield return new PluginHotkey("hud.vr.next", "Next VR widget (while adjusting)", () => h.VrNextHotkey, k => h.VrNextHotkey = k, () => Hud?.VrNext(), vr, Config.RaceHudSettings.VrNextDefault, OverlayPage, Adjusting);
             yield return new PluginHotkey("hud.vr.setting", "Next VR setting (while adjusting)", () => h.VrSettingHotkey, k => h.VrSettingHotkey = k, () => Hud?.VrNextSetting(), vr, Config.RaceHudSettings.VrSettingDefault, OverlayPage, Adjusting);
             yield return new PluginHotkey("hud.vr.left", "Nudge left (while adjusting)", () => h.VrLeftHotkey, k => h.VrLeftHotkey = k, () => Hud?.VrNudge(-1, 0), vr, Config.RaceHudSettings.VrLeftDefault, OverlayPage, Adjusting);

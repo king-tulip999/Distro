@@ -19,6 +19,8 @@ internal sealed class MapWidget : HudWidget
         HudOption.Choice("dotStyle", "Style", "dot", new HudChoice("dot", "Dot"), new HudChoice("pill", "Pill"), new HudChoice("circle", "Circle")),
         HudOption.Number("dotSize", "Dot size", 100, 50, 300, 10, "%"),
         HudOption.Number("myDotSize", "My dot size", 100, 50, 300, 10, "%", "Compared with the other dots"),
+        HudOption.Color("myColor", "My color", "Until one is picked, the overlay's accent color"),
+        HudOption.Color("carColor", "Other cars' color", "Until one is picked, grey with one class and iRacing's class colors with several. A picked color is used for every class"),
         HudOption.Bool("positions", "Text on the dots", true, "Shown once the dots are big enough"),
         HudOption.Choice("dotText", "Text", "position", new HudChoice("position", "Class position"), new HudChoice("number", "Car number")),
         HudOption.Bool("spread", "Spread packs along the track", true, "Cars in a pack slide a little along the track so their numbers fit"),
@@ -27,7 +29,6 @@ internal sealed class MapWidget : HudWidget
         HudOption.Bool("pit", "Cars on pit road", true, "Dimmed where iRacing places them along the track"),
     };
 
-    public static bool Moves(HudOptions o) => o.Bool("rotate") || o.Number("zoom") > 1;
 
     private const double HeadingLookMetres = 25;
     private const double TurnSettleSeconds = 0.3;
@@ -228,7 +229,9 @@ internal sealed class MapWidget : HudWidget
         bool lapColors = v.Options.Bool("lapColors") && f.SessionKind == SessionKind.Race && me >= 0 && me < TelemetryFrame.MaxCars && f.CarLapDistPct[me] >= 0;
         double myPct = lapColors ? f.CarLapDistPct[me] : 0;
         double myDist = lapColors ? FieldOrder.Distance(f, me) ?? 0 : 0;
-        var others = p.P.MapCars ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.8);
+        var others = v.Options.ColorOf("carColor") ?? p.P.MapCars ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.8);
+        bool oneColor = v.Options.ColorOf("carColor") is not null;
+        var myColor = v.Options.ColorOf("myColor") ?? p.P.Player;
         int n = 0;
         for (int pass = 0; pass < 2; pass++)
             for (int car = 0; car < TelemetryFrame.MaxCars; car++)
@@ -241,7 +244,7 @@ internal sealed class MapWidget : HudWidget
                 if (onPit && !pit && !mine) continue;
                 var at = _view.ToScreen(map.At(pct));
                 float x = at.X, y = at.Y;
-                var color = mine ? p.P.Player : multiclass ? p.ClassColor(s, driver.ClassId) : others;
+                var color = mine ? myColor : multiclass && !oneColor ? p.ClassColor(s, driver.ClassId) : others;
                 if (onPit && !mine) color = HudPalette.Alpha(color, 110);
                 float r = mine ? myDot : dot;
                 int laps = lapColors && !mine ? LapDiff(f, car, pct, myPct, myDist) : 0;
@@ -296,7 +299,9 @@ internal sealed class MapWidget : HudWidget
         double myPct = hasMe ? f.CarLapDistPct[me] : 0;
         bool lapColors = v.Options.Bool("lapColors") && f.SessionKind == SessionKind.Race && hasMe;
         double myDist = lapColors ? FieldOrder.Distance(f, me) ?? 0 : 0;
-        var others = p.P.MapCars ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.8);
+        var others = v.Options.ColorOf("carColor") ?? p.P.MapCars ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.8);
+        bool oneColor = v.Options.ColorOf("carColor") is not null;
+        var myColor = v.Options.ColorOf("myColor") ?? p.P.Player;
         var font = p.Font(Math.Max(8, dot * 1.15f / d), true);
         float widest = 0;
         int n = 0;
@@ -307,7 +312,7 @@ internal sealed class MapWidget : HudWidget
             if (pct < 0 || !s.ByCar.TryGetValue(car, out var driver) || !driver.Races || !v.ClassShown(car)) continue;
             bool onPit = f.CarOnPitRoad[car];
             if (onPit && !pit) continue;
-            var color = multiclass ? p.ClassColor(s, driver.ClassId) : others;
+            var color = multiclass && !oneColor ? p.ClassColor(s, driver.ClassId) : others;
             if (onPit) color = HudPalette.Alpha(color, 110);
             int laps = lapColors ? LapDiff(f, car, pct, myPct, myDist) : 0;
             string? label = text ? Label(f, driver, car, carNumbers) : null;
@@ -384,7 +389,7 @@ internal sealed class MapWidget : HudWidget
         if (hasMe)
         {
             p.Dot(mineAt.X, mineAt.Y, myDot + 2, p.P.Heading);
-            p.Dot(mineAt.X, mineAt.Y, myDot, p.P.Player);
+            p.Dot(mineAt.X, mineAt.Y, myDot, myColor);
         }
     }
 

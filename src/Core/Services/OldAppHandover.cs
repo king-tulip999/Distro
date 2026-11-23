@@ -29,7 +29,7 @@ internal static class OldAppHandover
         var lines = new List<string>();
         if (state.Running)
             lines.Add(kind == AppKind.Tecnica
-                ? $"{OldName} is running and still drives the fans, display profiles and keybinds, so the two apps would fight over them. Quit it from its tray icon and pick “Give fans back and quit”."
+                ? $"{OldName} is running and still drives the fans, display setups and keybinds, so the two apps would fight over them. Quit it from its tray icon and pick “Give fans back and quit”."
                 : $"{OldName} is running, so its iRacing Overlay and keybinds would show and fire twice. Quit it from its tray icon.");
         if (state.StartsWithWindows)
             lines.Add(kind == AppKind.Tecnica

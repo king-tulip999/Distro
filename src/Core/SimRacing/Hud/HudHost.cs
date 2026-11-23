@@ -37,6 +37,8 @@ internal sealed class HudHost : IDisposable
     private readonly HudWebRenderer _webRenderer;
     private bool _webDirty = true;
     private readonly HudVr _vr;
+    private bool _night;
+    private HudAppearance? _nightLook;
 
     public string? WebProblem { get; private set; }
 
@@ -173,6 +175,7 @@ internal sealed class HudHost : IDisposable
 
     public bool Editing => _editing;
     public bool Preview => _preview;
+    public int PagePreviewHz { get; set; }
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
 
@@ -236,6 +239,7 @@ internal sealed class HudHost : IDisposable
 
     public void SettingsChanged(bool save = true)
     {
+        SyncNight(HudNight.IsNight(Settings, Race.Frame), force: true);
         _webDirty = true;
         if (_web is { Running: true } web) web.ThemeCss = HudWebRenderer.ThemeCss(CurrentPalette());
         if (save) Save();
@@ -320,7 +324,7 @@ internal sealed class HudHost : IDisposable
         _vr.Remove(FlashId);
         var target = _vr.Begin(FlashId, size, top: true);
         var p = target.Painter;
-        p.Begin(target.Surface.Graphics!, scale, new SizeF(layout.Width, size.Height / scale), Palette, Settings.Appearance);
+        p.Begin(target.Surface.Graphics!, scale, new SizeF(layout.Width, size.Height / scale), Palette, Look);
         VrFlash.Paint(p, names, Math.Max(0, current), footer ?? (HasVrCandidate() ? "Press again for the next one" : "No VR widgets in this layout"));
         p.End(target.Surface.Dc, size);
         _vr.Publish(target, FlashId, "Layout", EditorConfig, EditorPose(Settings));
@@ -336,7 +340,7 @@ internal sealed class HudHost : IDisposable
         _vr.Remove(FlashId);
         var target = _vr.Begin(FlashId, size, top: true);
         var p = target.Painter;
-        p.Begin(target.Surface.Graphics!, scale, new SizeF(layout.Width, size.Height / scale), Palette, Settings.Appearance);
+        p.Begin(target.Surface.Graphics!, scale, new SizeF(layout.Width, size.Height / scale), Palette, Look);
         VrFlash.PaintToast(p, title, detail);
         p.End(target.Surface.Dc, size);
         _vr.Publish(target, FlashId, title, EditorConfig, EditorPose(Settings));
@@ -485,6 +489,7 @@ internal sealed class HudHost : IDisposable
             }
         }
         Race.Update(frame);
+        SyncNight(HudNight.IsNight(Settings, frame));
         _tickPalette = CurrentPalette();
         ResolveLayout(force: false);
         bool show = !_app.Demo && (_editing || _preview || (Settings.Enabled || HeadsetOnly) && !_hidden && ShowWhen(frame));
@@ -538,9 +543,32 @@ internal sealed class HudHost : IDisposable
             _timer.Stop();
             return;
         }
+        fastest = Math.Max(fastest, PagePreviewHz);
         int interval = fastest > 0 ? Math.Clamp(1000 / fastest, 16, 250) : 250;
         if (_timer.Interval != interval) _timer.Interval = interval;
         if (!_timer.Enabled) _timer.Start();
+    }
+
+    private void SyncNight(bool night, bool force = false)
+    {
+        if (night == _night && !force) return;
+        _night = night;
+        _nightLook = night ? HudNight.Look(Settings.Appearance) : null;
+        _webRenderer.Look = _nightLook;
+        _tickPalette = CurrentPalette();
+        if (_web is { Running: true } web) web.ThemeCss = HudWebRenderer.ThemeCss(_tickPalette);
+        _webDirty = true;
+        foreach (var s in _slots.Values) s.Dirty = true;
+    }
+
+    private HudAppearance Look => _nightLook ?? Settings.Appearance;
+
+    public bool NightShown => _night;
+
+    public void ToggleNight()
+    {
+        Settings.NightMode = _night ? HudNightMode.Off : HudNightMode.On;
+        SettingsChanged();
     }
 
     private void SyncSimBar(bool on)
@@ -564,14 +592,14 @@ internal sealed class HudHost : IDisposable
 
     private HudPalette Palette => _tickPalette ?? CurrentPalette();
 
-    private HudPalette CurrentPalette() => HudPalette.Of(Settings.Appearance);
+    private HudPalette CurrentPalette() => _night ? HudNight.Palette(Settings.NightColor) : HudPalette.Of(Settings.Appearance);
 
     private void Draw(Slot s, TelemetryFrame frame)
     {
         long start = Stopwatch.GetTimestamp();
         var monitor = HudGeometry.MonitorFor(s.Config.Monitor, Monitors);
         var fit = SizeOf(s.Config, Race);
-        bool onMonitor = !AppIdentity.SimHub && !(s.Config.VrOnly && !_editing && _vr.Wants(s.Config));
+        bool onMonitor = !AppIdentity.SimHub && !(s.Config.VrOnly && !_editing && _vr.On && s.Config.Vr != HudVrPlacement.Off);
         if (!onMonitor && s.Window?.Visible == true) { s.Window.Hide(); s.Window.ReleaseSurface(); }
         if (onMonitor)
         {
@@ -610,7 +638,7 @@ internal sealed class HudHost : IDisposable
                 float scale = size.Width / fit.Width;
                 s.BandPx = band * scale;
                 painter.Simulated = frame.Simulated;
-                painter.Begin(g, scale, new SizeF(fit.Width, size.Height / scale), Palette, Settings.Appearance);
+                painter.Begin(g, scale, new SizeF(fit.Width, size.Height / scale), Palette, Look);
                 painter.Background = s.Config.Background;
                 var view = new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def };
                 painter.Inset(0, s.BandTop ? band : 0, 0, s.BandTop ? 0 : band);
@@ -657,7 +685,7 @@ internal sealed class HudHost : IDisposable
         var painter = target.Painter;
         float scale = size.Width / fit.Width;
         painter.Simulated = frame.Simulated;
-        painter.Begin(target.Surface.Graphics!, scale, new SizeF(fit.Width, size.Height / scale), Palette, Settings.Appearance);
+        painter.Begin(target.Surface.Graphics!, scale, new SizeF(fit.Width, size.Height / scale), Palette, Look);
         painter.Background = s.Config.Background;
         s.Widget.Paint(painter, new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def });
         painter.FinishPanels();
@@ -693,11 +721,15 @@ internal sealed class HudHost : IDisposable
         var candidates = VrCandidates();
         if (!_vr.Showing)
         {
-            _app.Notify("Nothing to edit in VR", !_vr.On ? "VR widgets are off in Overlay settings." : "No headset is showing VR widgets right now.", NoticeKind.Info);
+            _app.Notify("Nothing to edit in VR", !_vr.On ? "VR widgets are off in VR settings." : "No headset is showing VR widgets right now.", NoticeKind.Info);
             return;
         }
         HideFlash();
-        _editor = new VrEditor(Settings, StepLayout);
+        _editor = new VrEditor(Settings, StepLayout, w =>
+        {
+            var size = SizeOf(w, Race);
+            return size.Width > 0 ? size.Height / size.Width : 0.5;
+        }, w => HudCatalog.Find(w.Kind)?.Name ?? w.Kind);
         _editor.SetCandidates(candidates);
         _vrSetting = VrAdjustSetting.Move;
         _mouse.Moved += OnMouseMoved;
@@ -815,7 +847,7 @@ internal sealed class HudHost : IDisposable
         _editorScale = size.Width / layout.Width;
         var target = _vr.Begin(EditorId, size, top: true);
         var painter = target.Painter;
-        painter.Begin(target.Surface.Graphics!, _editorScale, new SizeF(layout.Width, size.Height / _editorScale), Palette, Settings.Appearance);
+        painter.Begin(target.Surface.Graphics!, _editorScale, new SizeF(layout.Width, size.Height / _editorScale), Palette, Look);
         VrEditorPainter.Paint(painter, editor, editor.PickedName(w => HudCatalog.Find(w.Kind)?.Name ?? w.Kind), _layoutName);
         painter.End(target.Surface.Dc, size);
         _vr.Publish(target, EditorId, "VR widgets", EditorConfig, EditorPose(Settings), pointer: true);
@@ -905,7 +937,7 @@ internal sealed class HudHost : IDisposable
         float scale = size.Width / EditButtonLayout.Width;
         var target = _vr.Begin(EditButtonId, size);
         var p = target.Painter;
-        p.Begin(target.Surface.Graphics!, scale, new SizeF(EditButtonLayout.Width, size.Height / scale), Palette, Settings.Appearance);
+        p.Begin(target.Surface.Graphics!, scale, new SizeF(EditButtonLayout.Width, size.Height / scale), Palette, Look);
         var b = p.Bounds;
         p.Fill(b, HudPalette.Alpha(p.P.Bg, 230), b.Height / 2);
         if (progress > 0) p.Fill(new RectangleF(b.X, b.Y, (float)(b.Width * progress), b.Height), HudPalette.Alpha(p.P.Accent, 150), b.Height / 2);
@@ -915,11 +947,22 @@ internal sealed class HudHost : IDisposable
         _vr.Publish(target, EditButtonId, "Edit VR widgets", EditorConfig, pose);
     }
 
+    public const int VrBrightnessStep = 10;
+
+    public void StepVrBrightness(int direction)
+    {
+        var hud = Settings;
+        int next = Math.Clamp(hud.VrBrightness + direction * VrBrightnessStep, RaceHudSettings.MinVrBrightness, 100);
+        if (next == hud.VrBrightness) return;
+        hud.VrBrightness = next;
+        SettingsChanged();
+    }
+
     public void RecenterVr()
     {
         if (!_vr.Showing)
         {
-            _app.Notify("Nothing to recenter", !_vr.On ? "VR widgets are off in Overlay settings." : "No headset is showing VR widgets right now.", NoticeKind.Info);
+            _app.Notify("Nothing to recenter", !_vr.On ? "VR widgets are off in VR settings." : "No headset is showing VR widgets right now.", NoticeKind.Info);
             return;
         }
         if (!_vr.Recenter())
@@ -1133,6 +1176,7 @@ internal sealed class HudHost : IDisposable
         if (!keep)
             foreach (var start in _editStart.Values) Restore(start);
         _editing = false;
+        HideGuides();
         _editStart.Clear();
         _dragging = null;
         _picked = null;
@@ -1270,9 +1314,11 @@ internal sealed class HudHost : IDisposable
             return;
         }
         var moved = new RectangleF(proposed.X, s.DragBandTop ? proposed.Y + s.BandPx : proposed.Y, proposed.Width, Math.Max(1, proposed.Height - s.BandPx));
+        _guides.Clear();
         if (snap)
-            moved = HudGeometry.Snap(moved, Others(s, monitor), monitor.Bounds, Settings.GridSize * monitor.Scale, 10 * monitor.Scale, false);
+            moved = HudGeometry.Align(moved, Others(s, monitor).ToList(), monitor.Bounds, Settings.GridSize * monitor.Scale, 10 * monitor.Scale, _guides);
         moved = HudGeometry.Clamp(moved, monitor.Bounds);
+        ShowGuides(monitor);
         s.BandTop = moved.Bottom + s.BandPx > monitor.Bounds.Bottom + 0.5f;
         window.Rect = new RectangleF(moved.X, s.BandTop ? moved.Y - s.BandPx : moved.Y, moved.Width, moved.Height + s.BandPx);
         HudGeometry.Store(s.Config, moved, monitor, fit);
@@ -1284,6 +1330,7 @@ internal sealed class HudHost : IDisposable
     {
         if (!_slots.TryGetValue((string)window.Tag!, out var s)) return;
         var monitor = HudGeometry.MonitorAt(new PointF(window.Rect.X + window.Rect.Width / 2, window.Rect.Y + window.Rect.Height / 2), Monitors);
+        HideGuides();
         var rect = Content(s, window.Rect);
         if (!HudWindow.Free) rect = HudGeometry.Resolve(rect, Others(s, monitor).ToList(), monitor.Bounds);
         HudGeometry.Store(s.Config, rect, monitor, s.Fit.Width > 0 ? s.Fit : SizeOf(s.Config, Race));
@@ -1292,6 +1339,74 @@ internal sealed class HudHost : IDisposable
         Save();
         Draw(s, Race.Frame);
         Changed?.Invoke();
+    }
+
+    private readonly List<HudGuide> _guides = new();
+    private readonly List<HudGuide> _shownGuides = new();
+    private HudWindow? _guideWindow;
+    private string? _guideMonitor;
+
+    private void ShowGuides(HudMonitor monitor)
+    {
+        if (_app.Demo || !_active) return;
+        if (_guideMonitor == monitor.Id && _shownGuides.SequenceEqual(_guides)) return;
+        _shownGuides.Clear();
+        _shownGuides.AddRange(_guides);
+        _guideMonitor = monitor.Id;
+        if (_guides.Count == 0) { _guideWindow?.Hide(); return; }
+        _guideWindow ??= new HudWindow("Velocita · guides");
+        var size = new Size((int)monitor.Bounds.Width, (int)monitor.Bounds.Height);
+        try
+        {
+            var g = _guideWindow.Surface(size);
+            DrawGuides(g, monitor, _guides, Palette);
+            if (!_guideWindow.Visible) _guideWindow.Show();
+            _guideWindow.Present(new Point((int)monitor.Bounds.X, (int)monitor.Bounds.Y));
+            _guideWindow.KeepOnTop();
+        }
+        catch (Exception ex) { LogOnce("guides", ex); }
+    }
+
+    private static void DrawGuides(Graphics g, HudMonitor monitor, List<HudGuide> guides, HudPalette p)
+    {
+        g.ResetTransform();
+        g.Clear(Color.Transparent);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+        float width = Math.Max(1, MathF.Round(monitor.Scale)), tick = 5 * monitor.Scale;
+        var accent = System.Windows.Application.Current?.TryFindResource("Accent") is System.Windows.Media.SolidColorBrush b
+            ? Color.FromArgb(b.Color.R, b.Color.G, b.Color.B) : p.Accent;
+        using var line = new Pen(Color.FromArgb(230, accent), width) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
+        using var gap = new Pen(Color.FromArgb(255, accent), width);
+        float ox = monitor.Bounds.X, oy = monitor.Bounds.Y;
+        foreach (var guide in guides)
+        {
+            var a = new PointF(guide.From.X - ox, guide.From.Y - oy);
+            var z = new PointF(guide.To.X - ox, guide.To.Y - oy);
+            if (!guide.Gap) { g.DrawLine(line, a, z); continue; }
+            g.DrawLine(gap, a, z);
+            bool across = Math.Abs(a.Y - z.Y) < 0.5f;
+            if (across)
+            {
+                g.DrawLine(gap, a.X, a.Y - tick, a.X, a.Y + tick);
+                g.DrawLine(gap, z.X, z.Y - tick, z.X, z.Y + tick);
+            }
+            else
+            {
+                g.DrawLine(gap, a.X - tick, a.Y, a.X + tick, a.Y);
+                g.DrawLine(gap, z.X - tick, z.Y, z.X + tick, z.Y);
+            }
+        }
+    }
+
+    private void HideGuides()
+    {
+        _guides.Clear();
+        _shownGuides.Clear();
+        _guideMonitor = null;
+        if (_guideWindow is null) return;
+        _guideWindow.Hide();
+        _guideWindow.Dispose();
+        _guideWindow = null;
     }
 
     private static RectangleF Content(Slot s, RectangleF r) =>
@@ -1468,7 +1583,7 @@ internal sealed class HudHost : IDisposable
         var g = _previewSurface.Ensure(new Size(w, h));
         painter.Simulated = race.Frame.Simulated;
         painter.IsPreview = true;
-        painter.Begin(g, scale, layout, Palette, Settings.Appearance);
+        painter.Begin(g, scale, layout, Palette, Look);
         painter.Background = config.Background;
         var key = (config.Id, config.Kind);
         if (!_previewWidgets.TryGetValue(key, out var preview))
@@ -1596,6 +1711,7 @@ internal sealed class HudHost : IDisposable
         _timer.Stop();
         _timer.Dispose();
         HideGrid();
+        HideGuides();
         CloseWindows();
         _web?.Dispose();
         _mouse.Dispose();

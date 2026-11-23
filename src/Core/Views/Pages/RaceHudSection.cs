@@ -27,8 +27,8 @@ internal interface IHudEditorHost
 
 internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdit, IHudEditorHost, IStagedBuild
 {
-    private static readonly string[] Tabs = { "Widgets", "Alerts", "Fuel", "Overlay settings" };
-    private const int WidgetsTab = 0, AlertsTabIndex = 1, FuelTabIndex = 2, SettingsTab = 3;
+    private static readonly string[] Tabs = { "Widgets", "Alerts", "Fuel", "Overlay settings", "VR settings" };
+    private const int WidgetsTab = 0, AlertsTabIndex = 1, FuelTabIndex = 2, SettingsTab = 3, VrTab = 4;
 
     private readonly AppServices _app;
     private readonly IModalHost _window;
@@ -67,9 +67,15 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
 
         _segments = Ui.PageTabs(Tabs, 0, i => { _tab = i; Build(); Motion.FadeIn(_body); }, "hudtabs");
         _segments.HorizontalAlignment = HorizontalAlignment.Left;
-        _segments.VerticalAlignment = VerticalAlignment.Center;
-        var tabRow = Ui.SplitRow(_segments, _layoutSlot, 19);
-        tabRow.Margin = Ui.TabRowMargin;
+        var bar = new Grid();
+        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        bar.ColumnDefinitions.Add(new ColumnDefinition());
+        bar.Children.Add(_segments);
+        _layoutSlot.HorizontalAlignment = HorizontalAlignment.Right;
+        _layoutSlot.Margin = new Thickness(19, 0, 0, 0);
+        Grid.SetColumn(_layoutSlot, 1);
+        bar.Children.Add(_layoutSlot);
+        var tabRow = Ui.TabBar(_segments, bar);
         if (!AppIdentity.SimHub)
         {
             _offBanner = OffBanner();
@@ -250,7 +256,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
 
     public void ShowSettings(string anchor = WebAnchor)
     {
-        SelectTab(SettingsTab);
+        SelectTab(anchor == VrAnchor ? VrTab : SettingsTab);
         Dispatcher.BeginInvoke(new Action(() =>
         {
             if (Ui.FindAnchor(_body, anchor) is not { } web) return;
@@ -342,6 +348,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             AlertsTabIndex => AlertsTab(),
             FuelTabIndex => FuelTab(),
             SettingsTab => HudSettingsTab(),
+            VrTab => VrHeadsets(_app, Changed),
             _ => WidgetsTabView(),
         };
         if (_tab == AlertsTabIndex) Ui.Anchor((FrameworkElement)_body.Child, AlertsAnchor);
@@ -681,27 +688,18 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private StackPanel HudSettingsTab()
     {
         var root = HudSettings(_app, Changed, Build, RefreshStatus);
-        if (AppIdentity.SimHub)
-        {
-            var headset = VrHeadsets(_app, Changed);
-            Ui.Anchor(headset, VrAnchor);
-            root.Children.Insert(Math.Min(1, root.Children.Count), headset);
-            return root;
-        }
+        if (AppIdentity.SimHub) return root;
         var web = BrowserSources(_app, Changed);
         Ui.Anchor(web, WebAnchor);
         root.Children.Insert(Math.Min(1, root.Children.Count), web);
-        var vr = VrHeadsets(_app, Changed);
-        Ui.Anchor(vr, VrAnchor);
-        root.Children.Insert(Math.Min(2, root.Children.Count), vr);
         return root;
     }
 
-    internal static Tile VrHeadsets(AppServices app, Action changed)
+    internal static StackPanel VrHeadsets(AppServices app, Action changed)
     {
         var S = app.Config.SimRacing.Hud;
         HudHost? Host() => app.Plugins.Find(PluginIds.SimRacing) is SimRacingPlugin { Hud: { } hud } ? hud : null;
-        var status = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4) };
+        var status = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 4) };
         void Refresh()
         {
             var vr = Host()?.Vr;
@@ -766,20 +764,29 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             adminBusy = false;
             RefreshAdmin(Host()?.Vr);
         }
+        Tile? vrKeys = null;
+        KeybindTree? vrKeyTree = null;
+        if (!AppIdentity.SimHub)
+        {
+            vrKeyTree = new KeybindTree(app, e => e.Id.StartsWith("hud.vr.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true);
+            vrKeys = KeybindCard(vrKeyTree);
+        }
+
+
         var toggle = Ui.Switch(S.VrOverlays, on => { S.VrOverlays = on; changed(); Host()?.SyncVr(); app.Hotkeys.RegisterAll(); Refresh(); });
         Refresh();
         FrameworkElement Shift(string label, string? help, double max, double metres, Action<double> set) =>
             Ui.SettingRow(label, help, Ui.SliderWithValue(-max * 100, max * 100, Math.Round(metres * 100), v => $"{v:0} {Units.Cm}", v => { set(v / 100); S.ClampVrShift(); changed(); Host()?.SettingsChanged(save: false); }, 190, 1));
         string adjustKey = Core.Hotkeys.Hotkey.Display(S.VrAdjustHotkey);
-        var tile = Group("VR headsets", null,
+        var headsets = Group("VR headsets", null,
             Ui.SettingRow("VR widgets", AppIdentity.SimHub
                 ? "Widgets set to show in VR appear in SteamVR and in iRacing through OpenXR, drawn by this plugin, not as SimHub overlays. Each widget's spot is on its page. Turn this on in only one of Velocita and Velocita for SimHub."
                 : "Widgets set to show in VR appear in SteamVR and in OpenXR games, iRacing included. Each widget's spot is on its page.", toggle),
-            status,
-            adminRow,
             Ui.SettingRow("Brightness", "Dims every VR widget, for night races. See-through parts stay the same.",
                 Ui.SliderWithValue(RaceHudSettings.MinVrBrightness, 100, S.VrBrightness, "{0:0}%", v => { S.VrBrightness = (int)v; changed(); Host()?.SettingsChanged(save: false); }, 190, 5)),
-            Ui.SubHeader("Move every cockpit widget"),
+            status,
+            adminRow);
+        var move = Group("Move every cockpit widget", null,
             Shift("Sideways", "Right is positive.", HudWidgetConfig.VrReach, S.VrShiftX, v => S.VrShiftX = v),
             Shift("Height", "Up is positive.", HudWidgetConfig.VrReach, S.VrShiftY, v => S.VrShiftY = v),
             Shift("Distance", "Further is positive.", RaceHudSettings.MaxVrShiftDistance, S.VrShiftDistance, v => S.VrShiftDistance = v),
@@ -790,28 +797,57 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                     + (string.IsNullOrWhiteSpace(S.VrRecenterHotkey) || AppIdentity.SimHub ? "" : $"{Core.Hotkeys.Hotkey.Display(S.VrRecenterHotkey)} does it too. ")
                     + "Lasts until the game or SteamVR restarts.",
                 Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4),
-            },
-            Ui.SubHeader("Edit in the headset"),
-            EditInHeadset(),
-            new TextBlock
+            });
+        var openEditor = Ui.LabeledButton("I.Move", "Edit VR widgets in the headset", () => Host()?.ToggleVrAdjust(), "GhostButton");
+        openEditor.HorizontalAlignment = HorizontalAlignment.Left;
+        var editorSide = new StackPanel
+        {
+            Margin = new Thickness(0, 4, 0, 4),
+            Children =
             {
-                Text = (string.IsNullOrWhiteSpace(S.VrAdjustHotkey) || AppIdentity.SimHub ? "" : $"{adjustKey} also opens it. ")
-                    + "A panel opens in front of you: the mouse or a SteamVR controller picks a widget and moves it. Right-click or Done gives the mouse back. It opens by itself the first time VR widgets show in the headset.",
-                Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4),
+                openEditor,
+                new TextBlock
+                {
+                    Text = (string.IsNullOrWhiteSpace(S.VrAdjustHotkey) || AppIdentity.SimHub ? "" : $"{adjustKey} also opens it. ")
+                        + "A panel opens in front of you: the mouse or a SteamVR controller picks a widget and moves it. Right-click or Done gives the mouse back. It opens by itself the first time VR widgets show in the headset.",
+                    Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0),
+                },
             },
-            Ui.SettingRow("Look-at button in the headset", "Shows above the windshield while the car is stopped. Look at it for a moment to open the editor.",
-                Ui.Switch(S.VrEditButton, on => { S.VrEditButton = on; changed(); })),
-            SimHubKeys());
+        };
+        var lookAt = Ui.SettingRow("Look-at button in the headset", "Shows above the windshield while the car is stopped. Look at it for a moment to open the editor.",
+            Ui.Switch(S.VrEditButton, on => { S.VrEditButton = on; changed(); }));
+        var editRule = Hairline.Rule(new Border { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 4) }, Orientation.Vertical);
+        editRule.SetResourceReference(Border.BackgroundProperty, "Line");
+        var editBody = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(),
+                new ColumnDefinition { Width = new GridLength(27) },
+                new ColumnDefinition(),
+            },
+        };
+        Grid.SetColumn(editRule, 1);
+        Grid.SetColumn(lookAt, 2);
+        lookAt.VerticalAlignment = VerticalAlignment.Top;
+        editBody.Children.Add(editorSide);
+        editBody.Children.Add(editRule);
+        editBody.Children.Add(lookAt);
+        var edit = Group("Edit in the headset", null, editBody);
+        Ui.Anchor(headsets, VrAnchor);
+        var root = new StackPanel { Children = { headsets, move, edit } };
+        if (AppIdentity.SimHub) root.Children.Add(Group("Keys and wheel buttons", null, SimHubKeys()));
+        else if (vrKeys is not null) root.Children.Add(vrKeys);
         FrameworkElement SimHubKeys()
         {
-            if (!AppIdentity.SimHub) return new StackPanel { Visibility = Visibility.Collapsed };
             return new StackPanel
             {
                 Children =
                 {
-                    Ui.SubHeader("Keys and wheel buttons"),
                     KeyRow("Edit VR widgets", S.VrAdjustHotkey, k => S.VrAdjustHotkey = k),
                     KeyRow("Recenter VR widgets", S.VrRecenterHotkey, k => S.VrRecenterHotkey = k),
+                    KeyRow("Brighter", S.VrBrighterHotkey, k => S.VrBrighterHotkey = k),
+                    KeyRow("Dimmer", S.VrDimmerHotkey, k => S.VrDimmerHotkey = k),
                     KeyRow("Next layout", S.NextLayoutHotkey, k => S.NextLayoutHotkey = k),
                     KeyRow("Previous layout", S.PreviousLayoutHotkey, k => S.PreviousLayoutHotkey = k),
                     KeyRow("Show / hide VR widgets", S.ToggleHotkey, k => S.ToggleHotkey = k),
@@ -851,21 +887,14 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             button.Margin = new Thickness(0, 4, 0, 0);
             return button;
         }
-        FrameworkElement EditInHeadset()
-        {
-            var open = Ui.LabeledButton("I.Move", "Edit VR widgets in the headset", () => Host()?.ToggleVrAdjust(), "GhostButton");
-            open.HorizontalAlignment = HorizontalAlignment.Left;
-            open.Margin = new Thickness(0, 4, 0, 0);
-            return open;
-        }
         void Hook(HudHost? host, bool on)
         {
             if (host is null) return;
             if (on) host.Vr.Changed += Refresh; else host.Vr.Changed -= Refresh;
         }
-        tile.Loaded += (_, _) => { Hook(Host(), true); Refresh(); };
-        tile.Unloaded += (_, _) => Hook(Host(), false);
-        return tile;
+        root.Loaded += (_, _) => { Hook(Host(), true); Refresh(); };
+        root.Unloaded += (_, _) => Hook(Host(), false);
+        return root;
     }
 
     internal static Tile BrowserSources(AppServices app, Action changed)
@@ -927,45 +956,38 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         }, S.ShowWhen.ToString(), c => { S.ShowWhen = Enum.Parse<HudShowWhen>(c.Id!); changed(); statusChanged?.Invoke(); }, 194);
         var stdLook = new HudAppearance();
         Ui.SettingDefault D(Func<bool> same, Action reset, string shown) => new(same, () => { reset(); changed(); rebuild(); }, shown);
+        var nightMode = Ui.Segmented(new[] { "Off", "Auto", "On" }, (int)S.NightMode, i => { S.NightMode = (HudNightMode)i; changed(); Host()?.SettingsChanged(save: false); }, "hudnight");
+        nightMode.HorizontalAlignment = HorizontalAlignment.Left;
+        var nightColor = Ui.Segmented(new[] { "Red", "Blue", "Purple", "Orange" }, (int)S.NightColor, i => { S.NightColor = (HudNightColor)i; changed(); Host()?.SettingsChanged(save: false); }, "hudnightcolor");
+        nightColor.HorizontalAlignment = HorizontalAlignment.Left;
+        nightColor.Margin = new Thickness(0, 6, 0, 0);
         var overlayRows = new List<UIElement>
         {
             Ui.SettingRow("Show the widgets", null, when),
             Ui.SettingRow("Click-through", "Clicks go to the game. Off: click a driver in the Relative or Standings to highlight them in both (the window never takes the keyboard).",
                 Ui.Switch(!S.Interactive, on => { S.Interactive = !on; changed(); })),
+            Ui.SettingRow("Hide app when iRacing connects", "Velocita goes to the tray; the overlay keeps running.", Ui.Switch(S.HideAppOnConnect, on => { S.HideAppOnConnect = on; changed(); })),
             Ui.SettingRow("Units", null, Ui.Segmented(new[] { "Metric", "Imperial" }, (int)S.Units, i => { S.Units = (HudUnits)i; changed(); }, "hudunits"),
                 D(() => S.Units == HudUnits.Metric, () => S.Units = HudUnits.Metric, "Metric")),
             Ui.SettingRow("Speed in mph", "Other values keep the units above.", Ui.Switch(S.SpeedInMph, on => { S.SpeedInMph = on; changed(); })),
             Ui.SettingRow("Clock", null, Ui.Segmented(new[] { "12h", "24h" }, S.Clock24h ? 1 : 0, i => { S.Clock24h = i == 1; changed(); }, "hudclock")),
-            Ui.SettingRow("Hide app when iRacing connects", "Velocita goes to the tray; the overlay keeps running.", Ui.Switch(S.HideAppOnConnect, on => { S.HideAppOnConnect = on; changed(); })),
-        };
-        if (AppIdentity.SimHub)
-        {
-            overlayRows.RemoveAt(overlayRows.Count - 1);
-            overlayRows.RemoveAt(1);
-        }
-        root.Children.Add(Group("Overlay", null, overlayRows.ToArray()));
-        if (!AppIdentity.SimHub)
-        {
-            var keys = new KeybindTree(app, e => e.Id.StartsWith("hud.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true,
-                heading: c => S.Layouts.FirstOrDefault(l => SimRacingPlugin.WidgetGroup(l) == c) is { } layout ? $"Widgets in “{layout.Name}”" : null) { Style = null, Padding = new Thickness(0), Margin = new Thickness(-5, 5, 0, 0) };
-            root.Children.Add(new Tile
-            {
-                Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing),
-                Child = new StackPanel
+            Ui.SettingRow("Night mode", "Black widgets in one color, for night racing. Auto switches at sunset in iRacing.",
+                new StackPanel
                 {
                     Children =
                     {
-                        Ui.Text("Keybinds", "H3"),
-                        new TextBlock
-                        {
-                            Text = "Wheel and button box buttons work too: click a box, then press the button.",
-                            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0),
-                        },
-                        keys,
+                        nightMode,
+                        nightColor,
                     },
                 },
-            });
+                D(() => S.NightMode == HudNightMode.Off && S.NightColor == HudNightColor.Red, () => { S.NightMode = HudNightMode.Off; S.NightColor = HudNightColor.Red; }, "Off, red")),
+        };
+        if (AppIdentity.SimHub)
+        {
+            overlayRows.RemoveAt(2);
+            overlayRows.RemoveAt(1);
         }
+        root.Children.Add(Group("Overlay", null, overlayRows.ToArray()));
         root.Children.Add(Group("Look", null, LookRows(a, changed, rebuild, (t, d, c, f) => Ui.SettingRow(t, d, c, f is null ? null : D(f.Value.Same, f.Value.Reset, f.Value.Shown))).Concat(new UIElement[] {
             Ui.SettingRow("Background", null, Ui.SliderWithValue(0, 100, a.Background, "{0:0}%", v => { a.Background = (int)v; changed(); }),
                 D(() => a.Background == stdLook.Background, () => a.Background = stdLook.Background, stdLook.Background + "%")),
@@ -981,11 +1003,37 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             Host()?.ShowGrid();
         }, step: RaceHudSettings.GridStep);
         root.Children.Add(Group("Arranging on screen", null,
-            Ui.SettingRow("Snap while arranging", "Edges line up with other widgets and the screen, else a grid. Hold Alt to place freely.", Ui.Switch(S.Snap, on => { if (Host() is { } host) host.SetSnap(on); else S.Snap = on; changed(); })),
+            Ui.SettingRow("Snap while arranging", "Edges and centers line up with other widgets and the screen, and gaps match the gaps already between widgets; else a grid. Hold Alt to place freely.", Ui.Switch(S.Snap, on => { if (Host() is { } host) host.SetSnap(on); else S.Snap = on; changed(); })),
             Ui.SettingRow("Show the grid while arranging", "Snapping works with the grid hidden.", Ui.Switch(S.GridShown, on => { if (Host() is { } host) host.SetGridShown(on); else S.GridShown = on; changed(); })),
             Ui.SettingRow("Grid", app.Demo ? "The grid is shown over your screens while you adjust it (not with demo data)." : "Shown over your screens while you adjust it.", grid)));
+        root.Children.Add(KeybindCard(new KeybindTree(app, e => e.Id.StartsWith("hud.", StringComparison.Ordinal) && !e.Id.StartsWith("hud.vr.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true,
+            heading: c => S.Layouts.FirstOrDefault(l => SimRacingPlugin.WidgetGroup(l) == c) is { } layout ? $"Widgets in “{layout.Name}”" : null)));
 
         return root;
+    }
+
+    private static Tile KeybindCard(KeybindTree keys)
+    {
+        keys.Style = null;
+        keys.Padding = new Thickness(0);
+        keys.Margin = new Thickness(-5, 5, 0, 0);
+        return new Tile
+        {
+            Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing),
+            Child = new StackPanel
+            {
+                Children =
+                {
+                    Ui.Text("Keybinds", "H3"),
+                    new TextBlock
+                    {
+                        Text = "Wheel and button box buttons work too: click a box, then press the button.",
+                        Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0),
+                    },
+                    keys,
+                },
+            },
+        };
     }
 
     private const string PresetColors = "Preset";
@@ -1234,7 +1282,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     {
         var choice = RaceState.ChoiceFor(S, def);
         HudAlertSetting Mine() => S.Alerts.TryGetValue(def.Id, out var x) ? x : S.Alerts[def.Id] = new HudAlertSetting();
-        var grid = new Grid { Margin = new Thickness(24, 6, 0, 6) };
+        var grid = new Grid { Margin = new Thickness(24, 2, 0, 2) };
         bool waiting = def.Id == "stint.limit" && S.Fuel.MaxStintMinutes <= 0;
         FrameworkElement? below = null;
         if (waiting)
@@ -1265,7 +1313,9 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         });
         on.ToolTip = "Raise this alert";
         System.Windows.Automation.AutomationProperties.SetName(on, def.Title);
-        ToggleCards.Row(on, ToggleCards.RowTitle(def.Title), def.Description.Length > 0 ? def.Description : null, below, box);
+        var heading = ToggleCards.RowTitle(def.Title);
+        if (def.Description.Length > 0) Ui.AddInfo(heading, def.Description);
+        ToggleCards.Row(on, heading, null, below, box);
         grid.Children.Add(on);
         void Apply(bool enabled)
         {
@@ -1570,7 +1620,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             LayoutsAnchor => WidgetsTab,
             AlertsAnchor => AlertsTabIndex,
             FuelAnchor => FuelTabIndex,
-            SettingsAnchor or WebAnchor or VrAnchor => SettingsTab,
+            SettingsAnchor or WebAnchor => SettingsTab,
+            VrAnchor => VrTab,
             _ => -1,
         };
         Finish();

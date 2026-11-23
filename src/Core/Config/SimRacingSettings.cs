@@ -4,6 +4,8 @@ public sealed class SimRacingSettings
 {
     public bool Imperial { get; set; }
 
+    public bool ShowPage { get; set; } = true;
+
     public FovSetup Current { get; set; } = new();
 
     public List<FovSetup> Compare { get; set; } = new();

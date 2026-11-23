@@ -7,6 +7,7 @@ using Core.Config;
 using Core.Controls;
 using Core.Grr;
 using Core.Hardware;
+using Core.LiveryShop;
 using Core.Services;
 using Core.Theme;
 
@@ -19,7 +20,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
     private readonly AppServices _app;
     private readonly MainWindow _window;
     private readonly PanelStack _body;
-    private readonly MasonryPanel _sections = new() { MinColumnWidth = 356, MaxColumns = 2, Gap = 2 * Ui.PanelSpacing };
+    private readonly MasonryPanel _sections = new() { MinColumnWidth = 356, MaxColumns = 2, Gap = 26 };
     private readonly Tile _sectionsCard = new();
     private readonly ScrollViewer _scroll;
 
@@ -183,13 +184,37 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
                 more: "Your league's next race, standings, results and schedule.");
             Ui.Anchor(grrRow, "settings.grr");
             window.Children.Add(grrRow);
+            var livery = _app.Config.LiveryShop;
+            window.Children.Add(Ui.Divider());
+            var liveryRow = Ui.SettingRow("Livery Shop page", null,
+                Ui.Switch(livery.ShowPage, v => { livery.ShowPage = v; _app.Save(); _app.Plugins.RaiseChanged(); }),
+                more: "Paint your iRacing car, helmet and suit, saved straight into iRacing.");
+            Ui.Anchor(liveryRow, "settings.livery");
+            window.Children.Add(liveryRow);
+            var sim = _app.Config.SimRacing;
+            window.Children.Add(Ui.Divider());
+            var simRow = Ui.SettingRow("Sim Racing Tools page", null,
+                Ui.Switch(sim.ShowPage, v => { sim.ShowPage = v; _app.Save(); _app.Plugins.RaiseChanged(); }));
+            Ui.Anchor(simRow, "settings.simtools");
+            window.Children.Add(simRow);
+            window.Children.Add(Ui.Divider());
+            var overlayRow = Ui.SettingRow("iRacing Overlay page", null,
+                Ui.Switch(sim.Hud.ShowPage, v => { sim.Hud.ShowPage = v; _app.Save(); _app.Plugins.RaiseChanged(); }));
+            Ui.Anchor(overlayRow, "settings.overlaypage");
+            window.Children.Add(overlayRow);
+            var stats = _app.Config.SessionStats;
+            window.Children.Add(Ui.Divider());
+            var statsRow = Ui.SettingRow("Session Stats page", null,
+                Ui.Switch(stats.ShowPage, v => { stats.ShowPage = v; _app.Save(); _app.Plugins.RaiseChanged(); }));
+            Ui.Anchor(statsRow, "settings.statspage");
+            window.Children.Add(statsRow);
         }
         BuildAboutAndUpdates(Group(app, "About and updates", "settings.updates"));
     }
 
-    private static StackPanel Group(StackPanel section, string title, string anchor)
+    private static StackPanel Group(StackPanel section, string title, string anchor, int columns = 1)
     {
-        var group = new SettingsFlow { FillRows = true, MaxColumns = 1, Margin = new Thickness(0, section.Children.Count > 1 ? 8 : 3, 0, 0) };
+        var group = new SettingsFlow { FillRows = true, MaxColumns = columns, MinColumnWidth = 250, Margin = new Thickness(0, section.Children.Count > 1 ? 8 : 3, 0, 0) };
         group.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 3, 0, 0) });
         Ui.Anchor(group, anchor);
         section.Children.Add(group);
@@ -403,7 +428,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             });
         var backgroundRow = Ui.SettingRow("Background usage", null, background,
             new Ui.SettingDefault(() => _app.Config.Performance.Background == BackgroundUsage.Reduced, () => { _app.SetPerformance(_app.Config.Performance.Rate, background: BackgroundUsage.Reduced); Build(); }, "Reduced"),
-            $"Reduced reads sensors at most every {PerformanceSettings.ReducedHiddenMs / 1000} s while the window is in the tray or minimized (pages already pause then). Fan control, the overlays, keybinds and window profiles keep working as normal.");
+            $"Reduced reads sensors at most every {PerformanceSettings.ReducedHiddenMs / 1000} s while the window is in the tray or minimized (pages already pause then). Fan control, the overlays, keybinds and window placements keep working as normal.");
         Ui.Anchor(backgroundRow, "settings.background");
         section.Children.Add(backgroundRow);
         section.Children.Add(Ui.Divider());
@@ -411,7 +436,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private static SettingRowGrid TickRow(string title, CheckBox toggle, string? beside = null, bool trailing = false, string? more = null, Ui.SettingDefault? fallback = null)
     {
-        var grid = new SettingRowGrid { Margin = new Thickness(0, 8, 0, 8) };
+        var grid = new SettingRowGrid { Margin = new Thickness(0, Ui.SettingRowGap, 0, Ui.SettingRowGap) };
         Ui.NameFor(toggle, title);
         var heading = ToggleCards.RowTitle(title);
         heading.VerticalAlignment = VerticalAlignment.Center;
@@ -441,7 +466,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private static SettingRowGrid BesideRow(string title, FrameworkElement control, string more)
     {
-        var grid = new SettingRowGrid { Margin = new Thickness(0, 8, 0, 8) };
+        var grid = new SettingRowGrid { Margin = new Thickness(0, Ui.SettingRowGap, 0, Ui.SettingRowGap) };
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         Ui.NameFor(control, title);
@@ -588,7 +613,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         var section = Section("Data and configuration", "settings.data");
         var transfer = new StackPanel { Orientation = Orientation.Horizontal };
         var export = Ui.LabeledButton("I.Save", "Export…", () => ExportSettings());
-        export.ToolTip = "Saves every setting (theme, window profiles, fan curves and presets, overlay, keybinds, plugins, layouts…) to a file";
+        export.ToolTip = "Saves every setting (theme, window placements, fan curves and presets, overlay, keybinds, plugins, layouts…) to a file";
         export.Margin = Ui.AfterButton;
         transfer.Children.Add(export);
         var import = Ui.LabeledButton("I.Download", "Import…", () => _ = ImportSettingsAsync());
@@ -761,7 +786,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         Para("What it's used for here",
             $"Reading CPU temperature, CPU power and motherboard sensors, and setting motherboard fan speeds when Fan Control is on. Nothing else. {AppIdentity.Name} doesn't send data anywhere and has no account or telemetry.");
         Para("Is it required?",
-            "No. Without it, everything else works: GPU temperatures and fans, frame rate, displays, window profiles, overlays, sim racing tools. CPU temperature shows as “Not available” and motherboard fans can't be controlled.");
+            "No. Without it, everything else works: GPU temperatures and fans, frame rate, displays, window placements, overlays, sim racing tools. CPU temperature shows as “Not available” and motherboard fans can't be controlled.");
         Para("Is it safe?",
             $"The driver is signed for Windows and works through small modules written for one job each (an AMD or Intel CPU's sensors, a fan controller chip), instead of the old driver's open access to any hardware address. Some anti-cheat systems are strict about any low-level driver; if a game ever complains, uninstall PawnIO and {AppIdentity.Name} carries on without it.");
         Para("How to install or remove it",
@@ -983,7 +1008,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             return;
         }
         if (!await _window.Confirm($"Reset {AppIdentity.Name} to defaults?",
-                "Everything goes back to how it was on first install: window profiles and groups, display profiles, " +
+                "Everything goes back to how it was on first install: window placements and groups, display setups, " +
                 $"fan curves and calibration, overlay layouts, page layouts, the page order and these settings. {AppIdentity.Name} then restarts.\n\n" +
                 "Kept: a copy of your current settings (config.before-reset-….json in the settings folder, rename it to config.json to go back), " +
                 "iRacing backups, the PawnIO driver and the Start with Windows task. Changes already made to Windows (displays, sound) aren't undone.",
@@ -1021,7 +1046,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             return;
         }
         string data = AppIdentity.IsTecnica
-            ? "window profiles, display profiles, fan curves and calibration, overlay layouts"
+            ? "window placements, display setups, fan curves and calibration, overlay layouts"
             : "overlay layouts, session stats, lap traces, setups, liveries and the iRacing backups it made";
         string kept = AppIdentity.IsTecnica
             ? "Fan control stops and the fans go back to the BIOS / driver. Kept: the PawnIO driver (Windows Settings → Apps → Installed apps → PawnIO) and changes already made to Windows (displays, sound)."
@@ -1075,7 +1100,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private static Grid StatusRow(string title, bool ok, string text)
     {
-        var grid = new Grid { Margin = new Thickness(0, 8, 0, 8) };
+        var grid = new Grid { Margin = new Thickness(0, 5, 0, 5) };
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var row = new DockPanel();
@@ -1110,7 +1135,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             void Para(string text) => stack.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) });
             Para("CPU temperatures and motherboard fans (case, CPU and pump headers) are read and controlled through PawnIO, a small free driver.");
             Para("It replaces WinRing0, the older driver Windows Defender now flags as unsafe, and is installed for the whole PC.");
-            Para("Without it everything else still works: GPU temperatures and fans, frame rate, displays, window profiles and the overlays.");
+            Para("Without it everything else still works: GPU temperatures and fans, frame rate, displays, window placements and the overlays.");
             var hide = ToggleCards.FromBox(new CheckBox { Content = "Don't show this again", IsChecked = U.HidePawnIoPrompt, Margin = new Thickness(0, 13, 0, 0) });
             stack.Children.Add(hide);
             var card = Ui.Dialog(_window, "Install the PawnIO driver?", "It isn't installed on this PC.", stack,

@@ -37,10 +37,10 @@ internal static class HudCatalog
             { FixedSize = true, MinW = 70, MinH = 70, DefaultHz = 5, Options = WindWidget.Options, Editor = Editors.WindEditor.Def,
               Limits = "iRacing gives the wind at the start / finish line, the same all round the track." },
         new("map", "Track map", "The track from iRacing's own maps, upright or turning with your car, whole or zoomed in on you, with the pit lane, start / finish and turn numbers, and every car as a dot in its class color; you stand out.", 300, 260, () => new MapWidget())
-            { FixedSize = true, MinW = 140, MinH = 120, DefaultHz = 15, MovingHz = 60, Moves = MapWidget.Moves, Background = 0, Options = MapWidget.Options, Editor = Editors.MapEditor.Def,
+            { FixedSize = true, MinW = 140, MinH = 120, DefaultHz = 60, Background = 0, Options = MapWidget.Options, Editor = Editors.MapEditor.Def,
               Limits = "Cars are placed along the track's center line from their distance round the lap; tracks without a bundled map show none." },
         new("flatmap", "Flat track map", "The lap laid out as a line: the whole lap, the stretch around you, one line per class, a line that bends at each turn, or a thin bar along a screen edge, with every car as a dot in its class color.", 600, 118, () => new FlatMapWidget())
-            { MinW = 160, MinH = 34, DefaultHz = 15, MovingHz = 30, Moves = FlatMapWidget.Moves, Options = FlatMapWidget.Options, Editor = Editors.FlatMapEditor.Def,
+            { MinW = 160, MinH = 34, DefaultHz = 30, Options = FlatMapWidget.Options, Editor = Editors.FlatMapEditor.Def,
               Limits = "Cars are placed from their distance round the lap. Turn numbers, the pit lane and the bends come from the track map; tracks without a bundled map show a straight line." },
         new("laps", "Lap history", "Your laps with deltas, what happened on them, fuel used, and consistency.", 400, 440, () => new LapsWidget())
             { MinW = 200, MinH = 110, DefaultHz = 10, MovingHz = 30, Options = LapsWidget.Options, Editor = Editors.LapsEditor.Def, Natural = LapsWidget.Natural },

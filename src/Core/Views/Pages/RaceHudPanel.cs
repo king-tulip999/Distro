@@ -13,7 +13,7 @@ namespace Core.Views.Pages;
 
 internal sealed partial class RaceHudWidgets
 {
-    private const double WellPad = 16, WellMinHeight = 160, PreviewShare = 0.85, SettingsMin = 380, TileGap = 6, TileHeight = 32;
+    private const double WellPad = 16, WellMinHeight = 160, PreviewShare = 0.85, SettingsMin = 380, TileGap = 4, TileHeight = 28;
 
     internal readonly record struct PanelTarget(string? SettingId, string? Key, string? Id, string? Tab = null);
 
@@ -92,6 +92,14 @@ internal sealed partial class RaceHudWidgets
         DockPanel.SetDock(title, Dock.Left);
         DockPanel.SetDock(_previewHidden, Dock.Left);
         head.Children.Add(title);
+        {
+            _previewTip = new TextBlock { Text = "Click a part to edit it", Style = Ui.Res<Style>("Caption") };
+            var tip = Ui.IconText("I.Move", _previewTip, "TextMuted");
+            tip.VerticalAlignment = VerticalAlignment.Center;
+            tip.Margin = new Thickness(10, 0, 0, 0);
+            DockPanel.SetDock(tip, Dock.Right);
+            head.Children.Add(tip);
+        }
         head.Children.Add(_previewHidden);
         head.Children.Add(_previewNote);
         var headBar = Hairline.Frame(new Border { Padding = new Thickness(14, 10, 10, 10), Child = head }, Sides.Bottom);
@@ -108,6 +116,19 @@ internal sealed partial class RaceHudWidgets
 
     private FrameworkElement SettingsColumn(HudWidgetConfig w, HudWidgetDef def)
     {
+        _settings = new Border();
+        FillSettings(w, def);
+        return _settings;
+    }
+
+    private void RefreshTabs(HudWidgetConfig w, HudWidgetDef def)
+    {
+        if (_settings is null || Tabs(w, def).Select(t => t.Title).SequenceEqual(_tabs.Select(t => t.Title))) return;
+        FillSettings(w, def);
+    }
+
+    private void FillSettings(HudWidgetConfig w, HudWidgetDef def)
+    {
         _tabs = Tabs(w, def);
         int index = Math.Max(0, _tabs.FindIndex(t => t.Title == _tab));
         _tab = _tabs[index].Title;
@@ -117,10 +138,9 @@ internal sealed partial class RaceHudWidgets
             _tab = _tabs[i].Title;
             ShowTab();
             if (Motion.Flourish && _tabBody is { } shown) Motion.FadeIn(shown);
-        }, "hudtab");
-        _settings = new Border { Child = new StackPanel { Children = { _tabStrip, _tabBody } } };
+        }, "hudtab", compact: true);
+        _settings!.Child = new StackPanel { Children = { _tabStrip, _tabBody } };
         ShowTab();
-        return _settings;
     }
 
     private void ShowTab()
@@ -153,8 +173,10 @@ internal sealed partial class RaceHudWidgets
             .Select(g => new EditorGroup(g.Title ?? page, () => g.Settings.Select(s => IsList(def, s) ? ListRow(def, w, s) : Row(s)).ToList(), g.Settings.Select(s => s.Id).ToList()))
             .ToList();
         var commonTabs = common.Select(c => c.Tab).Distinct().ToList();
+        var options = new HudOptions(def, w);
+        bool Shows(string page) => editor.Groups.Where(g => editor.PageOf(g) == page).SelectMany(g => g.Settings).Any(s => s.Visible(options));
         var tabs = new List<EditorTab>();
-        foreach (var page in editor.Pages.Where(p => !commonTabs.Contains(p)))
+        foreach (var page in editor.Pages.Where(p => !commonTabs.Contains(p) && Shows(p)))
             tabs.Add(new EditorTab(page, WidgetGroups(page)));
         foreach (var tab in commonTabs)
             tabs.Add(new EditorTab(tab, common.Where(c => c.Tab == tab).Select(c => new EditorGroup(c.Title, c.Rows, Array.Empty<string>())).Concat(WidgetGroups(tab)).ToList()));

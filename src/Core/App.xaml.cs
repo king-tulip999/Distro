@@ -111,7 +111,6 @@ public partial class App : Application
         Views.TextBalance.Install();
 
         string? screenshotDir = ArgValue(e.Args, "--screenshots");
-        bool fromStartup = e.Args.Contains("--minimized", StringComparer.OrdinalIgnoreCase);
         bool afterUpdate = e.Args.Any(a => a.Equals("--updated", StringComparison.OrdinalIgnoreCase) || a.Equals("--update-failed", StringComparison.OrdinalIgnoreCase));
         bool stayInTray = e.Args.Contains(UpdateService.StayInTrayArg, StringComparer.OrdinalIgnoreCase);
         string? perfFile = ArgValue(e.Args, "--perf");
@@ -248,23 +247,9 @@ public partial class App : Application
         {
             window.ScheduleTrim();
         }
-        else if (config.Ui.StartMinimized && !afterUpdate && _services.Tray is { } trayIcon)
+        else if (config.Ui.StartMinimized && !afterUpdate && _services.Tray is not null)
         {
             window.ScheduleTrim();
-            if (!fromStartup || !config.Ui.TrayTipShown)
-            {
-                config.Ui.TrayTipShown = true;
-                _services.Save();
-                void ShowTip() => trayIcon.ShowBalloon($"{AppIdentity.Name} is running in the background",
-                    $"Click the {AppIdentity.Name} icon in the system tray to open it, or right-click it to quit. (Settings → Start in background)", NoticeKind.Info);
-                if (NotificationIdentity.JustCreated)
-                {
-                    var wait = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-                    wait.Tick += (_, _) => { wait.Stop(); ShowTip(); };
-                    wait.Start();
-                }
-                else ShowTip();
-            }
         }
         else
         {

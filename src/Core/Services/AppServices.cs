@@ -27,6 +27,7 @@ internal sealed class AppServices : IDisposable
     public bool IsAdmin { get; } = Environment.IsPrivilegedProcess;
 
     public HardwareService Hardware { get; }
+    public Fans.CoolingLearner? FanLearning { get; set; }
     public FrameRateService Frames { get; }
     public NetworkMonitor Network { get; }
     public OverlayController Overlay { get; }

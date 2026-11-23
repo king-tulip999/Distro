@@ -199,8 +199,6 @@ public sealed class UiSettings
 
     public bool Animations { get; set; } = true;
 
-    public bool TrayTipShown { get; set; }
-
     public bool HidePawnIoPrompt { get; set; }
 
     public bool SetupPending { get; set; }
@@ -260,6 +258,10 @@ public sealed class FanSettings
     public List<PanelSlot> Layout { get; set; } = new();
 
     public List<LegacyFanAssignment>? Fans { get; set; }
+
+    public CoolingTestResult? CoolingTest { get; set; }
+
+    public CoolingGoal CoolingGoal { get; set; } = CoolingGoal.Balanced;
 
     [System.Text.Json.Serialization.JsonIgnore]
     public FanPreset? Active => Presets.FirstOrDefault(p => p.Name == ActivePreset) ?? Presets.FirstOrDefault();

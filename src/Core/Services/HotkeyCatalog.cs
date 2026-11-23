@@ -23,20 +23,20 @@ internal static class HotkeyCatalog
         foreach (var group in config.WindowProfiles.Groups)
         {
             var g = group;
-            list.Add(new HotkeyEntry("windowgroup:" + g.Id, new[] { "Window Profiles", "Apply a group" }, g.Name, "running programs", HotkeyOwner.WindowProfile,
+            list.Add(new HotkeyEntry("windowgroup:" + g.Id, new[] { "Window placement", "Apply a group" }, g.Name, "running programs", HotkeyOwner.WindowProfile,
                 PluginIds.WindowProfiles, PluginIds.WindowProfilesPage, g, () => g.Hotkey, hk => g.Hotkey = hk));
         }
         foreach (var profile in config.WindowProfiles.Profiles)
         {
             var p = profile;
-            list.Add(new HotkeyEntry("window:" + p.Id, new[] { "Window Profiles", "Apply a profile" }, p.Name, p.ProcessName, HotkeyOwner.WindowProfile,
+            list.Add(new HotkeyEntry("window:" + p.Id, new[] { "Window placement", "Apply a placement" }, p.Name, p.ProcessName, HotkeyOwner.WindowProfile,
                 PluginIds.WindowProfiles, PluginIds.WindowProfilesPage, p, () => p.Hotkey, hk => p.Hotkey = hk));
         }
 
         foreach (var profile in config.Displays.Profiles)
         {
             var p = profile;
-            list.Add(new HotkeyEntry("display:" + p.Name, new[] { "Displays", "Apply a display profile" }, p.Name, null, HotkeyOwner.DisplayProfile,
+            list.Add(new HotkeyEntry("display:" + p.Name, new[] { "Displays", "Apply a display setup" }, p.Name, null, HotkeyOwner.DisplayProfile,
                 PluginIds.Displays, "displays", p, () => p.Hotkey, hk => p.Hotkey = hk));
         }
 

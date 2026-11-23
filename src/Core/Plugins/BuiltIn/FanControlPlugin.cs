@@ -75,7 +75,17 @@ internal sealed class FanControlPlugin : Plugin
         }
     }
 
-    protected override void OnStart(AppServices app) => app.SetFanControlAvailable(true);
+    protected override void OnStart(AppServices app)
+    {
+        app.SetFanControlAvailable(true);
+        app.FanLearning ??= new Fans.CoolingLearner(app);
+        app.FanLearning.Start();
+    }
 
-    protected override void OnStop(AppServices app) => app.SetFanControlAvailable(false);
+    protected override void OnStop(AppServices app)
+    {
+        app.FanLearning?.Dispose();
+        app.FanLearning = null;
+        app.SetFanControlAvailable(false);
+    }
 }

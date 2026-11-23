@@ -12,7 +12,7 @@ namespace Core.Views;
 
 internal sealed class KeybindTree : Tile
 {
-    private const double RowIndent = 32, RowHeight = 34, KeyWidth = 133, CellWidth = 373, CellGap = 13, GroupWidth = 437;
+    private const double RowIndent = 32, RowHeight = 34, KeyWidth = 160, CellWidth = 373, CellGap = 13, GroupWidth = 437;
     private const int FlatStack = 2;
     private readonly AppServices _app;
     private readonly Action<string>? _navigate;
@@ -83,7 +83,7 @@ internal sealed class KeybindTree : Tile
         var entries = _app.Hotkeys.Catalog().Where(e => _app.Hotkeys.IsAvailable(e) && _include(e) && (_flat ? e.Path.Count >= _skip : e.Path.Count > _skip)).ToList();
         if (entries.Count == 0)
         {
-            _root.Children.Add(Ui.EmptyState("I.Keyboard", "No keybinds yet", "Window profiles, display profiles and the overlay add theirs when they're on."));
+            _root.Children.Add(Ui.EmptyState("I.Keyboard", "No keybinds yet", "Window placements, display setups and the overlay add theirs when they're on."));
             return;
         }
         string prefix = string.Join("/", entries[0].Path.Take(_skip));

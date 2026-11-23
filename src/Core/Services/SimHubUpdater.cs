@@ -65,7 +65,7 @@ internal sealed class SimHubUpdater
                 result = SimHubUpdateState.UpToDate;
                 return;
             }
-            if (latest.ExeUrl is null || latest.ChecksumUrl is null || latest.SignatureUrl is null) return;
+            if (latest.ExeUrl is null || latest.SignatureUrl is null) return;
             scratch = Environment.IsPrivilegedProcess ? App.ProtectedScratch() : Path.Combine(Path.GetTempPath(), "velocita-simhub-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(scratch);
             string zip = Path.Combine(scratch, UpdateService.SimHubZip);
@@ -73,9 +73,7 @@ internal sealed class SimHubUpdater
             byte[] hash;
             await using (var read = File.OpenRead(zip))
                 hash = await SHA256.HashDataAsync(read);
-            var expected = (await UpdateService.Http.GetStringAsync(latest.ChecksumUrl)).Trim().Split(' ', '\t')[0];
-            if (!Convert.ToHexString(hash).Equals(expected, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("checksum mismatch");
-            if (!UpdateService.SignedByRelease(hash, await UpdateService.Http.GetStringAsync(latest.SignatureUrl))) throw new InvalidDataException("not signed with the release key");
+            await UpdateService.VerifyAsync(latest, hash);
             Extract(zip, Path.Combine(scratch, "files"));
             File.Delete(zip);
             _staged = scratch;
@@ -83,7 +81,7 @@ internal sealed class SimHubUpdater
             Ready = latest;
             result = SimHubUpdateState.Ready;
         }
-        catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or UnauthorizedAccessException or TaskCanceledException or System.Text.Json.JsonException)
+        catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException or TaskCanceledException or System.Text.Json.JsonException)
         {
             App.LogError(ex);
         }

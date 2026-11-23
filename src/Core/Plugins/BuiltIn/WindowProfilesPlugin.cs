@@ -13,7 +13,7 @@ internal sealed class WindowProfilesPlugin : Plugin
 
     public override string Id => PluginIds.WindowProfiles;
     public override AppKind App => AppKind.Tecnica;
-    public override string Name => "Window Profiles";
+    public override string Name => "Window placement";
     public override string Description => "Give a program's window an exact size and spot, e.g. a game stretched across triples.";
     public override string Icon => PageIcon;
     public override (string Soft, string Deep) Colors => ("AccentSoft", "AccentText");
@@ -24,21 +24,21 @@ internal sealed class WindowProfilesPlugin : Plugin
 
     public override IReadOnlyList<PluginPage> Pages { get; } = new[]
     {
-        new PluginPage(PluginIds.WindowProfilesPage, "Window Profiles", PageIcon, (app, window) => new WindowProfilesPage(app, window)),
+        new PluginPage(PluginIds.WindowProfilesPage, "Window placement", PageIcon, (app, window) => new WindowProfilesPage(app, window)),
     };
 
     public override IEnumerable<SearchEntry> SearchEntries { get; } = new SearchEntry[]
     {
-        new("Window profiles", "Force a program's window to an exact size and spot: a game across triple screens, a fixed resolution, borderless.", "Window Profiles", PluginIds.WindowProfilesPage, null, "resize window size position borderless triple stretch span game resolution custom resolution windowed"),
-        new("Apply window profiles automatically", "Apply each automatic profile when its program starts.", "Window Profiles", PluginIds.WindowProfilesPage, WindowProfilesPage.AutoAnchor, "auto process watcher launch start detect"),
-        new("Window profile groups", "One keybind or click moves every running program in the group.", "Window Profiles", PluginIds.WindowProfilesPage, null, "group several multiple programs keybind"),
+        new("Window placement", "Force a program's window to an exact size and spot: a game across triple screens, a fixed resolution, borderless.", "Window placement", PluginIds.WindowProfilesPage, null, "resize window size position borderless triple stretch span game resolution custom resolution windowed"),
+        new("Apply window placements automatically", "Apply each automatic placement when its program starts.", "Window placement", PluginIds.WindowProfilesPage, WindowProfilesPage.AutoAnchor, "auto process watcher launch start detect"),
+        new("Window placement groups", "One keybind or click moves every running program in the group.", "Window placement", PluginIds.WindowProfilesPage, null, "group several multiple programs keybind"),
     };
 
     public override void AddTrayItems(WinForms.ToolStripItemCollection items, AppServices app)
     {
         var s = app.Config.WindowProfiles;
         if (s.Profiles.Count == 0) return;
-        var menu = new WinForms.ToolStripMenuItem("Window profiles");
+        var menu = new WinForms.ToolStripMenuItem("Window placement");
         var running = AppWatcher.Snapshot();
         foreach (var group in s.Groups.Where(g => s.Members(g).Any()))
         {

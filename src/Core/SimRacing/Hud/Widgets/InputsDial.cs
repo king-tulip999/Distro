@@ -12,6 +12,7 @@ internal sealed partial class InputsWidget
 
     private readonly List<(string Label, string Value, Color? Color)> _extras = new();
     private readonly List<string> _extraIds = new();
+    private static readonly string[] DialParts = { "content", "dial" }, DialRowParts = { "trace", "pedals" }, DialColumnParts = { "rpm", "main", "extras" };
 
     internal static float DialPedalsW(Shows on) => on.AnyPedal ? on.Pedals * (DialBarW + DialBarGap) - DialBarGap : 0;
 
@@ -31,20 +32,65 @@ internal sealed partial class InputsWidget
         var extras = traceOnly ? Array.Empty<string>() : v.Options.Columns("extras");
         var size = traceOnly ? BareSize(_on) : DialSize(_on, extras.Count > 0);
         Fit(p, size.Width, size.Height);
-        float contentW = _on.GearDial ? Math.Max(0, size.Width - size.Height - 8) : size.Width;
-        if (_on.GearDial) GearDial(p, v, live, At(size.Width - size.Height, 0, size.Height, size.Height));
+        bool dial = _on.GearDial && !traceOnly;
+        float contentW = dial ? Math.Max(0, size.Width - size.Height - 8) : size.Width;
+        float shift = 0;
+        if (dial && contentW > 0)
+        {
+            var ids = DialParts;
+            const string group = "inputs.gear";
+            Span<RectangleF> boxes = stackalloc RectangleF[2];
+            Span<float> sizes = stackalloc float[2];
+            sizes[1] = S(size.Height);
+            sizes[0] = S(contentW);
+            p.Arrange(v, group, At(0, 0, size.Width, size.Height), true, S(8), ids, sizes, boxes);
+            var dialBox = boxes[1];
+            var contentBox = boxes[0];
+            GearDial(p, v, live, dialBox);
+            shift = contentBox.X - At(0, 0, 0, 0).X;
+        }
+        else if (dial) GearDial(p, v, live, At(0, 0, size.Height, size.Height));
+        _ox += shift;
+        try { DrawDialContent(p, v, live, traceOnly, extras, contentW); }
+        finally { _ox -= shift; }
+    }
+
+    private void DrawDialContent(HudPainter p, HudView v, in Live live, bool traceOnly, IReadOnlyList<string> extras, float contentW)
+    {
         bool rpmBar = !traceOnly && _rpm;
         float top = rpmBar ? DialRpmH + DialRpmGap : 0, rowH = DialRow - top;
-        if (rpmBar)
+        var main = At(0, top, contentW, rowH);
+        var strip = At(0, DialRow + DialGap, contentW, DialStrip);
+        if (!traceOnly)
         {
-            var bar = At(0, 0, contentW, DialRpmH);
-            p.Panel(bar);
-            ShiftLights(p, live, bar.Inflated(-S(2), -S(2)), DialLights, S(3));
+            Span<RectangleF> parts = stackalloc RectangleF[3];
+            Span<float> heights = stackalloc float[3];
+            heights[0] = rpmBar ? S(DialRpmH) : -1;
+            heights[1] = 0;
+            heights[2] = extras.Count > 0 ? S(DialStrip) : -1;
+            p.Arrange(v, "inputs.dial.column", At(0, 0, contentW, DialRow + (extras.Count > 0 ? DialGap + DialStrip : 0)), false, S(DialGap), DialColumnParts, heights, parts);
+            main = parts[1];
+            strip = parts[2];
+            if (rpmBar)
+            {
+                p.Panel(parts[0]);
+                ShiftLights(p, live, parts[0].Inflated(-S(2), -S(2)), DialLights, S(3));
+            }
         }
-        float x = 0;
+        float pedalsW = traceOnly ? 0 : DialPedalsW(_on);
+        RectangleF trace = new(main.X, main.Y, S(DialTraceW), main.Height), pedals = new(main.X, main.Y, S(pedalsW), main.Height);
+        if (_on.TraceGraph && pedalsW > 0)
+        {
+            Span<RectangleF> boxes = stackalloc RectangleF[2];
+            Span<float> sizes = stackalloc float[2];
+            sizes[0] = S(DialTraceW);
+            sizes[1] = S(pedalsW);
+            p.Arrange(v, "inputs.dial.row", new RectangleF(main.X, main.Y, S(DialTraceW + 8 + pedalsW), main.Height), true, S(8), DialRowParts, sizes, boxes);
+            trace = boxes[0];
+            pedals = boxes[1];
+        }
         if (_on.TraceGraph)
         {
-            var trace = At(x, top, DialTraceW, rowH);
             p.Panel(trace);
             var inner = trace.Inflated(-S(1), -S(1));
             for (int i = 1; i < 4; i++)
@@ -52,13 +98,12 @@ internal sealed partial class InputsWidget
                 float gy = MathF.Round(inner.Y + inner.Height * i / 4) + 0.5f;
                 p.Line(inner.X, gy, inner.Right, gy, HudPalette.Alpha(p.P.InputTicks, 120), 1);
             }
+            var rounded = p.ClipEnds(inner, Math.Max(0, p.Look.Corner - 1), true, true);
             DialGraph(p, inner, live.Now);
-            x += DialTraceW + 8;
+            p.Unclip(rounded);
         }
-        float pedalsW = traceOnly ? 0 : DialPedalsW(_on);
-        if (pedalsW > 0) DialPedals(p, live, At(x, top, pedalsW, rowH));
+        if (pedalsW > 0) DialPedals(p, live, pedals);
         if (extras.Count == 0) return;
-        var strip = At(0, DialRow + DialGap, contentW, DialStrip);
         p.Panel(strip);
         _extras.Clear();
         _extraIds.Clear();
@@ -81,7 +126,7 @@ internal sealed partial class InputsWidget
 
     private void DialGraph(HudPainter p, RectangleF r, double now)
     {
-        if (_throttle) Area(p, r, now, TraceSeconds, 0, HudPalette.Alpha(p.P.ThrottleInput, 55));
+        if (_throttle) Area(p, r, now, TraceSeconds, 0, HudPalette.Alpha(p.P.ThrottleInput, p.P.Night ? 28 : 55));
         if (_brake) Area(p, r, now, TraceSeconds, 1, HudPalette.Alpha(p.P.BrakeInput, 80));
         if (_steering) Lines(p, r, now, TraceSeconds, 3, HudPalette.Alpha(p.P.SteerInput, 170), null, S(1.2f));
         if (_clutch) Lines(p, r, now, TraceSeconds, 2, p.P.ClutchInput, null, S(1.5f));

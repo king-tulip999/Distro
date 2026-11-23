@@ -136,6 +136,30 @@ internal static class MonkeyRunner
             window.Show();
             return;
         }
+        if (Focus is { } stay && window.CurrentPage != stay.Split('/', 2)[0])
+        {
+            Log($"{_step} back to {stay} from {window.CurrentPage}");
+            GoFocus(window, stay);
+            await Settle();
+        }
+        if (window.CurrentPage is { } current && window.PageFor(current) is LiveryShop.LiveryShopPage shop && rnd.Next(100) < 80)
+        {
+            try
+            {
+                if (await shop.MonkeyStepAsync(rnd.Next()) is { } web)
+                {
+                    Log($"{_step} web {web.Done}");
+                    foreach (var error in web.Errors) Problem("livery shop script error: " + error);
+                    await Task.Delay(120);
+                    return;
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or System.Text.Json.JsonException)
+            {
+                Problem("livery shop step failed: " + ex.Message);
+                return;
+            }
+        }
         int roll = rnd.Next(100);
         switch (roll)
         {
@@ -408,7 +432,7 @@ internal static class MonkeyRunner
 
         while (window.WindowState == WindowState.Minimized || !window.IsVisible) { window.WindowState = WindowState.Normal; window.Show(); await Settle(); }
         Key(window, System.Windows.Input.Key.Escape);
-        window.Navigate(window.FirstPage);
+        if (Focus is { } focus) GoFocus(window, focus); else window.Navigate(window.FirstPage);
         await Task.Delay(300);
         await Settle();
         int now = TickHandlers(app);

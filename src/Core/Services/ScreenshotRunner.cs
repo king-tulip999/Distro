@@ -263,7 +263,7 @@ internal static class ScreenshotRunner
 
     private static readonly (string Name, string Kind, string Glyph)[] NavIconKinds =
     {
-        ("Window Profiles", "windows", "I.Triple"),
+        ("Window placement", "windows", "I.Triple"),
         ("Displays", "displays", "I.Monitor"),
         ("Session Stats", "session-stats", "I.Candles"),
         ("iRacing Overlay", "iracing-overlay", "I.RaceOverlay"),
@@ -721,12 +721,46 @@ internal static class ScreenshotRunner
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())
         {
-            dc.DrawRectangle((Brush)window.FindResource("Bg"), null, new Rect(0, 0, width, height));
+            if (!ClearBackground) dc.DrawRectangle((Brush)window.FindResource("Bg"), null, new Rect(0, 0, width, height));
             dc.DrawRectangle(new VisualBrush(content) { Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top }, null, new Rect(0, 0, width, height));
         }
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        var titles = HideTitles(content);
         bitmap.Render(visual);
+        ShowTitles(titles);
         SavePng(bitmap, path);
+    }
+
+    private static bool ClearBackground => Environment.GetCommandLineArgs().Contains("--clear-background", StringComparer.OrdinalIgnoreCase);
+
+    private static bool HidePageTitles => Environment.GetCommandLineArgs().Contains("--hide-page-titles", StringComparer.OrdinalIgnoreCase);
+
+    private static List<UIElement> HideTitles(DependencyObject root)
+    {
+        var hidden = new List<UIElement>();
+        if (!HidePageTitles) return hidden;
+        void Walk(DependencyObject node)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(node);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(node, i);
+                if (child is Controls.EchoTitle { Opacity: > 0 } title)
+                {
+                    title.Opacity = 0;
+                    hidden.Add(title);
+                    continue;
+                }
+                Walk(child);
+            }
+        }
+        Walk(root);
+        return hidden;
+    }
+
+    private static void ShowTitles(List<UIElement> hidden)
+    {
+        foreach (var title in hidden) title.ClearValue(UIElement.OpacityProperty);
     }
 
     internal static void CaptureWindow(Window window, string path) => Capture(window, path);
@@ -765,7 +799,9 @@ internal static class ScreenshotRunner
                 catch (InvalidOperationException) { }
             }
         }
+        var titles = HideTitles(root);
         bitmap.Render(visual);
+        ShowTitles(titles);
 
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));

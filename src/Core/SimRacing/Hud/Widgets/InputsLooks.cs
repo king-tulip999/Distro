@@ -18,5 +18,5 @@ internal sealed partial class InputsWidget
 
     private static float Round(HudPainter p, float max) => Math.Max(0, Math.Min(p.Look.Corner, max));
 
-    internal static SizeF BareSize(Shows on) => new(Math.Max(60, (on.GearDial ? DialRow + (on.TraceGraph ? 8 : 0) : 0) + (on.TraceGraph ? DialTraceW : 0)), DialRow);
+    internal static SizeF BareSize(Shows on) => new(on.TraceGraph ? DialTraceW : 60, DialRow);
 }

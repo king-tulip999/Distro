@@ -190,7 +190,7 @@ internal sealed class HudVr : IDisposable
     public void Publish(Target t, string id, string name, HudWidgetConfig c, VrPose pose, bool pointer = false)
     {
         GdiFlush();
-        if (!pointer) Dim(t.Surface.Bits, t.Size.Width * t.Size.Height, _app.Config.SimRacing.Hud.VrBrightness);
+        if (!pointer) HudNight.Dim(t.Surface.Bits, t.Size.Width * t.Size.Height, _app.Config.SimRacing.Hud.VrBrightness, ref _dimBuffer);
         if (_steam.Connected)
         {
             try { _steam.Show(id, name, c.Vr, pose, c.Opacity, t.Size.Width, t.Size.Height, t.Surface.Bits, pointer); }
@@ -307,28 +307,6 @@ internal sealed class HudVr : IDisposable
     }
 
     private int[] _dimBuffer = Array.Empty<int>();
-
-    private void Dim(IntPtr bits, int pixels, int brightness)
-    {
-        if (brightness >= 100 || bits == IntPtr.Zero || pixels <= 0) return;
-        if (_dimBuffer.Length < pixels) _dimBuffer = new int[pixels];
-        Marshal.Copy(bits, _dimBuffer, 0, pixels);
-        Dim(_dimBuffer.AsSpan(0, pixels), brightness);
-        Marshal.Copy(_dimBuffer, 0, bits, pixels);
-    }
-
-    internal static void Dim(Span<int> pixels, int brightness)
-    {
-        uint keep = (uint)(Math.Clamp(brightness, 0, 100) * 256 / 100);
-        for (int i = 0; i < pixels.Length; i++)
-        {
-            uint px = (uint)pixels[i];
-            if ((px & 0x00FFFFFF) == 0) continue;
-            uint rb = ((px & 0x00FF00FF) * keep >> 8) & 0x00FF00FF;
-            uint g = ((px & 0x0000FF00) * keep >> 8) & 0x0000FF00;
-            pixels[i] = (int)((px & 0xFF000000) | rb | g);
-        }
-    }
 
     private readonly HashSet<string> _logged = new();
 

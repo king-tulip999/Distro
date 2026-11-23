@@ -13,7 +13,7 @@ internal readonly record struct VrEditorHit(VrEditorPart Part, int Row = -1)
 
 internal readonly record struct VrEditorElement(VrEditorPart Part, int Row, RectangleF Box);
 
-internal sealed record VrEditorRow(string Label, double Min, double Max, double Step, string Unit, Func<double> Get, Action<double> Set);
+internal sealed record VrEditorRow(string Label, double Min, double Max, double Step, string Unit, Func<double> Get, Action<double> Set, Func<double, VrSnap>? Snap = null);
 
 internal enum VrEditorResult { None, Redraw, Changed, Close }
 
@@ -24,6 +24,8 @@ internal sealed class VrEditor
 
     private readonly RaceHudSettings _settings;
     private readonly Action<int> _stepLayout;
+    private readonly Func<HudWidgetConfig, double> _aspect;
+    private readonly Func<HudWidgetConfig, string> _name;
     private List<HudWidgetConfig?> _candidates = new();
     private int _dragRow = -1;
     private float _dragFromX;
@@ -33,11 +35,17 @@ internal sealed class VrEditor
 
     public bool MovingPanel => _panelDrag;
 
-    public VrEditor(RaceHudSettings settings, Action<int> stepLayout)
+    public VrEditor(RaceHudSettings settings, Action<int> stepLayout, Func<HudWidgetConfig, double>? aspect = null, Func<HudWidgetConfig, string>? name = null)
     {
         _settings = settings;
         _stepLayout = stepLayout;
+        _aspect = aspect ?? (_ => 0.5);
+        _name = name ?? (w => w.Kind);
     }
+
+    public string? Note { get; private set; }
+
+    private IEnumerable<HudWidgetConfig> Placed => _candidates.OfType<HudWidgetConfig>();
 
     public int Pick { get; private set; }
 
@@ -66,6 +74,7 @@ internal sealed class VrEditor
 
     public void Step(int delta)
     {
+        Note = null;
         if (_candidates.Count == 0) return;
         Pick = ((Pick + delta) % _candidates.Count + _candidates.Count) % _candidates.Count;
         _dragRow = -1;
@@ -77,10 +86,14 @@ internal sealed class VrEditor
         double reach = HudWidgetConfig.VrReach * 100;
         if (Picked is { } w)
         {
-            rows.Add(new("Sideways", -reach, reach, 1, Units.Cm, () => w.VrX * 100, v => w.VrX = v / 100));
-            rows.Add(new("Height", -reach, reach, 1, Units.Cm, () => w.VrY * 100, v => w.VrY = v / 100));
-            rows.Add(new("Distance", HudWidgetConfig.MinVrDistance * 100, HudWidgetConfig.MaxVrDistance * 100, 1, Units.Cm, () => w.VrDistance * 100, v => w.VrDistance = v / 100));
-            rows.Add(new("Width", HudWidgetConfig.MinVrWidth * 100, HudWidgetConfig.MaxVrWidth * 100, 1, Units.Cm, () => w.VrWidth * 100, v => w.VrWidth = v / 100));
+            rows.Add(new("Sideways", -reach, reach, 1, Units.Cm, () => w.VrX * 100, v => w.VrX = v / 100,
+                v => Cm(VrAlign.Move(w, true, v / 100, Placed, _settings, _aspect, _name))));
+            rows.Add(new("Height", -reach, reach, 1, Units.Cm, () => w.VrY * 100, v => w.VrY = v / 100,
+                v => Cm(VrAlign.Move(w, false, v / 100, Placed, _settings, _aspect, _name))));
+            rows.Add(new("Distance", HudWidgetConfig.MinVrDistance * 100, HudWidgetConfig.MaxVrDistance * 100, 1, Units.Cm, () => w.VrDistance * 100, v => w.VrDistance = v / 100,
+                v => Cm(VrAlign.Distance(w, v / 100, Placed, _name))));
+            rows.Add(new("Width", HudWidgetConfig.MinVrWidth * 100, HudWidgetConfig.MaxVrWidth * 100, 1, Units.Cm, () => w.VrWidth * 100, v => w.VrWidth = v / 100,
+                v => Cm(VrAlign.Width(w, v / 100, Placed, _name))));
             rows.Add(new("Turn", -HudWidgetConfig.MaxVrAngle, HudWidgetConfig.MaxVrAngle, VrAdjust.AngleStep, "°", () => w.VrTurn, v => w.VrTurn = v));
             rows.Add(new("Tilt", -HudWidgetConfig.MaxVrAngle, HudWidgetConfig.MaxVrAngle, VrAdjust.AngleStep, "°", () => w.VrTilt, v => w.VrTilt = v));
         }
@@ -93,6 +106,8 @@ internal sealed class VrEditor
         }
         return rows;
     }
+
+    private static VrSnap Cm(VrSnap snap) => snap with { Value = snap.Value * 100 };
 
     public const float FooterHeight = 34, LayoutRowTop = 52, WidgetRowTop = 100;
 
@@ -178,6 +193,7 @@ internal sealed class VrEditor
     public VrEditorResult Press(PointF? at = null)
     {
         if (at is { } p) MoveTo(p, CursorShown);
+        Note = null;
         var hit = HitTest(Cursor);
         var rows = Rows();
         switch (hit.Part)
@@ -239,7 +255,19 @@ internal sealed class VrEditor
         if (index < 0 || index >= rows.Count) return false;
         var track = Elements().First(e => e.Part == VrEditorPart.Track && e.Row == index).Box;
         var row = rows[index];
-        return SetValue(row, _dragFromValue + (x - _dragFromX) / track.Width * (row.Max - row.Min));
+        double value = _dragFromValue + (x - _dragFromX) / track.Width * (row.Max - row.Min);
+        if (row.Snap?.Invoke(value) is { Note: { } note } snap && snap.Value >= row.Min && snap.Value <= row.Max)
+        {
+            bool noteChanged = note != Note;
+            Note = note;
+            if (Math.Abs(snap.Value - row.Get()) < 1e-9) return noteChanged;
+            row.Set(snap.Value);
+            Picked?.Clamp();
+            return true;
+        }
+        bool hadNote = Note is not null;
+        Note = null;
+        return SetValue(row, value) || hadNote;
     }
 
     private bool SetValue(VrEditorRow row, double value)

@@ -200,6 +200,9 @@ internal sealed class LiveryPictures
         return files;
     }
 
+    internal static Task<byte[]> RenderAsync(string dir, string paint, CancellationToken cancel = default) =>
+        Http.GetByteArrayAsync(Service + Encode(Query(dir, paint, null, null, null)), cancel);
+
     internal static SessionInfo? Session(string path)
     {
         try

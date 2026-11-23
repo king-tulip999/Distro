@@ -15,7 +15,8 @@ public sealed class MonitorLayoutView : FrameworkElement
 
     private static Brush TileFill => ThemeManager.Brush("TileRaised", Brushes.WhiteSmoke);
     private static Brush TileStroke => ThemeManager.Brush("TileEdge", Brushes.LightGray);
-    private static Brush PrimaryStroke => ThemeManager.Brush("Accent", Brushes.SlateBlue);
+    private static Brush BadgeFill => ThemeManager.Brush("Accent", Brushes.SlateBlue);
+    private static Brush BadgeText => ThemeManager.Brush("OnAccent", Brushes.Black);
     private static Brush TextBrush => ThemeManager.Brush("Text", Brushes.Black);
     private static Brush DetailBrush => ThemeManager.Brush("TextMuted", Brushes.Gray);
     private const double MinLabelHeight = 22;
@@ -75,7 +76,7 @@ public sealed class MonitorLayoutView : FrameworkElement
             var edge = new Rect(r.X + half, r.Y + half, Math.Max(0, r.Width - 2 * half), Math.Max(0, r.Height - 2 * half));
             dc.DrawGeometry(TileFill, _tilePen, Tile.Shape(edge, default));
             if (t.Primary)
-                dc.DrawRectangle(PrimaryStroke, null, new Rect(r.X, r.Y, r.Width, Math.Min(Snap(3), r.Height)));
+                DrawMainBadge(dc, r, dpi);
             if (r.Height < MinLabelHeight || string.IsNullOrEmpty(t.Label))
                 continue;
 
@@ -115,6 +116,20 @@ public sealed class MonitorLayoutView : FrameworkElement
             var r = new Rect(ox + (target.X - minX) * scale + 1, oy + (target.Y - minY) * scale + 1, Math.Max(2, target.Width * scale - 2), Math.Max(2, target.Height * scale - 2));
             dc.DrawRectangle(fill, _targetPen, r);
         }
+    }
+
+    private static void DrawMainBadge(DrawingContext dc, Rect tile, double dpi)
+    {
+        double size = Math.Clamp(tile.Height * 0.16, 9, 12);
+        var text = new FormattedText("Main", CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, ThemeManager.UiFace(bold: true), size, BadgeText, dpi);
+        double inset = Math.Min(5, tile.Height * 0.06), padX = size * 0.55, height = Math.Round(text.Height + size * 0.35);
+        double width = text.Width + padX * 2;
+        if (width + inset * 2 > tile.Width || height + inset * 2 > tile.Height)
+            return;
+        var box = new Rect(Math.Round(tile.X + inset), Math.Round(tile.Y + inset), Math.Round(width), height);
+        double corner = ThemeManager.Round(4).TopLeft;
+        dc.DrawRoundedRectangle(BadgeFill, null, box, corner, corner);
+        dc.DrawText(text, new Point(box.X + (box.Width - text.Width) / 2, box.Y + (box.Height - text.Height) / 2));
     }
 
     private static Pen Frozen(Pen? cached, Brush brush, double thickness)

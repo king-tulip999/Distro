@@ -44,6 +44,11 @@ internal static class PerfProbe
             await Rendered(window);
             Put("startup_ms", (DateTime.Now - me.StartTime).TotalMilliseconds);
             foreach (var (name, ms) in Marks) Put($"startup_{name}_ms", ms);
+            if (OnlyPage is { } only)
+            {
+                await PageOnly(window, only, lines);
+                return;
+            }
             await Task.Delay(3000);
             await Idle("idle_main", window, lines);
             await InvalidElements("main", window, lines);
@@ -223,9 +228,123 @@ internal static class PerfProbe
         finally
         {
             lines.AddRange(HitchWatch.Report(HitchWatch.Take()).Select(l => "# hitch " + l));
-            lines.AddRange(PerfBudget.Check(lines, PerfBudget.Read()));
+            if (OnlyPage is null) lines.AddRange(PerfBudget.Check(lines, PerfBudget.Read()));
             System.IO.File.AppendAllLines(file, lines);
             Application.Current.Shutdown();
+        }
+    }
+
+    private static string? OnlyPage => Environment.GetCommandLineArgs() is var args && Array.FindIndex(args, a => a.Equals("--perf-page", StringComparison.OrdinalIgnoreCase)) is int at and >= 0 && at + 1 < args.Length ? args[at + 1] : null;
+
+    private static async Task PageOnly(MainWindow window, string key, List<string> lines)
+    {
+        var me = Process.GetCurrentProcess();
+        string from = window.NavKeys.First(k => k != key);
+        HitchWatch.WatchFrames(true);
+        foreach (var pass in new[] { "first", "again" })
+        {
+            window.Navigate(from);
+            await Rendered(window);
+            await Task.Delay(1500);
+            var opened = new TaskCompletionSource();
+            var input = LongestInputWait(window, opened.Task);
+            await Task.Delay(50);
+            var clock = Stopwatch.StartNew();
+            double firstFrame = 0;
+            void OnFirstFrame(object? s, EventArgs e) { CompositionTarget.Rendering -= OnFirstFrame; firstFrame = clock.Elapsed.TotalMilliseconds; }
+            CompositionTarget.Rendering += OnFirstFrame;
+            _stage = $"open {pass} {key}";
+            window.Navigate(key);
+            await Rendered(window);
+            Put($"open_{pass}_{key}_first_frame_ms", firstFrame);
+            Put($"open_{pass}_{key}_ms", clock.Elapsed.TotalMilliseconds);
+            opened.SetResult();
+            Put($"open_{pass}_{key}_input_wait_ms", await input);
+            me.Refresh();
+            Put($"open_{pass}_{key}_private_mb", me.PrivateMemorySize64 / 1048576.0);
+            _stage = $"settle {pass} {key}";
+            await Task.Delay(6000);
+        }
+        _stage = "idle " + key;
+        await Idle($"idle_{key}", window, lines);
+        await InvalidElements(key, window, lines);
+        Motion.SetWindowActive(false, force: true);
+        await Task.Delay(2500);
+        await Idle($"idle_{key}_unfocused", window, lines);
+        Motion.SetWindowActive(true, force: true);
+        _stage = "theme switch " + key;
+        var original = Theme.ThemeManager.Current.Id;
+        foreach (var theme in Theme.Themes.All.Where(t => t.Id != original).Append(Theme.ThemeManager.Current))
+        {
+            var clock = Stopwatch.StartNew();
+            AppServices.Current!.SwitchThemeUnsaved(theme.Id);
+            await Rendered(window);
+            Put($"theme_switch_{theme.Id}_shown_ms", clock.Elapsed.TotalMilliseconds);
+            await Task.Delay(300);
+        }
+        window.Navigate(from);
+        await Task.Delay(3000);
+        _stage = "left " + key;
+        await Idle($"idle_after_{key}", window, lines);
+        window.Hide();
+        await Task.Delay(4000);
+        _stage = "hidden";
+        await Idle("idle_hidden", window, lines);
+        var hiddenChildren = new ChildProcesses(me.Id);
+        Put("hidden_child_processes", hiddenChildren.Count);
+        Put("hidden_child_private_mb", hiddenChildren.PrivateMb);
+        window.TrimWhileHidden();
+        await Task.Delay(5000);
+        _stage = "hidden trimmed";
+        await Idle("idle_hidden_trimmed", window, lines);
+        HitchWatch.WatchFrames(false);
+        me.Refresh();
+        Put("private_mb", me.PrivateMemorySize64 / 1048576.0);
+        Put("managed_heap_mb", GC.GetTotalMemory(false) / 1048576.0);
+        Put("threads", me.Threads.Count);
+        Put("handles", me.HandleCount);
+        var children = new ChildProcesses(me.Id);
+        Put("trimmed_child_processes", children.Count);
+        Put("trimmed_child_private_mb", children.PrivateMb);
+
+        void Put(string name, double value) => lines.Add($"{name} {value:0.0}");
+    }
+
+    private sealed class ChildProcesses
+    {
+        public int Count { get; }
+        public double PrivateMb { get; }
+
+        public ChildProcesses(int parent)
+        {
+            var seen = new HashSet<int> { parent };
+            var all = Process.GetProcesses();
+            try
+            {
+                var parents = new Dictionary<int, int>();
+                using (var search = new System.Management.ManagementObjectSearcher("SELECT ProcessId, ParentProcessId FROM Win32_Process"))
+                using (var results = search.Get())
+                    foreach (var row in results)
+                        using (row)
+                            parents[Convert.ToInt32(row["ProcessId"], System.Globalization.CultureInfo.InvariantCulture)] = Convert.ToInt32(row["ParentProcessId"], System.Globalization.CultureInfo.InvariantCulture);
+                bool grew = true;
+                while (grew)
+                {
+                    grew = false;
+                    foreach (var (id, owner) in parents)
+                        if (seen.Contains(owner) && seen.Add(id)) grew = true;
+                }
+                foreach (var process in all)
+                    if (process.Id != parent && seen.Contains(process.Id))
+                    {
+                        Count++;
+                        try { PrivateMb += process.PrivateMemorySize64 / 1048576.0; } catch (InvalidOperationException) { }
+                    }
+            }
+            finally
+            {
+                foreach (var process in all) process.Dispose();
+            }
         }
     }
 

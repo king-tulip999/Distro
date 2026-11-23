@@ -99,6 +99,8 @@ internal sealed class IncidentsWidget : HudWidget
 
     private static float RowHeight(HudPainter p) => 10 * p.Density + p.LineHeight(p.Font(13f, true));
 
+    private static readonly string[] BudgetParts = { "total", "cells", "list" };
+
     private void DrawBudget(HudPainter p, HudView v)
     {
         float d = p.Density;
@@ -107,8 +109,10 @@ internal sealed class IncidentsWidget : HudWidget
         int total = Total(v);
         int? limit = Limit(v);
         float bigPx = 40f, bigH = p.DisplaySize("0", bigPx).Height, cellH = 14 * d, rowH = RowHeight(p);
-        float top = area.Y + 4 * d;
         p.NeedBelow(area, 4 * d + bigH + 10 * d + cellH + 12 * d + rowH * BudgetRows);
+        Span<RectangleF> boxes = stackalloc RectangleF[3];
+        p.Arrange(v, "incidents.budget", area, false, 0, BudgetParts, stackalloc float[] { 4 * d + bigH + 10 * d, cellH + 12 * d, 0 }, boxes);
+        float top = boxes[0].Y + 4 * d;
 
         var state = IncidentBudget.State(total, limit);
         string big = v.Frame.Incidents is { } inc ? PooledText.Number("", inc, "x") : RaceFormat.Missing;
@@ -131,18 +135,18 @@ internal sealed class IncidentsWidget : HudWidget
         float sideCap = sideFont.Size * 0.72f;
         p.Text(side, sideFont, state == BudgetState.Over ? p.P.DangerText : p.P.Muted, new RectangleF(x, baseY - sideCap / 2 - p.LineHeight(sideFont) / 2, Math.Max(0, area.Right - x), p.LineHeight(sideFont)), HAlign.Right, VAlign.Center);
 
-        float cy = top + bigH + 10 * d;
-        DrawCells(p, v, list, total, limit, new RectangleF(area.X, cy, area.Width, cellH));
+        DrawCells(p, v, list, total, limit, new RectangleF(area.X, boxes[1].Y, area.Width, cellH));
 
-        float y = cy + cellH + 12 * d;
+        var rows = boxes[2];
+        float y = rows.Y;
         var font = p.Font(13f, true);
-        if (list.Count == 0) { Empty(p, new RectangleF(area.X, y, area.Width, Math.Max(rowH, area.Bottom - y))); return; }
+        if (list.Count == 0) { Empty(p, new RectangleF(area.X, y, area.Width, Math.Max(rowH, rows.Bottom - y))); return; }
         float gap = 8 * d, timeW = 52 * d, lapW = 34 * d;
         var clip = p.G.Save();
-        p.G.SetClip(new RectangleF(area.X, y, area.Width, Math.Max(0, area.Bottom - y)));
+        p.G.SetClip(new RectangleF(area.X, y, area.Width, Math.Max(0, rows.Bottom - y)));
         for (int n = 0, i = list.Count - 1; i >= 0 && n < BudgetRows; i--, n++)
         {
-            if (y + rowH > area.Bottom + 1) break;
+            if (y + rowH > rows.Bottom + 1) break;
             var e = list[i];
             var r = new RectangleF(area.X, y + Slide(p, v, e), area.Width, rowH);
             p.Line(area.X, MathF.Round(y) + 0.5f, area.Right, MathF.Round(y) + 0.5f, p.P.Line, 1);
@@ -252,6 +256,8 @@ internal sealed class IncidentsWidget : HudWidget
         p.G.Restore(clip);
     }
 
+    private static readonly string[] LineParts = { "ring", "last", "counts" };
+
     private void DrawLine(HudPainter p, HudView v)
     {
         float d = p.Density, ring = 56 * d, pad = 12 * d;
@@ -263,7 +269,14 @@ internal sealed class IncidentsWidget : HudWidget
         int? limit = Limit(v);
         var state = IncidentBudget.State(total, limit);
         float cy = area.Y + area.Height / 2;
-        var ringBox = new RectangleF(area.X + 2 * d + 2.5f * d, cy - ring / 2 + 2.5f * d, ring - 5 * d, ring - 5 * d);
+        const float numFont = 20f;
+        var unitFont = p.Font(13f, true);
+        float colW = Math.Max(p.DisplaySize("000", numFont).Width, p.Measure("4x", unitFont)) + 2 * d;
+        float countsW = colW * 3 + 10 * d * 2;
+        Span<RectangleF> boxes = stackalloc RectangleF[3];
+        p.Arrange(v, "incidents.line", area, true, 0, LineParts, stackalloc float[] { 2 * d + ring + 14 * d, 0, 14 * d + countsW }, boxes);
+        float ringX = boxes[0].X;
+        var ringBox = new RectangleF(ringX + 2 * d + 2.5f * d, cy - ring / 2 + 2.5f * d, ring - 5 * d, ring - 5 * d);
         p.G.DrawEllipse(p.Pen(HudPalette.Alpha(p.P.Text, 20), 5 * d), ringBox);
         double target = limit is { } lim ? Math.Min(1, total / (double)lim) : total > 0 ? 1 : 0;
         if (double.IsNegativeInfinity(_ringAt))
@@ -280,13 +293,9 @@ internal sealed class IncidentsWidget : HudWidget
         double shown = p.ReducedMotion ? target : RingShown(v.Now);
         var ringColor = state switch { BudgetState.Over => p.P.Danger, BudgetState.Warn => p.P.Warn, _ => p.P.Good };
         if (shown > 0.002) p.G.DrawArc(p.Pen(ringColor, 5 * d), ringBox, -90, (float)(360 * shown));
-        p.Display(v.Frame.Incidents is { } inc ? PooledText.Number("", inc) : RaceFormat.Missing, 17f, p.P.Heading, new RectangleF(area.X + 2 * d, cy - ring / 2, ring, ring), HAlign.Center, VAlign.Center);
+        p.Display(v.Frame.Incidents is { } inc ? PooledText.Number("", inc) : RaceFormat.Missing, 17f, p.P.Heading, new RectangleF(ringX + 2 * d, cy - ring / 2, ring, ring), HAlign.Center, VAlign.Center);
 
-        const float numFont = 20f;
-        var unitFont = p.Font(13f, true);
-        float colW = Math.Max(p.DisplaySize("000", numFont).Width, p.Measure("4x", unitFont)) + 2 * d;
-        float countsW = colW * 3 + 10 * d * 2;
-        float countsX = area.Right - countsW;
+        float countsX = boxes[2].X + 14 * d;
         float numH = p.DisplaySize("0", numFont).Height, unitH = p.LineHeight(unitFont), stack = numH + 3 * d + unitH;
         Span<int> kinds = stackalloc[] { 1, 2, 4 };
         for (int k = 0; k < 3; k++)
@@ -298,8 +307,8 @@ internal sealed class IncidentsWidget : HudWidget
             p.Text(PooledText.Number("", kinds[k], "x"), unitFont, p.P.Muted, new RectangleF(cx, cy - stack / 2 + numH + 3 * d, colW, unitH), HAlign.Center, VAlign.Top, false);
         }
 
-        float lx = area.X + 2 * d + ring + 14 * d;
-        float lineRight = countsX - 14 * d;
+        float lx = boxes[1].X;
+        float lineRight = boxes[1].Right;
         p.Line(MathF.Round(lx) + 0.5f, cy - ring / 2 + 4 * d, MathF.Round(lx) + 0.5f, cy + ring / 2 - 4 * d, p.P.LineStrong, 1);
         float tx = lx + 14 * d, tw = Math.Max(0, lineRight - tx);
         var kFont = p.Font(11f, true);
@@ -334,6 +343,8 @@ internal sealed class IncidentsWidget : HudWidget
         return _ringFrom + (_ringTo - _ringFrom) * k;
     }
 
+    private static readonly string[] TimelineParts = { "timeline", "summary" };
+
     private void DrawTimeline(HudPainter p, HudView v)
     {
         float d = p.Density;
@@ -347,7 +358,9 @@ internal sealed class IncidentsWidget : HudWidget
         double? avg = LapMath.Stats(v.Race.Laps.Laps, 5)?.Average;
         double span = IncidentBudget.Span(f.CurrentSession?.Laps, f.SessionTimeTotal, avg, now);
         int sectors = Math.Max(1, v.Race.Laps.SectorCount);
-        var tl = new RectangleF(area.X + 4 * d, area.Y + 8 * d, area.Width - 8 * d, tlH);
+        Span<RectangleF> boxes = stackalloc RectangleF[2];
+        p.Arrange(v, "incidents.timeline", area, false, 0, TimelineParts, stackalloc float[] { 8 * d + tlH + 4 * d, 0 }, boxes);
+        var tl = new RectangleF(area.X + 4 * d, boxes[0].Y + 8 * d, area.Width - 8 * d, tlH);
         float axisY = tl.Y + 62 * d;
         var (start, length) = IncidentBudget.TimelineWindow(span, now);
         float X(double laps) => tl.X + (float)((laps - start) / length * tl.Width);
@@ -389,7 +402,7 @@ internal sealed class IncidentsWidget : HudWidget
         p.Fill(new RectangleF(nx - d, axisY - 8 * d, 2 * d, 18 * d), p.P.Heading, d);
         p.G.Restore(clip);
 
-        float sy = tl.Bottom + 4 * d;
+        float sy = boxes[1].Y;
         p.Line(area.X, MathF.Round(sy) + 0.5f, area.Right, MathF.Round(sy) + 0.5f, p.P.Line, 1);
         var row = new RectangleF(area.X, sy + 8 * d, area.Width, p.LineHeight(sumFont));
         string count = RaceFormat.Count(list.Count, "incident");

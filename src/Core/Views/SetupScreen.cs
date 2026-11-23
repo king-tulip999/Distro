@@ -1,8 +1,10 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Core.Controls;
 using Core.Grr;
+using Core.LiveryShop;
 using Core.Services;
 using Core.Theme;
 
@@ -138,22 +140,6 @@ internal sealed class SetupScreen : UserControl
         return cards;
     }
 
-    private FrameworkElement OpenOn()
-    {
-        var u = _app.Config.Ui;
-        var pages = _app.NavPages().Prepend((Key: Config.UiSettings.LastUsedPage, Title: "Last page used")).ToList();
-        var pick = new ComboBox { MinWidth = 180, VerticalAlignment = VerticalAlignment.Center };
-        foreach (var (key, title) in pages) pick.Items.Add(new ComboBoxItem { Content = title, Tag = key });
-        pick.SelectedIndex = Math.Max(0, pages.FindIndex(p => p.Key == u.StartPage));
-        pick.SelectionChanged += (_, _) =>
-        {
-            if (pick.SelectedItem is ComboBoxItem { Tag: string key }) { u.StartPage = key; _app.Save(); }
-        };
-        var label = Compact(new TextBlock { Text = "Open on", FontSize = 14, VerticalAlignment = VerticalAlignment.Center });
-        DockPanel.SetDock(pick, Dock.Right);
-        return new DockPanel { Margin = new Thickness(2, 10, 0, 0), Children = { pick, label } };
-    }
-
     private FrameworkElement IracingOptions()
     {
         var rows = new StackPanel();
@@ -164,15 +150,33 @@ internal sealed class SetupScreen : UserControl
             _app.Save();
             _app.Plugins.RaiseChanged();
         });
+        var livery = _app.Config.LiveryShop;
+        Add(rows, "Livery Shop page", "Paint your iRacing car, helmet and suit, saved straight into iRacing.", livery.ShowPage, true, on =>
+        {
+            livery.ShowPage = on;
+            _app.Save();
+            _app.Plugins.RaiseChanged();
+        });
         var sim = _app.Config.SimRacing;
-        var plugin = _app.Plugins.Find(Plugins.PluginIds.SimRacing) as Plugins.BuiltIn.SimRacingPlugin;
-        Add(rows, "Trading Paints with iRacing", "Starts the Trading Paints Downloader when iRacing starts.", sim.TradingPaints.LaunchWithIracing, true,
-            on => { sim.TradingPaints.LaunchWithIracing = on; _app.Save(); plugin?.TradingPaints?.UpdateWatch(); });
-        Add(rows, "Garage 61 with iRacing", "Starts the Garage 61 Telemetry Agent when iRacing starts.", sim.Garage61.LaunchWithIracing, true,
-            on => { sim.Garage61.LaunchWithIracing = on; _app.Save(); plugin?.Garage61?.UpdateWatch(); });
-        var hud = sim.Hud;
-        Add(rows, "Browser sources", "Overlay widgets as pages on this PC, for streaming software or a wheel screen.", hud.WebOverlays, true,
-            on => { hud.WebOverlays = on; _app.Save(); plugin?.Hud?.SyncWeb(); });
+        Add(rows, "Sim Racing Tools page", "FOV, iRacing controls, setups and companion apps.", sim.ShowPage, true, on =>
+        {
+            sim.ShowPage = on;
+            _app.Save();
+            _app.Plugins.RaiseChanged();
+        });
+        Add(rows, "iRacing Overlay page", "Widgets drawn over iRacing: standings, relative, fuel, inputs and more.", sim.Hud.ShowPage, true, on =>
+        {
+            sim.Hud.ShowPage = on;
+            _app.Save();
+            _app.Plugins.RaiseChanged();
+        });
+        var stats = _app.Config.SessionStats;
+        Add(rows, "Session Stats page", "Your laps, sessions and pace from iRacing.", stats.ShowPage, true, on =>
+        {
+            stats.ShowPage = on;
+            _app.Save();
+            _app.Plugins.RaiseChanged();
+        });
         return rows;
     }
 
@@ -241,10 +245,55 @@ internal sealed class SetupScreen : UserControl
         Option("Start with Windows", _app.Demo ? "Not in demo mode." : $"{AppIdentity.Name} opens when you sign in.", _startup?.Enabled == true, !_app.Demo && _startup is not null, on => _ = SetStartupAsync(on));
         Option("Start in background", "Opens in the tray.", u.StartMinimized, true, on => { u.StartMinimized = on; _app.Save(); });
         Option("Close in background", $"The close button hides {AppIdentity.Name} to the tray.", u.CloseToTray, true, on => { u.CloseToTray = on; _app.Save(); });
-        rows.Children.Add(OpenOn());
+        rows.Children.Add(InstallFolder());
         return rows;
 
         void Option(string title, string caption, bool on, bool enabled, Action<bool> changed) => Add(rows, title, caption, on, enabled, changed);
+    }
+
+    private FrameworkElement InstallFolder()
+    {
+        string? exe = Environment.ProcessPath;
+        string here = exe is null ? "" : Path.GetDirectoryName(exe) ?? "";
+        bool canMove = !_app.Demo && exe is not null && UpdateService.CanSelfInstall;
+        var path = TextFit.TipWhenTrimmed(new TextBlock
+        {
+            Text = _app.Demo ? "Not in demo mode." : here, Style = Ui.Res<Style>("Caption"),
+            TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 2, 0, 0),
+        });
+        path.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        var label = Compact(new TextBlock { Text = "Install folder", FontSize = 14 });
+        var move = new Button { Content = "Move…", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0), IsEnabled = canMove };
+        move.Click += async (_, _) =>
+        {
+            if (exe is null || !External.Allowed("folder dialog")) return;
+            var dialog = new Microsoft.Win32.OpenFolderDialog { Title = $"Where to install {AppIdentity.Name}", InitialDirectory = Path.GetDirectoryName(AppHome.Folder) };
+            if (dialog.ShowDialog() != true) return;
+            string folder = AppHome.InstallFolderFor(dialog.FolderName);
+            if (AppHome.PassesThrough(folder))
+            {
+                _app.Notify("Pick another folder", "Downloads and temporary folders get cleaned up.", NoticeKind.Warning);
+                return;
+            }
+            if (!External.Allowed($"move {AppIdentity.Name}")) return;
+            move.IsEnabled = false;
+            string? target = null, failure = null;
+            await Task.Run(() =>
+            {
+                try { target = AppHome.Move(folder); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { failure = ex.Message; }
+            });
+            if (target is null)
+            {
+                _app.Notify($"Couldn't move {AppIdentity.Name}", failure ?? "", NoticeKind.Warning);
+                move.IsEnabled = true;
+                return;
+            }
+            _app.Save();
+            App.RelaunchAfterExit("", AppHome.RemoveSteps(exe), target);
+        };
+        DockPanel.SetDock(move, Dock.Right);
+        return new DockPanel { Margin = new Thickness(2, 10, 0, 0), Children = { move, new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { label, path } } } };
     }
 
     private async Task LoadStartupAsync()

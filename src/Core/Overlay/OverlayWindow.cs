@@ -66,6 +66,8 @@ internal class OverlayWindow : Form
 
     public IntPtr SurfaceDc => _surface.Dc;
 
+    public IntPtr SurfaceBits => _surface.Bits;
+
     public Graphics Surface(Size size) => _surface.Ensure(size);
 
     public void ReleaseSurface()

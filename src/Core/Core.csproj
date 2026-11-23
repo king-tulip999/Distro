@@ -2,7 +2,9 @@
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>bin/$(Configuration)/net10.0-windows/</OutputPath>
     <!-- WPF for the main window; WinForms only for the tray icon, global hotkeys and the GDI+ overlay. -->
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
@@ -48,6 +50,10 @@
     <EmbeddedResource Include="SimRacing\IracingFiles\catalog.json" />
     <EmbeddedResource Include="SimRacing\IracingFiles\demo-values.json" />
     <EmbeddedResource Include="SimRacing\Hud\Web\Pages\*" LogicalName="web/%(Filename)%(Extension)" />
+    <!-- Livery Shop: the paint editor page, shown in a WebView2 (LiveryShop/LiveryShopPage.cs). -->
+    <EmbeddedResource Include="LiveryShop\Web\**" LogicalName="livery-shop/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="LiveryShop\LiveryMonkey.js" LogicalName="livery-monkey.js" />
+    <EmbeddedResource Include="LiveryShop\CarTemplates.txt" LogicalName="livery-car-templates.txt" />
     <EmbeddedResource Include="Assets\TrackMaps.zip" LogicalName="TrackMaps.zip" Condition="Exists('Assets\TrackMaps.zip')" />
     <!-- OpenXR layer that shows VR widgets in OpenXR games (built by devtools\tools\vr-layer.cmd from src\VrLayer). -->
     <EmbeddedResource Include="Assets\VelocitaXr.dll" LogicalName="VelocitaXr.dll" Condition="Exists('Assets\VelocitaXr.dll')" />
@@ -74,6 +80,8 @@
     <PackageReference Include="Vortice.Direct2D1" Version="3.8.3" />
     <!-- Direct3D 11: the textures VR widgets are handed to SteamVR in. -->
     <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <!-- WebView2 (Edge, part of Windows 11): hosts the Livery Shop editor page. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4370.26" />
   </ItemGroup>
 
 </Project>

@@ -75,7 +75,7 @@ internal sealed class WindowProfileService : IDisposable
         var members = S.Members(group).ToList();
         if (members.Count == 0)
         {
-            _app.Notify($"“{group.Name}” is empty", "Add profiles to the group first.", NoticeKind.Info);
+            _app.Notify($"“{group.Name}” is empty", "Add placements to the group first.", NoticeKind.Info);
             return;
         }
         await ApplyRunningAsync(members, $"“{group.Name}”");
@@ -124,7 +124,7 @@ internal sealed class WindowProfileService : IDisposable
         WindowApplyResult.NotRunning => $"{p.ProcessName} isn't running.",
         WindowApplyResult.NoWindow => $"{p.ProcessName} is running but has no window yet.",
         WindowApplyResult.AccessDenied => $"Windows didn't let Tecnica move {p.ProcessName}'s window.",
-        _ => $"{p.ProcessName}'s window didn't end up where the profile says. Some games resize themselves; try a longer delay, or borderless in the game's settings.",
+        _ => $"{p.ProcessName}'s window didn't end up where the placement says. Some games resize themselves; try a longer delay, or borderless in the game's settings.",
     };
 
     public async Task<WindowApplyResult> ApplyAsync(WindowProfile profile, bool quiet = false, bool retry = true, bool watch = true)

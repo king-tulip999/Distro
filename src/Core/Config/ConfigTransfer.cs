@@ -95,8 +95,8 @@ internal static class ConfigTransfer
         var lines = new List<string>
         {
             $"Theme {ThemeName(c.Ui.Theme)}, animations {(c.Ui.Animations ? "on" : "off")}",
-            SimRacing.Race.RaceFormat.Count(c.WindowProfiles.Profiles.Count, "window profile") + $" ({c.WindowProfiles.Profiles.Count(p => p.Auto)} automatic), {SimRacing.Race.RaceFormat.Count(c.WindowProfiles.Groups.Count, "group")}",
-            SimRacing.Race.RaceFormat.Count(c.Displays.Profiles.Count, "display profile"),
+            SimRacing.Race.RaceFormat.Count(c.WindowProfiles.Profiles.Count, "window placement") + $" ({c.WindowProfiles.Profiles.Count(p => p.Auto)} automatic), {SimRacing.Race.RaceFormat.Count(c.WindowProfiles.Groups.Count, "group")}",
+            SimRacing.Race.RaceFormat.Count(c.Displays.Profiles.Count, "display setup"),
             $"Fan control {(c.Fans.Enabled ? "on" : "off")}: {SimRacing.Race.RaceFormat.Count(c.Fans.Presets.Count, "preset")}, {SimRacing.Race.RaceFormat.Count(c.Fans.Curves.Count, "curve")}, {SimRacing.Race.RaceFormat.Count(c.Fans.Hardware.Count, "fan")} set up",
             SimRacing.Race.RaceFormat.Count(c.Overlay.Layouts.Count, "overlay layout"),
             SimRacing.Race.RaceFormat.Count(Keybinds(c), "keybind"),

@@ -1,3 +1,4 @@
+using Core.LiveryShop;
 using Core.Config;
 using Core.Grr;
 
@@ -151,7 +152,9 @@ internal static class DemoData
         fans.Presets.Add(Preset("Default", 0));
         fans.Presets.Add(Preset("Race", 85));
         fans.ActivePreset = "Default";
+        fans.CoolingTest = CoolingTest();
         config.Grr.ShowPage = true;
+        config.LiveryShop.ShowPage = true;
         fans.Normalize();
         var hud = config.SimRacing.Hud;
         hud.Normalize(SimRacing.Hud.HudPresets.DefaultLayouts, SimRacing.Hud.HudPresets.DefaultRules);
@@ -160,6 +163,51 @@ internal static class DemoData
         hud.Remember("GTP", "Porsche 963 GTP", "Daytona International Speedway");
         hud.Remember("GT3", "BMW M4 GT3", "Autodromo Nazionale Monza");
         return config;
+    }
+
+    internal static CoolingTestResult CoolingTest()
+    {
+        const string cpu = "/amdcpu/0/temperature/2", gpu = "/gpu-amd/0/temperature/0";
+        var result = new CoolingTestResult
+        {
+            Date = new DateTime(2026, 11, 22, 21, 14, 0), CpuLoaded = true, GpuLoaded = true, LimitC = 90,
+            Sensors =
+            {
+                new CoolingSensor { Id = cpu, Name = "CPU", Idle = 46.2f, IdlePower = 38 },
+                new CoolingSensor { Id = gpu, Name = "GPU", Gpu = true, Idle = 44.8f, IdlePower = 31 },
+            },
+        };
+        CoolingStep Step(int percent, double cpuFan, double gpuFan, double caseFan) => new()
+        {
+            Percent = percent, Settled = true, Predicted = percent is 70 or 30, CpuPower = 118, GpuPower = 352,
+            Temps =
+            {
+                [cpu] = (float)Math.Round(48 + 48 * (0.62 + 0.38 * Math.Exp(-cpuFan / 26)) - 4.5 * caseFan / 100, 1),
+                [gpu] = (float)Math.Round(50 + 44 * (0.6 + 0.4 * Math.Exp(-gpuFan / 30)) - 6 * caseFan / 100, 1),
+            },
+        };
+        int[] steps = { 100, 70, 50, 30 };
+        int hold = Fans.CoolingTest.HoldPercent;
+        result.Groups.Add(new CoolingGroupResult { Name = "CPU", CurveName = "CPU", FanIds = { "/lpc/nct6798d/control/1" }, Floor = 20, Steps = steps.Select(p => Step(p, p, hold, hold)).ToList() });
+        result.Groups.Add(new CoolingGroupResult { Name = "GPU", CurveName = "GPU", FanIds = { "/gpu-amd/0/control/0" }, Floor = 20, Steps = steps.Select(p => Step(p, hold, p, hold)).ToList() });
+        result.Groups.Add(new CoolingGroupResult
+        {
+            Name = "Case", CurveName = "Case", FanIds = { "/lpc/nct6798d/control/2", "/lpc/nct6798d/control/3" }, Floor = 20,
+            Steps = steps.Select(p => Step(p, hold, hold, p)).ToList(),
+        });
+        return result;
+    }
+
+    internal static void SeedFanLearning(Dictionary<string, List<Fans.LearnedSample>> samples)
+    {
+        var list = new List<Fans.LearnedSample>();
+        var start = new DateTime(2026, 11, 23, 19, 0, 0);
+        for (int i = 0; i < 24; i++)
+        {
+            float predicted = 66 + i % 5;
+            list.Add(new Fans.LearnedSample { When = start.AddMinutes(i * 3), Power = 92 + i % 4 * 6, Percent = 52 + i % 3, Temp = predicted + 4.2f + (i % 3 - 1) * 0.4f, Predicted = predicted });
+        }
+        samples["CPU"] = list;
     }
 
     private static DisplaySnapshot Snapshot(string paths, params (string Name, string Key)[] monitors) => new()

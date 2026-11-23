@@ -132,12 +132,12 @@ internal sealed class ResultWidget : HudWidget
         var r = new Result(card, finish, shown, entrance, overall, tier, HudPalette.On(tier), RaceFormat.Name(card.Driver, v.Options.Choice("nameFormat")), v.Options.Columns("show"));
         string look = v.Options.Choice("look");
         var (panels, slope) = look switch { Banner => (6, 0.05f), Stamp => (4, 0.1f), Story => (5, 0.06f), _ => (4, 0.14f) };
-        p.SoftPanels(p.Bounds, HudPalette.Mix(p.P.Text, tier, BackdropTint), panels, slope, 12 * p.Density, v.Now);
+        p.SoftPanels(p.Bounds, p.P.Night ? HudPalette.Mix(p.P.Line, tier, BackdropTint) : HudPalette.Mix(p.P.Text, tier, BackdropTint), panels, slope, 12 * p.Density, v.Now);
         switch (look)
         {
             case Banner: DrawBanner(p, r); break;
-            case Stamp: DrawStamp(p, r); break;
-            case Story: DrawStory(p, r); break;
+            case Stamp: DrawStamp(p, v, r); break;
+            case Story: DrawStory(p, v, r); break;
             default: DrawCard(p, v, r); break;
         }
     }
@@ -185,7 +185,7 @@ internal sealed class ResultWidget : HudWidget
             if (rise <= 0) break;
             float h = Math.Max(2, area.Height * share) * rise;
             bool fastest = Math.Abs(time - best) < 0.0005;
-            var color = fastest ? p.P.Fastest : !clean ? HudPalette.Alpha(p.P.Danger, 170) : HudPalette.Alpha(p.P.Muted, 90);
+            var color = fastest ? p.P.Fastest : !clean ? HudPalette.Alpha(p.P.Danger, 170) : p.P.Night ? HudPalette.Alpha(p.P.Faint, 70) : HudPalette.Alpha(p.P.Muted, 90);
             var bar = new RectangleF(area.X + i * step, area.Bottom - h, Math.Max(1, step - gap), h);
             p.Fill(bar, color, 2);
             if (showTimes && h >= textH * 1.6f)
@@ -402,7 +402,9 @@ internal sealed class ResultWidget : HudWidget
         }
     }
 
-    private static void DrawStamp(HudPainter p, Result r)
+    private static readonly string[] StampBlocks = { "position", "stats", "consistency", "strip" };
+
+    private static void DrawStamp(HudPainter p, HudView v, Result r)
     {
         var card = r.Card;
         var b = p.Bounds;
@@ -411,22 +413,26 @@ internal sealed class ResultWidget : HudWidget
         var label = p.Font(10.5f * k, true);
         string pos = RaceFormat.Pos(r.Shown);
         float fullH = p.DisplaySize("P8", 100 * k).Height, block = 2 * pad + fullH;
-        p.Fill(new RectangleF(0, 0, w, block), r.Tier);
+        Span<RectangleF> boxes = stackalloc RectangleF[4];
+        p.Arrange(v, "result.stamp", new RectangleF(0, 0, w, Math.Max(0, b.Height - pad)), false, 0, StampBlocks, stackalloc float[] { block, 52 * k, 20 * k, 0 }, boxes);
+        float by = boxes[0].Y, sy = boxes[1].Y, cy = boxes[2].Y + 10 * k;
+        var stripBox = boxes[3];
+        p.Fill(new RectangleF(0, by, w, block), r.Tier);
         float room = colX - 10 * k - 2 * pad, px = 100 * k;
         float posW = p.DisplaySize(pos, px).Width;
         if (posW > room) px *= room / posW;
-        p.Display(pos, px, r.Ink, new RectangleF(pad - 2 * k, 0, room + 2 * k, block), HAlign.Left, VAlign.Center);
-        p.Fill(new RectangleF(colX - 10 * k, pad, 1, block - 2 * pad), HudPalette.Alpha(r.Ink, 77));
+        p.Display(pos, px, r.Ink, new RectangleF(pad - 2 * k, by, room + 2 * k, block), HAlign.Left, VAlign.Center);
+        p.Fill(new RectangleF(colX - 10 * k, by + pad, 1, block - 2 * pad), HudPalette.Alpha(r.Ink, 77));
         float lh = p.LineHeight(label);
         if (!r.Overall && r.Has("gain") && r.Gained is { } gained)
         {
-            Label(p, "Gained", colX, pad + 3 * k, 80 * k, r.Ink, label);
-            Number(p, Gain(gained), 26 * k, r.Ink, colX, pad + 26 * k, 80 * k);
-            Label(p, $"{RaceFormat.Pos(card.Start ?? 0)} to {RaceFormat.Pos(card.Finish)}", colX, pad + 47 * k, 80 * k, r.Ink, label);
+            Label(p, "Gained", colX, by + pad + 3 * k, 80 * k, r.Ink, label);
+            Number(p, Gain(gained), 26 * k, r.Ink, colX, by + pad + 26 * k, 80 * k);
+            Label(p, $"{RaceFormat.Pos(card.Start ?? 0)} to {RaceFormat.Pos(card.Finish)}", colX, by + pad + 47 * k, 80 * k, r.Ink, label);
         }
-        else if (r.Overall) Label(p, "Overall", colX, pad + 3 * k, 80 * k, r.Ink, label);
-        if (r.Has("ribbon") && card.Awards.Count > 0) Label(p, RaceResult.Name(card.Awards[0]), colX, block - pad - lh / 2 + 2 * k, 80 * k, r.Ink, label);
-        float ly = block + 18 * k, vy = block + 40 * k;
+        else if (r.Overall) Label(p, "Overall", colX, by + pad + 3 * k, 80 * k, r.Ink, label);
+        if (r.Has("ribbon") && card.Awards.Count > 0) Label(p, RaceResult.Name(card.Awards[0]), colX, by + block - pad - lh / 2 + 2 * k, 80 * k, r.Ink, label);
+        float ly = sy + 18 * k, vy = sy + 40 * k;
         float lapX = pad;
         if (r.Has("best"))
         {
@@ -444,7 +450,6 @@ internal sealed class ResultWidget : HudWidget
             Label(p, "Inc", w - pad, ly, 40 * k, p.P.Muted, label, HAlign.Right);
             Number(p, card.Incidents is { } inc ? inc + "x" : RaceFormat.Missing, 20 * k, p.P.Heading, w - pad, vy, 40 * k, HAlign.Right);
         }
-        float cy = block + 62 * k;
         if (r.Has("consistency"))
         {
             string grade = card.Consistency is { } g ? $"Consistency {g.ToString("0.0", CultureInfo.InvariantCulture)}%" : "Consistency " + RaceFormat.Missing;
@@ -452,35 +457,40 @@ internal sealed class ResultWidget : HudWidget
             Label(p, grade, pad, cy, gw + 4, p.P.Muted, label);
             if (card.Consistency is { } m) Meter(p, new RectangleF(pad + gw + 10 * k, cy - 3 * k, w - pad - (pad + gw + 10 * k), 6 * k), ConsistencyShare(m) * r.Grow, r.Tier, 8);
         }
-        if (r.Has("strip")) LapStrip(p, RectangleF.FromLTRB(pad, cy + 10 * k, w - pad, b.Height - pad), r);
+        if (r.Has("strip")) LapStrip(p, RectangleF.FromLTRB(pad, stripBox.Y, w - pad, stripBox.Bottom), r);
     }
 
-    private static void DrawStory(HudPainter p, Result r)
+    private static readonly string[] StoryBlocks = { "header", "chart", "stats" };
+
+    private static void DrawStory(HudPainter p, HudView v, Result r)
     {
         var card = r.Card;
         float k = Scale(p, 460, 272, out float ox, out float oy);
         float X(float v) => ox + v * k;
         float Y(float v) => oy + v * k;
         float W = 460;
+        Span<RectangleF> boxes = stackalloc RectangleF[3];
+        p.Arrange(v, "result.story", new RectangleF(X(0), Y(0), W * k, 272 * k), false, 0, StoryBlocks, stackalloc float[] { 70 * k, 148 * k, 0 }, boxes);
+        float hy = boxes[0].Y - Y(0), cdy = boxes[1].Y - Y(70), sdy = boxes[2].Y - Y(218);
         var label = p.Font(10.5f * k, true);
         string pos = RaceFormat.Pos(r.Shown);
         float blockW = Math.Max(76 * k, p.DisplaySize(pos, 44 * k).Width + 20 * k);
-        var block = new RectangleF(X(12), Y(12), blockW, 50 * k);
+        var block = new RectangleF(X(12), Y(12) + hy, blockW, 50 * k);
         p.Fill(block, r.Tier);
         p.Display(pos, 44 * k, r.Ink, block, HAlign.Center, VAlign.Center);
         float textX = block.Right + 12 * k, textW = X(W - 70) - textX;
         var nameFont = p.Font(20 * k, true);
-        if (r.Has("name")) p.Text(r.Name, nameFont, p.P.Heading, new RectangleF(textX, Y(26) - p.LineHeight(nameFont) / 2, textW, p.LineHeight(nameFont)), HAlign.Left, VAlign.Center);
+        if (r.Has("name")) p.Text(r.Name, nameFont, p.P.Heading, new RectangleF(textX, Y(26) + hy - p.LineHeight(nameFont) / 2, textW, p.LineHeight(nameFont)), HAlign.Left, VAlign.Center);
         var small = p.Font(12 * k, false);
         string carTrack = CarAndTrack(r);
-        if (carTrack.Length > 0) p.Text(carTrack, small, p.P.Muted, new RectangleF(textX, Y(48) - p.LineHeight(small) / 2, textW, p.LineHeight(small)), HAlign.Left, VAlign.Center);
+        if (carTrack.Length > 0) p.Text(carTrack, small, p.P.Muted, new RectangleF(textX, Y(48) + hy - p.LineHeight(small) / 2, textW, p.LineHeight(small)), HAlign.Left, VAlign.Center);
         if (!r.Overall && r.Has("gain") && r.Gained is { } gained)
         {
-            Number(p, Gain(gained), 38 * k, gained > 0 ? p.P.GoodText : gained < 0 ? p.P.DangerText : p.P.Muted, X(W - 12), Y(30), 70 * k, HAlign.Right);
-            Label(p, $"From {RaceFormat.Pos(card.Start ?? 0)}", X(W - 12), Y(56), 80 * k, p.P.Muted, label, HAlign.Right);
+            Number(p, Gain(gained), 38 * k, gained > 0 ? p.P.GoodText : gained < 0 ? p.P.DangerText : p.P.Muted, X(W - 12), Y(30) + hy, 70 * k, HAlign.Right);
+            Label(p, $"From {RaceFormat.Pos(card.Start ?? 0)}", X(W - 12), Y(56) + hy, 80 * k, p.P.Muted, label, HAlign.Right);
         }
 
-        var chart = new RectangleF(X(40), Y(82), (W - 52) * k, 120 * k);
+        var chart = new RectangleF(X(40), Y(82) + cdy, (W - 52) * k, 120 * k);
         var laps = card.Laps;
         if (laps.Count >= 2 && card.Best is { } best)
         {
@@ -540,8 +550,8 @@ internal sealed class ResultWidget : HudWidget
 
         void Stat(float x, string name, string value, HAlign align)
         {
-            Label(p, name, X(x), Y(230), 110 * k, p.P.Muted, label, align);
-            Number(p, value, 26 * k, p.P.Heading, X(x), Y(252), 110 * k, align);
+            Label(p, name, X(x), Y(230) + sdy, 110 * k, p.P.Muted, label, align);
+            Number(p, value, 26 * k, p.P.Heading, X(x), Y(252) + sdy, 110 * k, align);
         }
     }
 }

@@ -74,6 +74,14 @@ public sealed class CurveEditor : FrameworkElement
 
     public bool ReadOnly { get; init; }
 
+    private List<CurvePoint>? _ghost;
+
+    public void SetGhost(List<CurvePoint>? points)
+    {
+        _ghost = points;
+        Changed();
+    }
+
     public void SetPoints(List<CurvePoint> points)
     {
         _points = points;
@@ -267,6 +275,24 @@ public sealed class CurveEditor : FrameworkElement
             dc.DrawLine(t == 20 ? axisPen : gridPen, new Point(x, plot.Top), new Point(x, plot.Bottom));
             var text = Text($"{t} °C", 10.5, label, dpi);
             dc.DrawText(text, new Point(x - text.Width / 2, plot.Bottom + 5));
+        }
+
+        if (_ghost is { Count: > 0 })
+        {
+            var ghost = _ghost.OrderBy(p => p.Temp).ToList();
+            var gpts = new List<Point> { ToScreen(MinTemp, ghost[0].Percent) };
+            gpts.AddRange(ghost.Select(p => ToScreen(p.Temp, p.Percent)));
+            gpts.Add(ToScreen(MaxTemp, ghost[^1].Percent));
+            var ghostLine = new StreamGeometry();
+            using (var c = ghostLine.Open())
+            {
+                c.BeginFigure(gpts[0], false, false);
+                for (int i = 1; i < gpts.Count; i++) c.LineTo(gpts[i], true, true);
+            }
+            ghostLine.Freeze();
+            var ghostPen = new Pen(ThemeManager.Brush("TextMuted", Brushes.Gray), 1.6) { LineJoin = PenLineJoin.Round, DashStyle = new DashStyle(new double[] { 4, 3 }, 0) };
+            ghostPen.Freeze();
+            dc.DrawGeometry(null, ghostPen, ghostLine);
         }
 
         if (_points.Count == 0)

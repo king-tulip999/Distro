@@ -113,9 +113,28 @@ internal sealed class TimingWidget : HudWidget
         float barH = bar ? 7 * p.Density + 6 : 0, sectorH = sectors ? p.LineHeight(p.Small) + 10 : 0;
         bool wide = area.Width >= 300 * p.Density && fields.Count > 0;
         float topH = Math.Max(p.LineHeight(p.Big) + p.LineHeight(p.Label) + 10, area.Height - barH - sectorH - (wide ? 0 : p.BoxedStatHeight() + 4));
-        var top = area.Top(Math.Min(topH, area.Height), out var rest);
-        var deltaBlock = wide ? top.Left(top.Width * 0.42f, out var times) : top.Top(Math.Min(top.Height, p.LineHeight(p.Huge) + p.LineHeight(p.Label) + 10), out times);
-        if (!wide) times = rest.Top(Math.Min(rest.Height, p.BoxedStatHeight()), out rest);
+        float topSize = Math.Min(topH, area.Height);
+        float timesH = wide ? -1 : Math.Min(area.Height - topSize, p.BoxedStatHeight());
+        if (timesH <= 0) timesH = -1;
+        float below = area.Height - topSize - Math.Max(0, timesH);
+        float barSize = bar && below >= 7 * p.Density + 4 ? barH : -1;
+        bool showSectors = sectors && below - Math.Max(0, barSize) > p.LineHeight(p.Small) + 6;
+        Span<RectangleF> rows = stackalloc RectangleF[4];
+        p.Arrange(v, "fullStack", area, false, 0, FullStackParts, stackalloc float[] { topSize, timesH, barSize, showSectors ? 0 : -1 }, rows);
+        var top = rows[0];
+        RectangleF deltaBlock, times;
+        if (wide)
+        {
+            Span<RectangleF> topBoxes = stackalloc RectangleF[2];
+            p.Arrange(v, "full", top, true, 0, FullParts, stackalloc float[] { top.Width * 0.42f, 0 }, topBoxes);
+            deltaBlock = topBoxes[0];
+            times = topBoxes[1];
+        }
+        else
+        {
+            deltaBlock = top.Top(Math.Min(top.Height, p.LineHeight(p.Huge) + p.LineHeight(p.Label) + 10), out _);
+            times = rows[1];
+        }
         p.Region("delta", deltaBlock);
         var tint = d is null ? p.Raised(0.05) : HudPalette.Mix(p.Raised(0.05), d < 0 ? p.P.Good : p.P.Danger, 0.22);
         if (d is null) p.Fill(deltaBlock, p.Solid(tint, 130));
@@ -156,9 +175,9 @@ internal sealed class TimingWidget : HudWidget
             p.Item("fields", fields[i], box);
         }
         for (int i = fit; i < fields.Count; i++) p.Overflow?.Add(("fields", fields[i]));
-        if (bar && rest.Height >= 7 * p.Density + 4)
+        if (barSize > 0)
         {
-            var barBox = rest.Top(barH, out rest);
+            var barBox = rows[2];
             p.Region("bar", barBox);
             var track = new RectangleF(barBox.X, barBox.Y + 4, barBox.Width, 7 * p.Density);
             p.Fill(track, p.Solid(p.Raised(0.10), 130), 3);
@@ -171,10 +190,10 @@ internal sealed class TimingWidget : HudWidget
             }
             p.Line(mid, track.Y - 2, mid, track.Bottom + 2, p.P.Heading, 1.5f);
         }
-        if (sectors && rest.Height > p.LineHeight(p.Small) + 6)
+        if (showSectors)
         {
-            p.Region("sectors", rest);
-            Sectors(p, v, rest);
+            p.Region("sectors", rows[3]);
+            Sectors(p, v, rows[3]);
         }
     }
 
@@ -261,6 +280,13 @@ internal sealed class TimingWidget : HudWidget
         return sectors;
     }
 
+    private static readonly string[] TraceParts = { "delta", "graph" };
+    private static readonly string[] TraceFullParts = { "delta", "graph", "times" };
+    private static readonly string[] FullParts = { "delta", "times" };
+    private static readonly string[] FullStackParts = { "top", "times", "bar", "sectors" };
+    private static readonly string[] PillParts = { "delta", "pill" };
+    private static readonly string[] ThinParts = { "split", "predicted" };
+
     private void Trace(HudPainter p, HudView v, RectangleF area, double? d, Color color, string refLabel, double? refLap, string reference, bool full)
     {
         float k = p.Density;
@@ -270,32 +296,31 @@ internal sealed class TimingWidget : HudWidget
         {
             float sideW = Math.Max(p.Measure("+0.000", p.Big), p.Measure(p.LabelText(refLabel), p.Label)) + 6 * k;
             p.Need(sideW + 90 * k + area.X * 2, p.LineHeight(p.Big) + p.LineHeight(p.Label) + 2 + area.Y * 2);
-            var side = area.Left(sideW, out var graphArea);
+            Span<RectangleF> boxes = stackalloc RectangleF[2];
+            p.Arrange(v, "trace", area, true, 4 * k, TraceParts, stackalloc float[] { sideW, 0 }, boxes);
+            var side = boxes[0];
+            var graphArea = boxes[1];
             p.Region("delta", side);
             float block = p.LineHeight(p.Label) + 1 + p.LineHeight(p.Big);
             var stack = new RectangleF(side.X, side.Y + Math.Max(0, (side.Height - block) / 2), side.Width, block);
             var labelBox = stack.Top(p.LineHeight(p.Label) + 1, out var numberBox);
             p.Text(p.LabelText(refLabel), p.Label, p.LabelColor, labelBox, HAlign.Left, VAlign.Top);
             p.Text(RaceFormat.Delta(d), p.Big, color, numberBox, HAlign.Left, VAlign.Center, false);
-            graphArea = RectangleF.FromLTRB(graphArea.Left + 4 * k, graphArea.Top, graphArea.Right, graphArea.Bottom);
             p.Region("graph", graphArea);
             Graph(p, v, graphArea, trace, d, false);
             return;
         }
         float headH = p.LineHeight(p.Big), footH = p.ValueStatHeight(p.Bold);
         p.Need(220 * k, headH + 40 * k + area.Y * 2);
-        var head = area.Top(headH, out var rest);
+        bool foot = area.Height - headH >= footH + 4 * k + 46 * k;
+        Span<RectangleF> parts = stackalloc RectangleF[3];
+        p.Arrange(v, "traceFull", area, false, 0, TraceFullParts, stackalloc float[] { headH, 0, foot ? footH + 4 * k : -1 }, parts);
+        var head = parts[0];
+        var graph = parts[1];
+        var footer = foot ? RectangleF.FromLTRB(parts[2].Left, parts[2].Top + 4 * k, parts[2].Right, parts[2].Bottom) : RectangleF.Empty;
         p.Region("delta", head);
         p.Text(p.LabelText(refLabel), p.Label, p.LabelColor, head, HAlign.Left, VAlign.Center);
         p.Text(RaceFormat.Delta(d), p.Big, color, head, HAlign.Right, VAlign.Center, false);
-        bool foot = rest.Height >= footH + 4 * k + 46 * k;
-        var graph = rest;
-        var footer = RectangleF.Empty;
-        if (foot)
-        {
-            graph = rest.Top(rest.Height - footH - 4 * k, out footer);
-            footer = RectangleF.FromLTRB(footer.Left, footer.Top + 4 * k, footer.Right, footer.Bottom);
-        }
         graph = RectangleF.FromLTRB(graph.Left, graph.Top + 3 * k, graph.Right, graph.Bottom);
         p.Region("graph", graph);
         Graph(p, v, graph, trace, d, true);
@@ -516,12 +541,15 @@ internal sealed class TimingWidget : HudWidget
         float trackH = thin ? 8 * k : Math.Max(p.LineHeight(p.SmallBold) + 8 * k, 24 * k);
         float statsH = thin ? 0 : p.ValueStatHeight(p.Bold);
         var bar = area;
-        float endW = 0;
+        var endBox = RectangleF.Empty;
         if (thin)
         {
-            endW = Math.Max(p.Measure("0:00.000", p.Bold), p.Measure(p.LabelText("Predicted"), p.Label)) + 6 * k;
+            float endW = Math.Max(p.Measure("0:00.000", p.Bold), p.Measure(p.LabelText("Predicted"), p.Label)) + 6 * k;
             p.Need(endW + 140 * k + area.X * 2, Math.Max(badgeH + rise + trackH + 3 * k, p.ValueStatHeight(p.Bold)) + area.Y * 2);
-            bar = RectangleF.FromLTRB(area.Left, area.Top, area.Right - endW - 10 * k, area.Bottom);
+            Span<RectangleF> ends = stackalloc RectangleF[2];
+            p.Arrange(v, "thin", area, true, 10 * k, ThinParts, stackalloc float[] { 0, endW }, ends);
+            bar = ends[0];
+            endBox = ends[1];
         }
         else p.Need(280 * k + area.X * 2, badgeH + rise + trackH + 6 * k + statsH + area.Y * 2);
         float block = thin ? Math.Max(badgeH + rise + trackH + 3 * k, p.ValueStatHeight(p.Bold)) : badgeH + rise + trackH + 6 * k + statsH;
@@ -575,7 +603,7 @@ internal sealed class TimingWidget : HudWidget
         if (thin)
         {
             float vh = p.ValueStatHeight(p.Bold);
-            p.ValueStat(new RectangleF(area.Right - endW, top + (block - vh) / 2, endW, vh), "Predicted", RaceFormat.LapTime(Predicted(d, refLap)), null, p.Bold, HAlign.Right);
+            p.ValueStat(new RectangleF(endBox.X, top + (block - vh) / 2, endBox.Width, vh), "Predicted", RaceFormat.LapTime(Predicted(d, refLap)), null, p.Bold, HAlign.Right);
             return;
         }
         var stats = new RectangleF(area.X, track.Bottom + 6 * k, area.Width, statsH);
@@ -601,8 +629,10 @@ internal sealed class TimingWidget : HudWidget
         var sideBox = RectangleF.Empty;
         if (side)
         {
-            sideBox = area.Right(sideW, out numberBox);
-            numberBox = RectangleF.FromLTRB(numberBox.Left, numberBox.Top, numberBox.Right - 10 * k, numberBox.Bottom);
+            Span<RectangleF> pillBoxes = stackalloc RectangleF[2];
+            p.Arrange(v, "pill", area, true, 10 * k, PillParts, stackalloc float[] { 0, sideW }, pillBoxes);
+            numberBox = pillBoxes[0];
+            sideBox = pillBoxes[1];
         }
         var font = p.Fitting("+0.000", numberBox.Width, numberBox.Height, p.Font(Math.Max(14, numberBox.Height * 0.9f), true), p.Huge, p.Big, p.Bold);
         p.Region("delta", numberBox);
@@ -828,17 +858,14 @@ internal sealed class FuelWidget : HudWidget
         float pad = 7 * p.Density, partPad = 6 * p.Density, gap = partPad * 2 + p.PieceGap;
         var bounds = p.Bounds;
         float top = 0;
-        if (v.Options.Bool("title"))
-        {
-            string sub = measured == 0 ? "measuring…" : PooledText.Concat(RaceFormat.Count(measured, "clean lap"), " · ", Confidence(estimate.Reliability));
-            p.TitleBar(new RectangleF(0, 0, bounds.Width, p.PillHeight), "Fuel", r.FuelData.EnergyUnits ? "" : sub);
-            p.Region("title", new RectangleF(0, 0, bounds.Width, p.PillHeight));
-            top = p.PillHeight + p.PieceGap;
-        }
+        bool title = v.Options.Bool("title");
+        string titleRight = measured == 0 ? "measuring…" : PooledText.Concat(RaceFormat.Count(measured, "clean lap"), " · ", Confidence(estimate.Reliability));
+        if (title) top = p.PillHeight + p.PieceGap;
         if (f.Fuel is not { } level || r.FuelData.EnergyUnits)
         {
             var body = new RectangleF(0, top, bounds.Width, bounds.Height - top);
-            p.Panel(body);
+            p.Panel(new RectangleF(0, 0, bounds.Width, bounds.Height));
+            if (title) TitleStrip(p, r, bounds, titleRight);
             p.Text(r.FuelData.EnergyUnits ? "This car reports energy (kWh), not fuel" : "This car doesn't report fuel", p.Small, p.P.Faint, body.Inflated(-pad, -pad), HAlign.Center, VAlign.Center);
             return;
         }
@@ -858,6 +885,7 @@ internal sealed class FuelWidget : HudWidget
         float edgeTop = float.NaN, edgeBottom = 0;
         var area = new RectangleF(pad, top + partPad, bounds.Width - pad * 2, bounds.Height - top - partPad * 2);
         int last = _shown.Count - 1;
+        _boxes.Clear();
         for (int i = 0; i < _shown.Count; i++)
         {
             string part = _shown[i];
@@ -867,13 +895,22 @@ internal sealed class FuelWidget : HudWidget
                 break;
             }
             float h = i == last && part is "grid" or "table" ? area.Height : Math.Min(area.Height, _heights[i]);
-            var box = area.Top(h, out area);
+            _boxes.Add(area.Top(h, out area));
+            area = new RectangleF(area.X, area.Y + gap, area.Width, Math.Max(0, area.Height - gap));
+        }
+        float panelBottom = _boxes.Count == 0 ? top : _boxes.Count - 1 == last ? bounds.Height : _boxes[^1].Bottom + partPad;
+        var whole = new RectangleF(0, 0, bounds.Width, Math.Max(panelBottom, title ? p.PillHeight : 0));
+        p.Panel(whole);
+        if (title) TitleStrip(p, r, bounds, titleRight);
+        for (int i = 0; i < _boxes.Count; i++)
+        {
+            string part = _shown[i];
+            var box = _boxes[i];
             p.Item("parts", part, box);
             float pieceTop = box.Y - partPad, pieceBottom = i == last ? bounds.Height : box.Bottom + partPad;
-            var piece = new RectangleF(0, pieceTop, bounds.Width, pieceBottom - pieceTop);
-            p.Panel(piece);
-            edgeTop = float.IsNaN(edgeTop) ? piece.Y : Math.Min(edgeTop, piece.Y);
-            edgeBottom = Math.Max(edgeBottom, piece.Bottom);
+            if (i > 0 || title) p.Seam(whole, pieceTop);
+            edgeTop = float.IsNaN(edgeTop) ? pieceTop : Math.Min(edgeTop, pieceTop);
+            edgeBottom = Math.Max(edgeBottom, pieceBottom);
             switch (part)
             {
                 case "header": HeaderLine(p, v, box, level, plan); break;
@@ -884,9 +921,17 @@ internal sealed class FuelWidget : HudWidget
                 case "table": TablePart(p, v, box, level, plan); break;
                 case "save": SavePart(p, v, box, level, plan); break;
             }
-            area = new RectangleF(area.X, area.Y + gap, area.Width, Math.Max(0, area.Height - gap));
         }
         if (edge is { } edgeColor && !float.IsNaN(edgeTop)) p.Outline(new RectangleF(0, edgeTop, bounds.Width, edgeBottom - edgeTop).Inflated(-1, -1), edgeColor, 2, p.CornerRadius(4));
+    }
+
+    private readonly List<RectangleF> _boxes = new();
+
+    private static void TitleStrip(HudPainter p, RaceState r, RectangleF bounds, string right)
+    {
+        var strip = new RectangleF(0, 0, bounds.Width, p.PillHeight);
+        p.TitleText(strip, "Fuel", r.FuelData.EnergyUnits ? "" : right);
+        p.Region("title", strip);
     }
 
     private static Status StatusOf(FuelPlan? plan, double lowLaps)
