@@ -237,7 +237,7 @@ Each app checks for updates in Settings → Application → About and updates. *
 - [Fan Control](https://github.com/Rem0o/FanControl.Releases) by Rem0o: the Fan Control page
 - [Resize Raccoon](https://github.com/mistenkt/resize-raccoon) by mistenkt and its fork [Resize Rabbit](https://github.com/rosscarlson/resize-rabbit) by rosscarlson: Window placement
 
-Full license texts ship with the components (for example `NOTICES.md` inside the track map library and `Saira-OFL.txt` beside the fonts). Thanks to the [GRR League](https://www.grassrootsracing.org) for letting Velocita use its site data and logo.
+Full license texts ship with the components (for example `NOTICES.md` inside the track map library and `Saira-OFL.txt` beside the fonts, and the Livery Shop's font and ag-psd licenses inside its files). Thanks to the [GRR League](https://www.grassrootsracing.org) for letting Velocita use its site data and logo.
 </details>
 
 <br>
