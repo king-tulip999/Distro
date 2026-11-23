@@ -162,6 +162,9 @@ internal static class DemoData
         hud.Remember("GT3", "Ferrari 296 GT3", "Circuit de Spa-Francorchamps");
         hud.Remember("GTP", "Porsche 963 GTP", "Daytona International Speedway");
         hud.Remember("GT3", "BMW M4 GT3", "Autodromo Nazionale Monza");
+        hud.AssignCar(hud.ActiveLayout, "BMW M4 GT3");
+        hud.AssignCar(hud.ActiveLayout, "Ferrari 296 GT3");
+        hud.AssignClass(hud.ActiveLayout, "GT4");
         return config;
     }
 

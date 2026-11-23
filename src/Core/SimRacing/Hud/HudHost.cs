@@ -173,6 +173,8 @@ internal sealed class HudHost : IDisposable
 
     public HudLayoutRule? MatchedRule { get; private set; }
 
+    public string? PickedForCar { get; private set; }
+
     public bool Editing => _editing;
     public bool Preview => _preview;
     public int PagePreviewHz { get; set; }
@@ -425,21 +427,26 @@ internal sealed class HudHost : IDisposable
         _sessionKey = key;
         HudLayout? layout;
         MatchedRule = null;
-        if (!_overrideRules && Settings.AutoSwitch && session.Length > 0)
+        PickedForCar = null;
+        if (!_overrideRules && session.Length > 0 && !AppIdentity.SimHub)
         {
             layout = Settings.Resolve(session, player?.CarName ?? "", f.Session.TrackDisplayName, player?.ClassName ?? "");
-            MatchedRule = Settings.Rules.Where(r => Settings.Layout(r.Layout) == layout && r.Matches(session, player?.CarName ?? "", f.Session.TrackDisplayName, player?.ClassName ?? ""))
-                .OrderByDescending(r => r.Specificity).FirstOrDefault();
+            if (Settings.AutoSwitch)
+                MatchedRule = Settings.Rules.Where(r => Settings.Layout(r.Layout) == layout && r.Matches(session, player?.CarName ?? "", f.Session.TrackDisplayName, player?.ClassName ?? ""))
+                    .OrderByDescending(r => r.Specificity).FirstOrDefault();
+            if (MatchedRule is null && layout is not null)
+                PickedForCar = Settings.LayoutForCar(player?.CarName ?? "") == layout ? player?.CarName
+                    : Settings.LayoutForClass(player?.CarName ?? "", player?.ClassName ?? "") is { } byClass && byClass.Layout == layout ? $"the {byClass.Class} class" : null;
         }
         else layout = Settings.Layout(Settings.ActiveLayout) ?? Settings.Layouts.FirstOrDefault();
         string name = layout?.Name ?? "";
         if (!force && name == _layoutName) return;
         bool changed = name != _layoutName;
-        bool byRule = changed && _layoutName.Length > 0 && MatchedRule is not null;
+        bool byRule = changed && _layoutName.Length > 0 && (MatchedRule is not null || PickedForCar is not null);
         _layoutName = name;
         NoteEditStart();
         Sync(layout);
-        if (byRule && _editor is null && _vr.Showing) ShowLayoutMenu("Picked by a rule for this session");
+        if (byRule && _editor is null && _vr.Showing) ShowLayoutMenu(MatchedRule is null ? "Picked for this car" : "Picked by a rule for this session");
         if (changed) Changed?.Invoke();
     }
 

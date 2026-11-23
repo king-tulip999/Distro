@@ -67,13 +67,9 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
 
         _segments = Ui.PageTabs(Tabs, 0, i => { _tab = i; Build(); Motion.FadeIn(_body); }, "hudtabs");
         _segments.HorizontalAlignment = HorizontalAlignment.Left;
-        var bar = new Grid();
-        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        bar.ColumnDefinitions.Add(new ColumnDefinition());
+        var bar = new TabBarRow();
         bar.Children.Add(_segments);
-        _layoutSlot.HorizontalAlignment = HorizontalAlignment.Right;
         _layoutSlot.Margin = new Thickness(19, 0, 0, 0);
-        Grid.SetColumn(_layoutSlot, 1);
         bar.Children.Add(_layoutSlot);
         var tabRow = Ui.TabBar(_segments, bar);
         if (!AppIdentity.SimHub)
@@ -280,6 +276,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         if (_layoutPick is null) return;
         var want = _layoutPick.Items.Cast<Choice>().FirstOrDefault(c => c.Id == ShownLayout);
         if (want is not null && !Equals(_layoutPick.SelectedItem, want)) _layoutPick.SelectedItem = want;
+        FillCars();
         _widgets?.FollowLayout();
     }
 
@@ -318,7 +315,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             _statusChip = chip;
             _statusShown = (text, soft, deep);
         }
-        string why = h?.MatchedRule is { } rule ? $"Layout picked by a rule: {rule.Describe()} · " : "";
+        string why = h?.MatchedRule is { } rule ? $"Layout picked by a rule: {rule.Describe()} · "
+            : h?.PickedForCar is { Length: > 0 } car ? $"Layout picked for {car} · " : "";
         string state = h?.OnScreen == true ? (why.Length == 0 ? "On screen" : "on screen") : ShowWhenText(why.Length == 0);
         _status.Text = _app.Demo || !S.Enabled || AppIdentity.SimHub ? ""
             : why + state + (h?.Editing == true ? " · arranging" : "");
@@ -338,6 +336,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         _steps = 2;
         _tick = null;
         _rules = null;
+        _carsCard = null;
         _ruleCount = null;
         _alertGroups = null;
         _widgets = null;
@@ -386,6 +385,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             Host?.UseLayout(c.Id!);
             if (Host is null) { S.ActiveLayout = c.Id!; _app.Save(); }
             RefreshStatus();
+            FillCars();
             _widgets?.FollowLayout();
         }, 160);
         _builtLayouts = LayoutsSignature();
@@ -460,9 +460,9 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             if (_rulesCard is not null) _rulesCard.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
             RefreshRuleCount();
         });
-        System.Windows.Automation.AutomationProperties.SetName(useRules, "Switch layouts automatically");
-        var switchLabel = ToggleCards.RowTitle("Switch layouts automatically");
-        Ui.AddInfo(switchLabel, "Rules pick a layout by session, class, car and track. The most specific matching rule wins, then the higher one; with none, the layout picked on the left shows.");
+        System.Windows.Automation.AutomationProperties.SetName(useRules, "Advanced rules");
+        var switchLabel = ToggleCards.RowTitle("Advanced rules");
+        Ui.AddInfo(switchLabel, "Rules pick a layout by session, class, car and track, and beat the cars set on layouts. The most specific matching rule wins, then the higher one.");
         switchLabel.TextWrapping = TextWrapping.NoWrap;
         ToggleCards.Row(useRules, switchLabel, null, trailing: _ruleCount);
         useRules.VerticalAlignment = VerticalAlignment.Center;
@@ -470,7 +470,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         useRules.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
         row.Children.Add(useRules);
         _rules.Fill();
-        _rulesEmpty = Caption("No rules yet: the layout picked above always shows.", 0);
+        _rulesEmpty = Caption("No rules yet: layouts follow the cars set above.", 0);
         _rulesEmpty.VerticalAlignment = VerticalAlignment.Center;
         _rulesEmpty.Visibility = S.Rules.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         var ruleBar = new DockPanel { LastChildFill = true };
@@ -487,8 +487,11 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             Visibility = S.AutoSwitch ? Visibility.Visible : Visibility.Collapsed,
         };
         Ui.Anchor(row, LayoutsAnchor);
+        _carsCard = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Padding = new Thickness(13, 10, 13, 10) };
+        FillCars();
         if (!AppIdentity.SimHub)
         {
+            root.Children.Add(_carsCard);
             root.Children.Add(_rulesCard);
             _layoutSlot.Content = row;
         }
@@ -499,6 +502,165 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     }
 
     private ArrangeList? _rules;
+    private Tile? _carsCard;
+
+    private bool _carsOpen;
+    private const int CarsFolded = 8;
+
+    private void FillCars()
+    {
+        if (_carsCard is null || S.Layout(ShownLayout) is not { } layout) return;
+        var me = Preview.Race.Frame.Session.Player;
+        var head = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var title = Ui.Text("Use this layout for", "H3");
+        title.VerticalAlignment = VerticalAlignment.Center;
+        title.Margin = new Thickness(0, 0, 10, 0);
+        head.Children.Add(title);
+        head.Children.Add(Ui.LabeledButton("I.Plus", "Add classes or cars", () => PickCars(layout, me)));
+
+        bool isTheDefault = string.Equals(S.DefaultLayout, layout.Name, StringComparison.OrdinalIgnoreCase);
+        var isDefault = Ui.Switch(isTheDefault, on =>
+        {
+            if (!on) return;
+            S.DefaultLayout = layout.Name;
+            Changed();
+            Dispatcher.BeginInvoke(FillCars, DispatcherPriority.Background);
+        });
+        isDefault.IsEnabled = !isTheDefault;
+        if (isTheDefault)
+        {
+            isDefault.ToolTip = "To move the default, open another layout and tick it there";
+            ToolTipService.SetShowOnDisabled(isDefault, true);
+        }
+        System.Windows.Automation.AutomationProperties.SetName(isDefault, "Default for other cars");
+        var defaultLabel = ToggleCards.RowTitle("Default for other cars");
+        Ui.AddInfo(defaultLabel, "Shows for any car not set on a layout. One layout is always the default: tick it on another layout to move it there.");
+        defaultLabel.TextWrapping = TextWrapping.NoWrap;
+        ToggleCards.Row(isDefault, defaultLabel, null);
+        isDefault.VerticalAlignment = VerticalAlignment.Center;
+        isDefault.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
+
+        var bar = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(isDefault, Dock.Right);
+        bar.Children.Add(isDefault);
+        bar.Children.Add(head);
+
+        var stack = new StackPanel();
+        stack.Children.Add(bar);
+        var entries = layout.Classes.Select(c => (Text: $"{c} class", Remove: (Action)(() => layout.Classes.RemoveAll(x => string.Equals(x, c, StringComparison.OrdinalIgnoreCase)))))
+            .Concat(layout.Cars.Select(c => (Text: c, Remove: (Action)(() => layout.Cars.RemoveAll(x => string.Equals(x, c, StringComparison.OrdinalIgnoreCase))))))
+            .ToList();
+        if (entries.Count > 0)
+        {
+            var tags = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
+            bool folded = !_carsOpen && entries.Count > CarsFolded;
+            foreach (var (text, remove) in folded ? entries.Take(CarsFolded - 1) : entries) tags.Children.Add(Tag(text, remove));
+            if (entries.Count > CarsFolded)
+            {
+                var more = Ui.LabeledButton(_carsOpen ? "I.ChevronUp" : "I.ChevronDown",
+                    _carsOpen ? "Show fewer" : $"{entries.Count - CarsFolded + 1} more", () => { _carsOpen = !_carsOpen; FillCars(); });
+                more.Margin = new Thickness(0, 3, 6, 3);
+                tags.Children.Add(more);
+            }
+            stack.Children.Add(tags);
+        }
+        _carsCard.Child = stack;
+    }
+
+    private void PickCars(HudLayout layout, DriverEntry? me)
+    {
+        var classes = new HashSet<string>(layout.Classes, StringComparer.OrdinalIgnoreCase);
+        var cars = new HashSet<string>(layout.Cars, StringComparer.OrdinalIgnoreCase);
+        var items = new List<(FrameworkElement Box, string Name, FrameworkElement Group)>();
+
+        CheckBox Item(string name, HashSet<string> picked, double width)
+        {
+            var text = TextFit.TipWhenTrimmed(new TextBlock { Text = name, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+            var box = new CheckBox { Content = text, IsChecked = picked.Contains(name), Width = width, Margin = new Thickness(0, 0, 8, 4) };
+            box.Click += (_, _) => { if (box.IsChecked == true) picked.Add(name); else picked.Remove(name); };
+            return box;
+        }
+
+        var body = new StackPanel();
+        var search = Ui.Search(new TextBox { Tag = "Find a class or car", Margin = new Thickness(0, 0, 0, 4) });
+        body.Children.Add(search);
+
+        var classHead = Ui.SubHeader("Classes", true);
+        body.Children.Add(classHead);
+        var classPanel = new WrapPanel();
+        foreach (var c in SessionNames.Merge(null, S.KnownClasses.Append(me?.ClassName), SessionNames.Classes).Concat(layout.Classes).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var box = Item(c, classes, 150);
+            classPanel.Children.Add(box);
+            items.Add((box, c, classHead));
+        }
+        body.Children.Add(classPanel);
+
+        body.Children.Add(Ui.SubHeader("Cars"));
+        var allCars = SessionNames.Merge(null, S.KnownCars.Append(me?.CarName).Concat(layout.Cars), Core.SimRacing.Setups.SetupCars.BuiltInNames);
+        var order = Core.SimRacing.Setups.SetupCars.Classes.ToList();
+        foreach (var group in allCars.GroupBy(Core.SimRacing.Setups.SetupCars.ClassOfName, StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(g => order.IndexOf(g.Key) is var i && i >= 0 ? i : order.Count))
+        {
+            var head = Ui.TableHead(group.Key);
+            head.Margin = new Thickness(0, 6, 0, 4);
+            body.Children.Add(head);
+            var panel = new WrapPanel();
+            foreach (var car in group)
+            {
+                var box = Item(car, cars, 290);
+                panel.Children.Add(box);
+                items.Add((box, car, head));
+            }
+            body.Children.Add(panel);
+        }
+
+        search.TextChanged += (_, _) =>
+        {
+            string find = search.Text.Trim();
+            foreach (var (box, name, _) in items)
+                box.Visibility = find.Length == 0 || name.Contains(find, StringComparison.OrdinalIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
+            foreach (var head in items.Select(i => i.Group).Distinct())
+                head.Visibility = items.Any(i => i.Group == head && i.Box.Visibility == Visibility.Visible) ? Visibility.Visible : Visibility.Collapsed;
+        };
+
+        var buttons = Ui.DialogButtons(_window, "Save", () =>
+        {
+            layout.Classes.RemoveAll(c => !classes.Contains(c));
+            layout.Cars.RemoveAll(c => !cars.Contains(c));
+            foreach (var c in classes.Where(c => !layout.Classes.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList()) S.AssignClass(layout.Name, c);
+            foreach (var c in cars.Where(c => !layout.Cars.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList()) S.AssignCar(layout.Name, c);
+            Changed();
+            FillCars();
+            return true;
+        });
+        var dialog = Ui.Dialog(_window, $"Classes and cars for “{layout.Name}”", "Ticking one that's on another layout moves it here. A car ticked here beats its class.", body, buttons, width: 860);
+        dialog.Loaded += (_, _) => search.Focus();
+        _ = _window.ShowModal(dialog);
+    }
+
+    private FrameworkElement Tag(string label, Action removeIt)
+    {
+        var text = TextFit.TipWhenTrimmed(new TextBlock { Text = label, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 260 });
+        var remove = Ui.IconButton("I.X", $"Stop using this layout for {label}", () =>
+        {
+            removeIt();
+            Changed();
+            FillCars();
+        }, "QuietIconButton");
+        remove.Margin = new Thickness(2, 0, 0, 0);
+        remove.VerticalAlignment = VerticalAlignment.Center;
+        var inside = new DockPanel();
+        DockPanel.SetDock(remove, Dock.Right);
+        inside.Children.Add(remove);
+        inside.Children.Add(text);
+        var tile = Hairline.Frame(new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(10, 0, 0, 0), Child = inside });
+        tile.SetResourceReference(Border.BorderBrushProperty, "Line");
+        tile.Margin = new Thickness(0, 3, 6, 3);
+        tile.VerticalAlignment = VerticalAlignment.Center;
+        return tile;
+    }
+
     private TextBlock? _rulesEmpty;
     private TextBlock? _ruleCount;
 
@@ -1527,6 +1689,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     {
         yield return ("hud", () => { SelectTab(WidgetsTab); return Task.CompletedTask; });
         yield return ("hud-rules", () => { _rulesCard?.BringIntoView(); return Task.CompletedTask; });
+        yield return ("hud-cars", () => { if (S.Layout(ShownLayout) is { } l) PickCars(l, Preview.Race.Frame.Session.Player); return Task.CompletedTask; });
+        yield return ("hud-cars-done", () => { _window.CloseModal(false); return Task.CompletedTask; });
         yield return ("hud-rules-arrange", () => { _rules?.SetEditing(true); _rulesCard?.BringIntoView(); return Task.CompletedTask; });
         yield return ("hud-rules-done", () => { _rules?.SetEditing(false); return Task.CompletedTask; });
         yield return ("hud-widgets", () => { _widgets?.Select("relative"); return Task.CompletedTask; });

@@ -157,6 +157,14 @@ internal static class SetupCars
 
     public static string? BuiltInName(string dir) => Known.TryGetValue(dir, out var k) ? k.Name : null;
 
+    public static string ClassOfName(string name)
+    {
+        name = name.Trim();
+        foreach (var k in Known.Values)
+            if (string.Equals(k.Name, name, StringComparison.OrdinalIgnoreCase)) return k.Class;
+        return Guess(name.Replace(" ", ""));
+    }
+
     public static IEnumerable<string> BuiltInNames => Known.Values.Select(k => k.Name).Distinct().OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
 
     public static string Guess(string dir)

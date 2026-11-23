@@ -35,7 +35,7 @@ public sealed class RaceHudSettings
 {
     public bool ShowPage { get; set; } = true;
 
-    public const int CurrentVersion = 8;
+    public const int CurrentVersion = 9;
 
     public int Version { get; set; }
 
@@ -48,6 +48,8 @@ public sealed class RaceHudSettings
     public string ActiveLayout { get; set; } = SimRacing.Hud.HudPresets.DefaultName;
 
     public bool AutoSwitch { get; set; } = false;
+
+    public string? DefaultLayout { get; set; }
 
     public List<HudLayout> Layouts { get; set; } = new();
 
@@ -207,7 +209,61 @@ public sealed class RaceHudSettings
             }
             if (best is not null) return Layout(best.Layout);
         }
-        return Layout(ActiveLayout) ?? Layouts.FirstOrDefault();
+        return LayoutForCar(car) ?? LayoutForClass(car, carClass)?.Layout ?? Fallback;
+    }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public HudLayout? Fallback => Layout(DefaultLayout) ?? Layout(ActiveLayout) ?? Layouts.FirstOrDefault();
+
+    public HudLayout? LayoutForCar(string car)
+    {
+        car = car.Trim();
+        if (car.Length == 0) return null;
+        HudLayout? best = null;
+        int bestScore = -1;
+        foreach (var layout in Layouts)
+            foreach (var want in layout.Cars)
+            {
+                if (string.IsNullOrWhiteSpace(want) || !car.Contains(want.Trim(), StringComparison.OrdinalIgnoreCase)) continue;
+                int score = want.Trim().Length * 2 + (string.Equals(want.Trim(), car, StringComparison.OrdinalIgnoreCase) ? 1 : 0);
+                if (score > bestScore) { best = layout; bestScore = score; }
+            }
+        return best;
+    }
+
+    public (HudLayout Layout, string Class)? LayoutForClass(string car, string carClass)
+    {
+        foreach (var layout in Layouts)
+            foreach (var want in layout.Classes)
+                if (carClass.Trim().Length > 0 && SimRacing.Race.SessionNames.ClassMatches(carClass.Trim(), want)) return (layout, want);
+        if (car.Trim().Length == 0) return null;
+        string guessed = SimRacing.Setups.SetupCars.ClassOfName(car);
+        foreach (var layout in Layouts)
+            foreach (var want in layout.Classes)
+                if (string.Equals(want, guessed, StringComparison.OrdinalIgnoreCase)) return (layout, want);
+        return null;
+    }
+
+    public HudLayout? ClassOwner(string carClass) =>
+        Layouts.FirstOrDefault(l => l.Classes.Contains(carClass.Trim(), StringComparer.OrdinalIgnoreCase));
+
+    public void AssignClass(string layoutName, string carClass)
+    {
+        carClass = carClass.Trim();
+        if (carClass.Length == 0 || Layout(layoutName) is not { } layout) return;
+        foreach (var l in Layouts) l.Classes.RemoveAll(c => string.Equals(c, carClass, StringComparison.OrdinalIgnoreCase));
+        layout.Classes.Add(carClass);
+    }
+
+    public HudLayout? CarOwner(string car) =>
+        Layouts.FirstOrDefault(l => l.Cars.Contains(car.Trim(), StringComparer.OrdinalIgnoreCase));
+
+    public void AssignCar(string layoutName, string car)
+    {
+        car = car.Trim();
+        if (car.Length == 0 || Layout(layoutName) is not { } layout) return;
+        foreach (var l in Layouts) l.Cars.RemoveAll(c => string.Equals(c, car, StringComparison.OrdinalIgnoreCase));
+        layout.Cars.Add(car);
     }
 
     public bool RenameLayout(string from, string to)
@@ -218,6 +274,7 @@ public sealed class RaceHudSettings
             || Layouts.Any(l => l != layout && string.Equals(l.Name, to, StringComparison.OrdinalIgnoreCase))) return false;
         foreach (var rule in Rules.Where(r => string.Equals(r.Layout, layout.Name, StringComparison.OrdinalIgnoreCase))) rule.Layout = to;
         if (string.Equals(ActiveLayout, layout.Name, StringComparison.OrdinalIgnoreCase)) ActiveLayout = to;
+        if (string.Equals(DefaultLayout, layout.Name, StringComparison.OrdinalIgnoreCase)) DefaultLayout = to;
         layout.Name = to;
         return true;
     }
@@ -229,6 +286,7 @@ public sealed class RaceHudSettings
         Layouts.Remove(layout);
         Rules.RemoveAll(r => string.Equals(r.Layout, layout.Name, StringComparison.OrdinalIgnoreCase));
         if (string.Equals(ActiveLayout, layout.Name, StringComparison.OrdinalIgnoreCase)) ActiveLayout = Layouts[0].Name;
+        if (string.Equals(DefaultLayout, layout.Name, StringComparison.OrdinalIgnoreCase)) DefaultLayout = ActiveLayout;
         return true;
     }
 
@@ -238,11 +296,14 @@ public sealed class RaceHudSettings
     {
         var layout = Layouts.FirstOrDefault(l => IsDefaultName(l.Name));
         if (layout is null || isDefault(layout)) return null;
-        var custom = new HudLayout { Name = UniqueName(SimRacing.Hud.HudPresets.CustomName), Widgets = layout.Widgets };
+        var custom = new HudLayout { Name = UniqueName(SimRacing.Hud.HudPresets.CustomName), Widgets = layout.Widgets, Cars = layout.Cars, Classes = layout.Classes };
         layout.Widgets = preset().Widgets.Select(w => w.Copy()).ToList();
+        layout.Cars = new();
+        layout.Classes = new();
         foreach (var w in layout.Widgets) w.Clamp();
         Layouts.Insert(Layouts.IndexOf(layout) + 1, custom);
         if (IsDefaultName(ActiveLayout)) ActiveLayout = custom.Name;
+        if (DefaultLayout is not null && IsDefaultName(DefaultLayout)) DefaultLayout = custom.Name;
         return custom.Name;
     }
 
@@ -275,7 +336,7 @@ public sealed class RaceHudSettings
             Layouts.AddRange(defaults());
             Rules.AddRange(defaultRules());
         }
-        bool before2 = Version < 2, before3 = Version < 3, before4 = Version < 4, before5 = Version < 5, before6 = Version < 6, before7 = Version < 7, before8 = Version < 8;
+        bool before2 = Version < 2, before3 = Version < 3, before4 = Version < 4, before5 = Version < 5, before6 = Version < 6, before7 = Version < 7, before8 = Version < 8, before9 = Version < 9;
         Version = CurrentVersion;
         Appearance ??= new();
         if (before4) { Appearance.Colors = HudAppearance.DefaultColors; Appearance.Custom = new(); }
@@ -309,6 +370,16 @@ public sealed class RaceHudSettings
             }
         }
         Rules.RemoveAll(r => r is null || Layout(r.Layout) is null);
+        var assigned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var assignedClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var layout in Layouts)
+        {
+            layout.Cars = (layout.Cars ?? new()).Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim()).ToList();
+            layout.Cars.RemoveAll(c => !assigned.Add(c));
+            layout.Classes = (layout.Classes ?? new()).Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim()).ToList();
+            layout.Classes.RemoveAll(c => !assignedClasses.Add(c));
+        }
+        if (before9 && AutoSwitch) CarRulesToLayouts(assigned, assignedClasses);
         foreach (var r in Rules) if (r.Session is not null) r.Session = SessionKind(r.Session);
         Rules = Rules.DistinctBy(r => (r.Layout.ToLowerInvariant(), r.Session?.ToLowerInvariant(), r.Class?.ToLowerInvariant(), r.Car?.ToLowerInvariant(), r.Track?.ToLowerInvariant())).ToList();
         var ruleIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -318,6 +389,7 @@ public sealed class RaceHudSettings
         AlertGroupsFolded = (AlertGroupsFolded ?? new()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         FoldedPanels = (FoldedPanels ?? new()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (Layout(ActiveLayout) is null) ActiveLayout = Layouts[0].Name;
+        DefaultLayout = (Layout(DefaultLayout) ?? Layout(ActiveLayout)!).Name;
         Appearance ??= new();
         Appearance.Clamp();
         Fuel ??= new();
@@ -339,6 +411,25 @@ public sealed class RaceHudSettings
             n.Clean();
             if (string.IsNullOrWhiteSpace(n.Id) || !noteIds.Add(n.Id)) { n.Id = Guid.NewGuid().ToString("N"); noteIds.Add(n.Id); }
         }
+    }
+
+    private void CarRulesToLayouts(HashSet<string> assigned, HashSet<string> assignedClasses)
+    {
+        foreach (var rule in Rules.ToList())
+        {
+            if (rule.Track is not null) continue;
+            if (!string.IsNullOrWhiteSpace(rule.Car) && rule.Class is null)
+            {
+                if (assigned.Add(rule.Car.Trim())) Layout(rule.Layout)!.Cars.Add(rule.Car.Trim());
+            }
+            else if (!string.IsNullOrWhiteSpace(rule.Class) && rule.Car is null)
+            {
+                if (assignedClasses.Add(rule.Class.Trim())) Layout(rule.Layout)!.Classes.Add(rule.Class.Trim());
+            }
+            else continue;
+            Rules.Remove(rule);
+        }
+        if (Rules.Count == 0) AutoSwitch = false;
     }
 
     internal void ShowClassesInsteadOfHiding(HudWidgetConfig w) =>
@@ -435,6 +526,8 @@ public sealed class HudLayout
 {
     public string Name { get; set; } = "Layout";
     public List<HudWidgetConfig> Widgets { get; set; } = new();
+    public List<string> Cars { get; set; } = new();
+    public List<string> Classes { get; set; } = new();
 
     public HudLayout Copy(string name) => new()
     {
