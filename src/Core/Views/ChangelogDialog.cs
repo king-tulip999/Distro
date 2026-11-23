@@ -80,7 +80,9 @@ internal static class ChangelogDialog
     {
         var stack = new StackPanel { Margin = new Thickness(0, first ? 0 : 18, 0, 0) };
         string when = release.Published is { } at ? " · " + Dates.Date(at.ToLocalTime()) : "";
-        stack.Children.Add(new TextBlock { Text = UpdateService.Tag(release.Version) + when, Style = Ui.Res<Style>("H3") });
+        stack.Children.Add(new TextBlock { Text = UpdateService.Tag(release.Version) + when, Style = Ui.Res<Style>(release.Title is null ? "H3" : "Muted") });
+        if (release.Title is { } title)
+            stack.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
         if (lines.Count == 0)
             stack.Children.Add(new TextBlock { Text = "No notes for this release.", Style = Ui.Res<Style>("Muted"), Margin = new Thickness(0, 5, 0, 0) });
         foreach (var line in lines) stack.Children.Add(Line(line));

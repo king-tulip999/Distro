@@ -57,6 +57,10 @@ public sealed class RaceHudSettings
 
     public bool VrOverlays { get; set; }
 
+    public bool VrEditButton { get; set; }
+
+    public bool VrEditorIntroDone { get; set; }
+
     public const double MaxVrShiftDistance = 1;
 
     public double VrShiftX { get; set; }
@@ -70,6 +74,21 @@ public sealed class RaceHudSettings
         VrShiftX = double.IsFinite(VrShiftX) ? Math.Clamp(VrShiftX, -HudWidgetConfig.VrReach, HudWidgetConfig.VrReach) : 0;
         VrShiftY = double.IsFinite(VrShiftY) ? Math.Clamp(VrShiftY, -HudWidgetConfig.VrReach, HudWidgetConfig.VrReach) : 0;
         VrShiftDistance = double.IsFinite(VrShiftDistance) ? Math.Clamp(VrShiftDistance, -MaxVrShiftDistance, MaxVrShiftDistance) : 0;
+    }
+
+    public const double VrPanelDistance = 0.55, VrPanelReach = 0.4, DefaultVrPanelY = -0.2, DefaultVrPanelWidth = 0.28, MinVrPanelWidth = 0.16, MaxVrPanelWidth = 0.5;
+
+    public double VrPanelX { get; set; }
+
+    public double VrPanelY { get; set; } = DefaultVrPanelY;
+
+    public double VrPanelWidth { get; set; } = DefaultVrPanelWidth;
+
+    public void ClampVrPanel()
+    {
+        VrPanelX = double.IsFinite(VrPanelX) ? Math.Clamp(VrPanelX, -VrPanelReach, VrPanelReach) : 0;
+        VrPanelY = double.IsFinite(VrPanelY) ? Math.Clamp(VrPanelY, -VrPanelReach, VrPanelReach) : DefaultVrPanelY;
+        VrPanelWidth = double.IsFinite(VrPanelWidth) ? Math.Clamp(VrPanelWidth, MinVrPanelWidth, MaxVrPanelWidth) : DefaultVrPanelWidth;
     }
 
     public int WebPort { get; set; } = DefaultWebPort;
@@ -234,6 +253,7 @@ public sealed class RaceHudSettings
         if (before5 && Appearance.Corner == 0) Appearance.Corner = HudAppearance.DefaultCorner;
         if (WebPort is < MinWebPort or > MaxWebPort) WebPort = DefaultWebPort;
         ClampVrShift();
+        ClampVrPanel();
         var builtIn = defaults();
         if (!Layouts.Any(l => l is not null && IsDefaultName(l.Name ?? ""))) Layouts.Add(builtIn[0]);
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

@@ -4,7 +4,7 @@ using Units = Core.Services.CapsUnits;
 
 namespace Core.SimRacing.Hud.Vr;
 
-internal enum VrEditorPart { None, Done, Previous, Next, Minus, Plus, Track, Curve, VrOnly, Face }
+internal enum VrEditorPart { None, Done, Previous, Next, Minus, Plus, Track, Curve, VrOnly, Face, Grip }
 
 internal readonly record struct VrEditorHit(VrEditorPart Part, int Row = -1)
 {
@@ -20,11 +20,16 @@ internal enum VrEditorResult { None, Redraw, Changed, Close }
 internal sealed class VrEditor
 {
     public const float Width = 480, Pad = 14, RowHeight = 34, RowGap = 4, ButtonSize = 30, LabelWidth = 84, ValueWidth = 70;
-    public const double MouseSpeed = 0.6;
+    public const double MouseSpeed = 0.6, PanelMetresPerCount = 0.0006, PanelWidthStep = 0.02;
 
     private readonly RaceHudSettings _settings;
     private List<HudWidgetConfig?> _candidates = new();
     private int _dragRow = -1;
+    private float _dragFromX;
+    private double _dragFromValue;
+    private bool _panelDrag;
+
+    public bool MovingPanel => _panelDrag;
 
     public VrEditor(RaceHudSettings settings) => _settings = settings;
 
@@ -83,7 +88,9 @@ internal sealed class VrEditor
         return rows;
     }
 
-    public float Height => Layout(Rows().Count).Max(e => e.Box.Bottom) + Pad + 18;
+    public const float FooterHeight = 34;
+
+    public float Height => Layout(Rows().Count).Max(e => e.Box.Bottom) + Pad + FooterHeight;
 
     public List<VrEditorElement> Elements() => Layout(Rows().Count);
 
@@ -92,6 +99,7 @@ internal sealed class VrEditor
         var list = new List<VrEditorElement>
         {
             new(VrEditorPart.Done, -1, new RectangleF(Width - Pad - 76, Pad, 76, 28)),
+            new(VrEditorPart.Grip, -1, new RectangleF(Pad, Pad, Width - Pad * 2 - 76 - 8, 28)),
             new(VrEditorPart.Previous, -1, new RectangleF(Pad, 52, ButtonSize + 6, 32)),
             new(VrEditorPart.Next, -1, new RectangleF(Width - Pad - ButtonSize - 6, 52, ButtonSize + 6, 32)),
         };
@@ -109,7 +117,6 @@ internal sealed class VrEditor
         {
             float half = (Width - Pad * 3) / 2;
             y += 6;
-            // Velocita for SimHub draws nothing on the monitor, so only the curve toggle applies there.
             if (AppIdentity.SimHub) list.Add(new(VrEditorPart.Curve, -1, new RectangleF(Pad, y, Width - Pad * 2, 30)));
             else
             {
@@ -129,8 +136,17 @@ internal sealed class VrEditor
         return VrEditorHit.Nothing;
     }
 
-    public VrEditorResult MoveBy(double dx, double dy) =>
-        MoveTo(new PointF((float)Math.Clamp(Cursor.X + dx * MouseSpeed, 0, Width), (float)Math.Clamp(Cursor.Y + dy * MouseSpeed, 0, Height)), true);
+    public VrEditorResult MoveBy(double dx, double dy)
+    {
+        if (_panelDrag)
+        {
+            _settings.VrPanelX += dx * PanelMetresPerCount;
+            _settings.VrPanelY -= dy * PanelMetresPerCount;
+            _settings.ClampVrPanel();
+            return VrEditorResult.Redraw;
+        }
+        return MoveTo(new PointF((float)Math.Clamp(Cursor.X + dx * MouseSpeed, 0, Width), (float)Math.Clamp(Cursor.Y + dy * MouseSpeed, 0, Height)), true);
+    }
 
     public VrEditorResult MoveTo(PointF p, bool cursor)
     {
@@ -139,7 +155,7 @@ internal sealed class VrEditor
         var hover = HitTest(p);
         bool redraw = hover != Hover || cursor;
         Hover = hover;
-        if (_dragRow >= 0 && SetFromTrack(_dragRow, p.X)) return VrEditorResult.Changed;
+        if (_dragRow >= 0 && DragTo(_dragRow, p.X)) return VrEditorResult.Changed;
         return redraw ? VrEditorResult.Redraw : VrEditorResult.None;
     }
 
@@ -151,13 +167,18 @@ internal sealed class VrEditor
         switch (hit.Part)
         {
             case VrEditorPart.Done: return VrEditorResult.Close;
+            case VrEditorPart.Grip when at is null:
+                _panelDrag = true;
+                return VrEditorResult.Redraw;
             case VrEditorPart.Previous: Step(-1); return VrEditorResult.Redraw;
             case VrEditorPart.Next: Step(1); return VrEditorResult.Redraw;
             case VrEditorPart.Minus when hit.Row < rows.Count: return Nudge(rows[hit.Row], -1);
             case VrEditorPart.Plus when hit.Row < rows.Count: return Nudge(rows[hit.Row], 1);
-            case VrEditorPart.Track:
+            case VrEditorPart.Track when hit.Row < rows.Count:
                 _dragRow = hit.Row;
-                return SetFromTrack(hit.Row, Cursor.X) ? VrEditorResult.Changed : VrEditorResult.Redraw;
+                _dragFromX = Cursor.X;
+                _dragFromValue = rows[hit.Row].Get();
+                return VrEditorResult.Redraw;
             case VrEditorPart.Curve when Picked is { } c: c.VrCurve = !c.VrCurve; return VrEditorResult.Changed;
             case VrEditorPart.VrOnly when Picked is { } o: o.VrOnly = !o.VrOnly; return VrEditorResult.Changed;
             case VrEditorPart.Face when Picked is { } f:
@@ -167,11 +188,24 @@ internal sealed class VrEditor
         }
     }
 
-    public void Release() => _dragRow = -1;
+    public VrEditorResult Release()
+    {
+        _dragRow = -1;
+        if (!_panelDrag) return VrEditorResult.None;
+        _panelDrag = false;
+        return VrEditorResult.Redraw;
+    }
 
     public VrEditorResult Wheel(int notches)
     {
         var hit = HitTest(Cursor);
+        if (hit.Part == VrEditorPart.Grip && notches != 0)
+        {
+            double before = _settings.VrPanelWidth;
+            _settings.VrPanelWidth += Math.Sign(notches) * PanelWidthStep;
+            _settings.ClampVrPanel();
+            return Math.Abs(_settings.VrPanelWidth - before) > 1e-9 ? VrEditorResult.Redraw : VrEditorResult.None;
+        }
         var rows = Rows();
         if (hit.Row < 0 || hit.Row >= rows.Count || notches == 0) return VrEditorResult.None;
         return Nudge(rows[hit.Row], Math.Sign(notches));
@@ -179,14 +213,13 @@ internal sealed class VrEditor
 
     private VrEditorResult Nudge(VrEditorRow row, int direction) => SetValue(row, row.Get() + direction * row.Step) ? VrEditorResult.Changed : VrEditorResult.None;
 
-    private bool SetFromTrack(int index, float x)
+    private bool DragTo(int index, float x)
     {
         var rows = Rows();
         if (index < 0 || index >= rows.Count) return false;
         var track = Elements().First(e => e.Part == VrEditorPart.Track && e.Row == index).Box;
-        double t = Math.Clamp((x - track.X) / track.Width, 0, 1);
         var row = rows[index];
-        return SetValue(row, row.Min + t * (row.Max - row.Min));
+        return SetValue(row, _dragFromValue + (x - _dragFromX) / track.Width * (row.Max - row.Min));
     }
 
     private bool SetValue(VrEditorRow row, double value)

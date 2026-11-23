@@ -7,7 +7,7 @@ using Core.Config;
 
 namespace Core.Services;
 
-internal sealed record ReleaseInfo(Version Version, string Tag, string Notes, string PageUrl, string? ExeUrl, long ExeSize, string? ChecksumUrl, DateTime? Published = null, string? SignatureUrl = null);
+internal sealed record ReleaseInfo(Version Version, string Tag, string Notes, string PageUrl, string? ExeUrl, long ExeSize, string? ChecksumUrl, DateTime? Published = null, string? SignatureUrl = null, string? Title = null);
 
 internal enum UpdateState { Idle, Checking, UpToDate, Available, Downloading, Failed, NotConfigured }
 
@@ -388,8 +388,10 @@ internal sealed class UpdateService
             }
         }
         DateTime? published = root.TryGetProperty("published_at", out var at) && at.ValueKind == JsonValueKind.String && at.TryGetDateTime(out var when) ? when : null;
+        string? title = root.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String ? name.GetString()?.Trim() : null;
+        if (string.IsNullOrEmpty(title) || string.Equals(title, tag, StringComparison.OrdinalIgnoreCase)) title = null;
         return new ReleaseInfo(version, tag, root.TryGetProperty("body", out var body) && body.ValueKind == JsonValueKind.String ? body.GetString() ?? "" : "",
-            TrustedPage(root.TryGetProperty("html_url", out var page) && page.ValueKind == JsonValueKind.String ? page.GetString() : null), exe, size, checksum, published, signature);
+            TrustedPage(root.TryGetProperty("html_url", out var page) && page.ValueKind == JsonValueKind.String ? page.GetString() : null), exe, size, checksum, published, signature, title);
     }
 
     public const string SimHubZip = "Velocita-SimHub.zip";

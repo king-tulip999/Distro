@@ -202,6 +202,7 @@ internal sealed class HudHost : IDisposable
 
     private void OnVrChanged()
     {
+        _editButtonShown = -1;
         foreach (var s in _slots.Values) s.Dirty = true;
         if (AppIdentity.SimHub) Refresh();
         if (_holding && !_timer.Enabled) SafeTick();
@@ -460,6 +461,7 @@ internal sealed class HudHost : IDisposable
             if (s.Dirty || due && s.LastSeq != frame.Sequence) Draw(s, frame);
             anyShown = true;
         }
+        if (TickEditButton(frame)) fastest = Math.Max(fastest, EditButtonHz);
         SyncSimBar(anyShown && frame.Simulated);
         if (_web?.Clients is { Count: > 0 } clients)
         {
@@ -673,8 +675,7 @@ internal sealed class HudHost : IDisposable
     private void OnMouseButton(bool down)
     {
         if (_editor is null) return;
-        if (down) Apply(_editor.Press());
-        else _editor.Release();
+        Apply(down ? _editor.Press() : _editor.Release());
     }
 
     private void OnMouseWheel(int notches) => Apply(_editor?.Wheel(notches));
@@ -686,7 +687,7 @@ internal sealed class HudHost : IDisposable
         var at = new PointF(x / scale, y / scale);
         if (kind == 0) Apply(_editor.MoveTo(at, false));
         else if (kind == 1) Apply(_editor.Press(at));
-        else _editor.Release();
+        else Apply(_editor.Release());
     }
 
     private void Apply(VrEditorResult? result)
@@ -754,14 +755,101 @@ internal sealed class HudHost : IDisposable
         painter.Begin(target.Surface.Graphics!, _editorScale, new SizeF(layout.Width, size.Height / _editorScale), Palette, Settings.Appearance);
         VrEditorPainter.Paint(painter, editor, editor.PickedName(w => HudCatalog.Find(w.Kind)?.Name ?? w.Kind));
         painter.End(target.Surface.Dc, size);
-        _vr.Publish(target, EditorId, "VR widgets", EditorConfig, EditorPose(), pointer: true);
+        _vr.Publish(target, EditorId, "VR widgets", EditorConfig, EditorPose(Settings), pointer: true);
     }
 
-    public static VrPose EditorPose()
+    public static VrPose EditorPose(RaceHudSettings settings)
     {
-        const double y = -0.12, distance = 0.55, width = 0.42;
+        double x = settings.VrPanelX, y = settings.VrPanelY, distance = RaceHudSettings.VrPanelDistance;
+        var (turn, tilt) = VrPlacement.FacingHead(x, y, distance);
+        return new VrPose(x, y, distance, settings.VrPanelWidth, turn, tilt, 0);
+    }
+
+    private const string EditButtonId = "vr-edit-button";
+    private const int EditButtonHz = 12;
+    private const double LookSeconds = 1.5, StillSpeed = 1;
+    private static readonly SizeF EditButtonLayout = new(190, 40);
+    private double _editButtonShown = -1;
+    private long _lookStart;
+    private bool _lookArmed = true;
+
+    public static VrPose EditButtonPose()
+    {
+        const double y = 0.3, distance = 0.9, width = 0.19;
         var (turn, tilt) = VrPlacement.FacingHead(0, y, distance);
         return new VrPose(0, y, distance, width, turn, tilt, 0);
+    }
+
+    private bool HasVrCandidate()
+    {
+        if (Settings.Layout(_layoutName) is not { } layout) return false;
+        foreach (var w in layout.Widgets)
+            if (w.Enabled && w.Vr != HudVrPlacement.Off && HudCatalog.Find(w.Kind) is not null) return true;
+        return false;
+    }
+
+    private bool TickEditButton(TelemetryFrame frame)
+    {
+        bool ready = !_app.Demo && _editor is null && _vr.Showing && !(frame.Driving && frame.Speed > StillSpeed) && HasVrCandidate();
+        if (ready && !Settings.VrEditorIntroDone)
+        {
+            Settings.VrEditorIntroDone = true;
+            _app.Save();
+            _lookArmed = false;
+            System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => { if (_editor is null) ToggleVrAdjust(); });
+            ready = false;
+        }
+        if (!ready || !Settings.VrEditButton)
+        {
+            if (_editButtonShown >= 0) _vr.Hide(EditButtonId);
+            _editButtonShown = -1;
+            _lookStart = 0;
+            return false;
+        }
+        double progress = 0;
+        var pose = EditButtonPose();
+        bool looking = _vr.Head() is { } head && VrPlacement.Looks(head, pose, pose.Width * EditButtonLayout.Height / EditButtonLayout.Width);
+        if (!looking)
+        {
+            _lookStart = 0;
+            _lookArmed = true;
+        }
+        else if (_lookArmed)
+        {
+            long now = Stopwatch.GetTimestamp();
+            if (_lookStart == 0) _lookStart = now;
+            progress = Stopwatch.GetElapsedTime(_lookStart, now).TotalSeconds / LookSeconds;
+            if (progress >= 1)
+            {
+                _lookArmed = false;
+                _lookStart = 0;
+                progress = 0;
+                System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => { if (_editor is null) ToggleVrAdjust(); });
+            }
+        }
+        double step = Math.Round(Math.Clamp(progress, 0, 1) * 20) / 20;
+        if (step != _editButtonShown)
+        {
+            _editButtonShown = step;
+            DrawEditButton(step, pose);
+        }
+        return true;
+    }
+
+    private void DrawEditButton(double progress, VrPose pose)
+    {
+        var size = VrPlacement.Pixels(EditButtonLayout, VrShare.MaxPixels / 8);
+        float scale = size.Width / EditButtonLayout.Width;
+        var target = _vr.Begin(EditButtonId, size);
+        var p = target.Painter;
+        p.Begin(target.Surface.Graphics!, scale, new SizeF(EditButtonLayout.Width, size.Height / scale), Palette, Settings.Appearance);
+        var b = p.Bounds;
+        p.Fill(b, HudPalette.Alpha(p.P.Bg, 230), b.Height / 2);
+        if (progress > 0) p.Fill(new RectangleF(b.X, b.Y, (float)(b.Width * progress), b.Height), HudPalette.Alpha(p.P.Accent, 150), b.Height / 2);
+        p.Outline(new RectangleF(b.X + 1, b.Y + 1, b.Width - 2, b.Height - 2), p.P.Accent, 2, b.Height / 2);
+        p.Text(progress > 0 ? "Keep looking…" : "Look here to edit VR widgets", p.SmallBold, p.P.Text, b, HAlign.Center, VAlign.Center);
+        p.End(target.Surface.Dc, size);
+        _vr.Publish(target, EditButtonId, "Edit VR widgets", EditorConfig, pose);
     }
 
     public void RecenterVr()
@@ -872,6 +960,7 @@ internal sealed class HudHost : IDisposable
     {
         foreach (var s in _slots.Values) Close(s);
         _vr.HideAll();
+        _editButtonShown = -1;
         _toolbar?.Close();
         _simBar?.Close();
         _simBar = null;

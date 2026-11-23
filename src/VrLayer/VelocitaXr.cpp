@@ -214,6 +214,18 @@ namespace
         char runtime[128];
     };
 
+    constexpr uint32_t HeadAt = 2304;
+
+    struct HeadReport
+    {
+        uint64_t tick;
+        XrVector3f position;
+        XrQuaternionf orientation;
+        uint32_t pad;
+    };
+
+    static_assert(sizeof(HeadReport) == 40, "head");
+    static_assert(HeadAt >= ReportAt + sizeof(LayerReport) && HeadAt + sizeof(HeadReport) <= HeaderBytes, "head place");
     static_assert(sizeof(SharedHeader) == 32, "header");
     static_assert(sizeof(SharedSlot) == 64, "slot");
     static_assert(sizeof(LayerReport) == 176, "report");
@@ -530,8 +542,27 @@ namespace
         space.poseInReferenceSpace.position = head.pose.position;
         XrSpace anchored = nullptr;
         if (g_next.createReferenceSpace(g_session, &space, &anchored) != XR_SUCCESS) return;
+        if (!g_anchored)
+            Log("Widgets anchored to the head: %.2f, %.2f, %.2f m from the runtime's origin, facing %.0f degrees",
+                head.pose.position.x, head.pose.position.y, head.pose.position.z, yaw * 57.29578f);
         if (g_anchored) g_next.destroySpace(g_anchored);
         g_anchored = anchored;
+    }
+
+    void WriteHead(XrTime time, ULONGLONG now)
+    {
+        XrSpace base = g_anchored ? g_anchored : g_local;
+        if (!g_next.locateSpace || !base || !g_view) return;
+        XrSpaceLocation head{};
+        head.type = XR_TYPE_SPACE_LOCATION;
+        if (g_next.locateSpace(g_view, base, time, &head) != XR_SUCCESS || (head.locationFlags & 0x3) != 0x3) return;
+        auto report = reinterpret_cast<HeadReport*>(g_shared + HeadAt);
+        report->tick = 0;
+        MemoryBarrier();
+        report->position = head.pose.position;
+        report->orientation = head.pose.orientation;
+        MemoryBarrier();
+        report->tick = now;
     }
 
     uint32_t BuildQuads(XrTime time)
@@ -549,7 +580,9 @@ namespace
             g_recenterSeen = recenter;
             Recenter(time);
         }
+        if (!g_anchored) Recenter(time);
         ULONGLONG now = GetTickCount64();
+        WriteHead(time, now);
         header->readerTick = now;
         bool stale = now - header->writerTick > StaleMs;
         uint32_t count = stale ? 0 : (header->count < MaxSlots ? header->count : MaxSlots);

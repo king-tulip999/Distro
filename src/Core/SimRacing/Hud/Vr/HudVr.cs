@@ -231,6 +231,23 @@ internal sealed class HudVr : IDisposable
         return done;
     }
 
+    private readonly float[] _head = new float[12];
+
+    public float[]? Head()
+    {
+        if (!_on) return null;
+        try
+        {
+            if (_steam.Connected && _steam.HeadPose(_head))
+            {
+                _steam.Anchor.Unapply(_head);
+                return _head;
+            }
+        }
+        catch (Exception ex) when (ex is SEHException or InvalidOperationException) { LogOnce("head", ex); }
+        return _share.ReaderAlive && _share.ReadHead(_head) ? _head : null;
+    }
+
     public void PollPointer(string id, Action<int, float, float> pointed)
     {
         try { _steam.PollPointer(id, pointed); }

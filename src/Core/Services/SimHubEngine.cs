@@ -23,6 +23,7 @@ internal static class SimHubEngine
     private static AppServices? _services;
     private static HudHost? _hud;
     private static SimHubUpdater? _updater;
+    private static SimHubTray? _tray;
 
     public static HudHost? Hud => _hud;
 
@@ -37,6 +38,8 @@ internal static class SimHubEngine
     private static string DetachEventName => $@"Local\{AppIdentity.DataName}.Detach";
     private static string ClosingEventName => $@"Local\{AppIdentity.DataName}.Closing";
     private static string ResumedEventName => $@"Local\{AppIdentity.DataName}.Resumed";
+    private static string EditVrEventName => $@"Local\{AppIdentity.DataName}.EditVr";
+    private static string RecenterVrEventName => $@"Local\{AppIdentity.DataName}.RecenterVr";
     private static readonly TimeSpan ParentExitGrace = TimeSpan.FromSeconds(10);
     private static bool _watchingParent;
     private static bool _parentHandled;
@@ -88,6 +91,11 @@ internal static class SimHubEngine
             racing.Start(_services);
             _hud = racing.Hud;
         }
+        if (Arg(args, ShotArg) is null)
+        {
+            _services.Hotkeys.RegisterAll();
+            if (Arg(args, ParentArg) is not null) _tray = new SimHubTray(_services, () => _hud, ShowSettings);
+        }
 
         if (Arg(args, FolderArg) is { } folder)
         {
@@ -105,6 +113,8 @@ internal static class SimHubEngine
         Listen(app, DetachEventName, "SimHub detach", SimHubEmbed.Detach);
         Listen(app, ClosingEventName, "SimHub closing", SimHubClosing);
         Listen(app, ResumedEventName, "SimHub resumed", StopParentGrace);
+        Listen(app, EditVrEventName, "SimHub edit VR", () => _hud?.ToggleVrAdjust());
+        Listen(app, RecenterVrEventName, "SimHub recenter VR", () => _hud?.RecenterVr());
         SingleInstance.ListenForQuit(() => app.Dispatcher.BeginInvoke(new Action(App.Quit)));
         if (int.TryParse(Arg(args, ParentArg), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parent)) WatchParent(app, parent);
         if (args.Contains(SettingsArg, StringComparer.OrdinalIgnoreCase)) ShowSettings();
@@ -237,6 +247,8 @@ internal static class SimHubEngine
     public static void Stop()
     {
         SimHubEmbed.Detach();
+        _tray?.Dispose();
+        _tray = null;
         _updater?.Stop();
         _updater = null;
         if (_services is not { } services) return;

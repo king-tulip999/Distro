@@ -39,6 +39,25 @@ internal readonly record struct VrAnchor(double X, double Y, double Z, double Ya
             }
         return o;
     }
+
+    public void Unapply(float[] m)
+    {
+        if (this == None || m.Length < 12) return;
+        double r = Yaw * Math.PI / 180, c = Math.Cos(r), s = Math.Sin(r);
+        for (int col = 0; col < 4; col++)
+        {
+            double x = m[col], y = m[4 + col], z = m[8 + col];
+            if (col == 3)
+            {
+                x -= X;
+                y -= Y;
+                z -= Z;
+            }
+            m[col] = (float)(c * x - s * z);
+            m[4 + col] = (float)y;
+            m[8 + col] = (float)(s * x + c * z);
+        }
+    }
 }
 
 internal enum VrAdjustSetting { Move, DistanceAndWidth, Angle }
@@ -185,6 +204,38 @@ internal static class VrPlacement
         double yaw = turn * Math.PI / 360, pitch = -tilt * Math.PI / 360;
         double cy = Math.Cos(yaw), sy = Math.Sin(yaw), cp = Math.Cos(pitch), sp = Math.Sin(pitch);
         return ((float)(cy * sp), (float)(sy * cp), (float)(-sy * sp), (float)(cy * cp));
+    }
+
+    public static void FromQuaternion(float px, float py, float pz, float qx, float qy, float qz, float qw, float[] m)
+    {
+        m[0] = 1 - 2 * (qy * qy + qz * qz);
+        m[1] = 2 * (qx * qy - qz * qw);
+        m[2] = 2 * (qx * qz + qy * qw);
+        m[3] = px;
+        m[4] = 2 * (qx * qy + qz * qw);
+        m[5] = 1 - 2 * (qx * qx + qz * qz);
+        m[6] = 2 * (qy * qz - qx * qw);
+        m[7] = py;
+        m[8] = 2 * (qx * qz - qy * qw);
+        m[9] = 2 * (qy * qz + qx * qw);
+        m[10] = 1 - 2 * (qx * qx + qy * qy);
+        m[11] = pz;
+    }
+
+    public static bool Looks(float[] head, VrPose pose, double height)
+    {
+        if (head.Length < 12 || pose.Width <= 0 || height <= 0) return false;
+        var w = Matrix(pose.X, pose.Y, pose.Distance, pose.Turn, pose.Tilt);
+        double px = head[3], py = head[7], pz = head[11];
+        double fx = -head[2], fy = -head[6], fz = -head[10];
+        double nx = w[2], ny = w[6], nz = w[10];
+        double facing = fx * nx + fy * ny + fz * nz;
+        if (Math.Abs(facing) < 1e-6) return false;
+        double t = ((w[3] - px) * nx + (w[7] - py) * ny + (w[11] - pz) * nz) / facing;
+        if (!(t > 0)) return false;
+        double hx = px + t * fx - w[3], hy = py + t * fy - w[7], hz = pz + t * fz - w[11];
+        double across = hx * w[0] + hy * w[4] + hz * w[8], up = hx * w[1] + hy * w[5] + hz * w[9];
+        return Math.Abs(across) <= pose.Width / 2 && Math.Abs(up) <= height / 2;
     }
 
     public static (double Turn, double Tilt) FacingHead(double x, double y, double distance)

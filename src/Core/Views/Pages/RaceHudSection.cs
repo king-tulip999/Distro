@@ -794,9 +794,38 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             new TextBlock
             {
                 Text = (string.IsNullOrWhiteSpace(S.VrAdjustHotkey) || AppIdentity.SimHub ? "" : $"{adjustKey} also opens it. ")
-                    + "A panel opens in front of you: the mouse or a SteamVR controller picks a widget and moves it. Right-click or Done gives the mouse back.",
+                    + "A panel opens in front of you: the mouse or a SteamVR controller picks a widget and moves it. Right-click or Done gives the mouse back. It opens by itself the first time VR widgets show in the headset.",
                 Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4),
-            });
+            },
+            Ui.SettingRow("Look-at button in the headset", "Shows above the windshield while the car is stopped. Look at it for a moment to open the editor.",
+                Ui.Switch(S.VrEditButton, on => { S.VrEditButton = on; changed(); })),
+            SimHubKeys());
+        FrameworkElement SimHubKeys()
+        {
+            if (!AppIdentity.SimHub) return new StackPanel { Visibility = Visibility.Collapsed };
+            return new StackPanel
+            {
+                Children =
+                {
+                    Ui.SubHeader("Keys and wheel buttons"),
+                    KeyRow("Edit VR widgets", S.VrAdjustHotkey, k => S.VrAdjustHotkey = k),
+                    KeyRow("Recenter VR widgets", S.VrRecenterHotkey, k => S.VrRecenterHotkey = k),
+                    new TextBlock
+                    {
+                        Text = "Click a box, then press a key or a wheel button. SimHub's Controls and events can run both too, as Velocita actions.",
+                        Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 4),
+                    },
+                },
+            };
+        }
+        FrameworkElement KeyRow(string label, string? value, Action<string?> set)
+        {
+            var box = new Core.Controls.HotkeyBox { Width = 160, VerticalAlignment = VerticalAlignment.Center };
+            box.SetHotkey(value);
+            box.HotkeyChanged += k => { set(k); changed(); app.Hotkeys.RegisterAll(); };
+            System.Windows.Automation.AutomationProperties.SetName(box, label);
+            return Ui.SettingRow(label, null, box);
+        }
         FrameworkElement Recenter()
         {
             var button = Ui.LabeledButton("I.Target", "Recenter VR widgets", () => Host()?.RecenterVr(), "GhostButton");

@@ -104,6 +104,20 @@ internal sealed class VrShare : IDisposable
             v.ReadUInt32(ReportAt + 24), v.ReadUInt32(ReportAt + 28), v.ReadInt64(ReportAt + 32), v.ReadInt32(ReportAt + 40), runtime);
     }
 
+    public const int HeadAt = 2304, HeadBytes = 40, HeadFreshMs = 500;
+
+    public bool ReadHead(float[] into)
+    {
+        if (_view is not { } v || into.Length < 12) return false;
+        long tick = v.ReadInt64(HeadAt);
+        if (tick == 0 || Environment.TickCount64 - tick > HeadFreshMs) return false;
+        VrPlacement.FromQuaternion(v.ReadSingle(HeadAt + 8), v.ReadSingle(HeadAt + 12), v.ReadSingle(HeadAt + 16),
+            v.ReadSingle(HeadAt + 20), v.ReadSingle(HeadAt + 24), v.ReadSingle(HeadAt + 28), v.ReadSingle(HeadAt + 32), into);
+        for (int i = 0; i < 12; i++)
+            if (!float.IsFinite(into[i])) return false;
+        return true;
+    }
+
     public void Recenter()
     {
         if (_view is not { } v) return;

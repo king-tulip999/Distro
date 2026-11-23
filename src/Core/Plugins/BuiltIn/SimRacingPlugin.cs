@@ -93,6 +93,9 @@ internal sealed class SimRacingPlugin : Plugin
         var item = new WinForms.ToolStripMenuItem("Show iRacing Overlay") { Checked = h.Enabled, ShortcutKeyDisplayString = Core.Hotkeys.Hotkey.Display(h.ToggleHotkey) };
         item.Click += (_, _) => Hud?.SetEnabled(!h.Enabled);
         items.Add(item);
+        if (!h.VrOverlays) return;
+        items.Add(new WinForms.ToolStripMenuItem("Edit VR widgets in the headset", null, (_, _) => Hud?.ToggleVrAdjust()) { ShortcutKeyDisplayString = Core.Hotkeys.Hotkey.Display(h.VrAdjustHotkey) });
+        items.Add(new WinForms.ToolStripMenuItem("Recenter VR widgets", null, (_, _) => Hud?.RecenterVr()) { ShortcutKeyDisplayString = Core.Hotkeys.Hotkey.Display(h.VrRecenterHotkey) });
     }
 
     public CompanionApp? TradingPaints { get; private set; }

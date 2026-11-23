@@ -9,13 +9,18 @@ internal static class VrEditorPainter
         var b = p.Bounds;
         p.Fill(b, HudPalette.Alpha(p.P.Bg, 240), p.Look.Corner);
         p.Outline(new RectangleF(b.X + 1, b.Y + 1, b.Width - 2, b.Height - 2), p.P.Accent, 2, p.Look.Corner);
-        p.Text("VR widgets", p.Bold, p.P.Heading, new RectangleF(VrEditor.Pad, VrEditor.Pad, 200, 28));
         var rows = editor.Rows();
         foreach (var e in editor.Elements())
         {
             bool hover = editor.Hover.Part == e.Part && editor.Hover.Row == e.Row;
             switch (e.Part)
             {
+                case VrEditorPart.Grip:
+                    if (hover || editor.MovingPanel) p.Fill(e.Box, p.Raised(editor.MovingPanel ? 0.18 : 0.08), 6);
+                    p.Text("VR widgets", p.Bold, p.P.Heading, new RectangleF(e.Box.X + 6, e.Box.Y, 96, e.Box.Height));
+                    var hintBox = new RectangleF(e.Box.X + 96, e.Box.Y, e.Box.Width - 100, e.Box.Height);
+                    p.Text(editor.MovingPanel ? "Moving the panel" : "Drag here to move, scroll to resize", p.Tiny, p.P.Faint, hintBox, HAlign.Right);
+                    break;
                 case VrEditorPart.Done:
                     Button(p, e.Box, "Done", hover, true);
                     break;
@@ -59,6 +64,8 @@ internal static class VrEditorPainter
                     break;
             }
         }
+        string hint = editor.Picked is null ? "Drag a slider, or scroll over it for small steps" : "Drag or scroll over a slider. Face my head undoes a tilt";
+        p.Text(hint, p.Tiny, p.P.Faint, new RectangleF(VrEditor.Pad, b.Bottom - 38, b.Width - VrEditor.Pad * 2, 16));
         p.Text("Right-click or Done gives the mouse back", p.Tiny, p.P.Faint, new RectangleF(VrEditor.Pad, b.Bottom - 22, b.Width - VrEditor.Pad * 2, 16));
         if (editor.CursorShown)
         {

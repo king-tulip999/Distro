@@ -29,6 +29,8 @@ public class VelocitaPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
         this.AddAction("Toggle", (_, _) => Engine.Toggle());
         this.AddAction("TurnOn", (_, _) => Engine.SetOn(true));
         this.AddAction("TurnOff", (_, _) => Engine.SetOn(false));
+        this.AddAction("EditVrWidgets", (_, _) => Engine.EditVr());
+        this.AddAction("RecenterVrWidgets", (_, _) => Engine.RecenterVr());
         if (Engine.On && !Engine.Running) Engine.Start();
         _sinceCheck.Restart();
     }

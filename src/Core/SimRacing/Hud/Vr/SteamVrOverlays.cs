@@ -186,13 +186,18 @@ internal sealed class SteamVrOverlays : IDisposable
 
     public float[]? HeadPose()
     {
-        if (!Connected || _trackingPose is null) return null;
+        var m = new float[12];
+        return HeadPose(m) ? m : null;
+    }
+
+    public bool HeadPose(float[] into)
+    {
+        if (!Connected || _trackingPose is null || into.Length < 12) return false;
         Array.Clear(_headPose);
         _trackingPose(UniverseSeated, 0, _headPose, 1);
-        if (_headPose[PoseValidAt] == 0) return null;
-        var m = new float[12];
-        Buffer.BlockCopy(_headPose, 0, m, 0, 48);
-        return m;
+        if (_headPose[PoseValidAt] == 0) return false;
+        Buffer.BlockCopy(_headPose, 0, into, 0, 48);
+        return true;
     }
 
     public void Show(string id, string name, HudVrPlacement mode, VrPose pose, int opacity, int width, int height, IntPtr pixels, bool pointer = false)

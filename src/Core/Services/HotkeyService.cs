@@ -15,8 +15,7 @@ internal sealed class HotkeyService : IDisposable
 
     public void RegisterAll()
     {
-        // Velocita for SimHub hides keybinds: global keys there would clash with Velocita's own.
-        if (_app.Demo || _pauseCount > 0 || AppIdentity.SimHub)
+        if (_app.Demo || _pauseCount > 0)
             return;
 
         _manager ??= new HotkeyManager();
@@ -27,6 +26,14 @@ internal sealed class HotkeyService : IDisposable
         {
             if (!string.IsNullOrWhiteSpace(hotkey) && !_manager!.TryRegister(hotkey, action, out var error))
                 failures.Add($"{label}: {Hotkey.Display(hotkey)} {error}");
+        }
+
+        if (AppIdentity.SimHub)
+        {
+            foreach (var hotkey in PluginHotkeys().Where(h => SimHubKeybinds.Contains(h.Id) && h.Live?.Invoke() != false))
+                Register(hotkey.Get(), hotkey.Invoke, hotkey.Label);
+            ReportFailures(failures);
+            return;
         }
 
         var config = _app.Config;
@@ -50,7 +57,13 @@ internal sealed class HotkeyService : IDisposable
             }
         }
         Register(config.Hotkeys.ShowWindow, _app.RequestToggleWindow, $"Show / hide {AppIdentity.Name}");
+        ReportFailures(failures);
+    }
 
+    public static readonly IReadOnlySet<string> SimHubKeybinds = new HashSet<string> { "hud.vr.adjust", "hud.vr.recenter" };
+
+    private void ReportFailures(List<string> failures)
+    {
         var failed = string.Join("\n", failures);
         if (failed.Length > 0 && failed != _lastFailures)
             _app.Notify("Some keybinds didn't register", failed, NoticeKind.Warning, important: true);
