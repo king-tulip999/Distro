@@ -1,0 +1,1030 @@
+[
+  {
+    "title": "What applying it changes",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "heading"
+  },
+  {
+    "title": "Save current setup",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "action"
+  },
+  {
+    "title": "Reapply",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "action"
+  },
+  {
+    "title": "Monitors",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "heading"
+  },
+  {
+    "title": "Layout",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "setting"
+  },
+  {
+    "title": "HDR",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "setting"
+  },
+  {
+    "title": "Taskbar",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "setting"
+  },
+  {
+    "title": "Audio",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "heading"
+  },
+  {
+    "title": "Output",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "setting"
+  },
+  {
+    "title": "Microphone",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "setting"
+  },
+  {
+    "title": "Also use them for calls (Discord, Teams\u2026)",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "tick"
+  },
+  {
+    "title": "Volume",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "setting"
+  },
+  {
+    "title": "Set to",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "setting"
+  },
+  {
+    "title": "Keybind",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "heading"
+  },
+  {
+    "title": "Switch to it",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "setting"
+  },
+  {
+    "title": "Wallpapers",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "heading"
+  },
+  {
+    "title": "Apps",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "heading"
+  },
+  {
+    "title": "Add app",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "action"
+  },
+  {
+    "title": "Close them when left",
+    "page": "displays",
+    "section": null,
+    "anchor": "displays.setup",
+    "tabs": [],
+    "where": "Displays",
+    "kind": "tick"
+  },
+  {
+    "title": "Apply automatically",
+    "page": "windows",
+    "section": null,
+    "anchor": "windows.auto",
+    "tabs": [],
+    "where": "Window placement",
+    "kind": "setting"
+  },
+  {
+    "title": "Apply all",
+    "page": "windows",
+    "section": null,
+    "anchor": null,
+    "tabs": [],
+    "where": "Window placement",
+    "kind": "action"
+  },
+  {
+    "title": "In this group",
+    "page": "windows",
+    "section": null,
+    "anchor": null,
+    "tabs": [],
+    "where": "Window placement",
+    "kind": "heading"
+  },
+  {
+    "title": "Keybind",
+    "page": "windows",
+    "section": null,
+    "anchor": null,
+    "tabs": [],
+    "where": "Window placement",
+    "kind": "heading"
+  },
+  {
+    "title": "Move them all",
+    "page": "windows",
+    "section": null,
+    "anchor": null,
+    "tabs": [],
+    "where": "Window placement",
+    "kind": "setting"
+  },
+  {
+    "title": "Layout",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.layouts",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "heading"
+  },
+  {
+    "title": "New layout",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.layouts",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "action"
+  },
+  {
+    "title": "Show the overlay",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.visible",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "setting"
+  },
+  {
+    "title": "Preview",
+    "page": "overlay",
+    "section": null,
+    "anchor": null,
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "heading"
+  },
+  {
+    "title": "Rename items",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.names",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "action"
+  },
+  {
+    "title": "What to show",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.metrics",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "heading"
+  },
+  {
+    "title": "FPS",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.metrics",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "heading"
+  },
+  {
+    "title": "VRAM",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.metrics",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "heading"
+  },
+  {
+    "title": "RAM",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.metrics",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "heading"
+  },
+  {
+    "title": "NET",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.metrics",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "heading"
+  },
+  {
+    "title": "FAN",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.metrics",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "heading"
+  },
+  {
+    "title": "Look",
+    "page": "overlay",
+    "section": null,
+    "anchor": null,
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "heading"
+  },
+  {
+    "title": "Data and keybinds",
+    "page": "overlay",
+    "section": null,
+    "anchor": null,
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "heading"
+  },
+  {
+    "title": "Style",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.style",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "row"
+  },
+  {
+    "title": "Text size",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.font",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "row"
+  },
+  {
+    "title": "Background",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.opacity",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "row"
+  },
+  {
+    "title": "Accent",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.accent",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "row"
+  },
+  {
+    "title": "Frame-time graph",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.graph",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "setting"
+  },
+  {
+    "title": "Update rate",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.rate",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "row"
+  },
+  {
+    "title": "FPS statistics",
+    "page": "overlay",
+    "section": null,
+    "anchor": null,
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "row"
+  },
+  {
+    "title": "Show / hide",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.hotkey",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "row"
+  },
+  {
+    "title": "Reset FPS statistics",
+    "page": "overlay",
+    "section": null,
+    "anchor": "overlay.fpshotkey",
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "row"
+  },
+  {
+    "title": "Position",
+    "page": "overlay",
+    "section": null,
+    "anchor": null,
+    "tabs": [],
+    "where": "Performance Overlay",
+    "kind": "heading"
+  },
+  {
+    "title": "Control fans",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.master",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "setting"
+  },
+  {
+    "title": "Fans",
+    "page": "fans",
+    "section": null,
+    "anchor": null,
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control",
+    "kind": "tab"
+  },
+  {
+    "title": "Curves",
+    "page": "fans",
+    "section": null,
+    "anchor": null,
+    "tabs": [
+      "Curves"
+    ],
+    "where": "Fan Control",
+    "kind": "tab"
+  },
+  {
+    "title": "Preset",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.presets",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "heading"
+  },
+  {
+    "title": "New preset",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.presets",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "action"
+  },
+  {
+    "title": "Calibrate all",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.actions",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "action"
+  },
+  {
+    "title": "Cooling test",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.actions",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "action"
+  },
+  {
+    "title": "Reset all",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.actions",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "action"
+  },
+  {
+    "title": "Emergency temperature",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.failsafe",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "heading"
+  },
+  {
+    "title": "Curve",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.fans",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "heading"
+  },
+  {
+    "title": "Limits",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.fans",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "heading"
+  },
+  {
+    "title": "This is a pump",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.fans",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "setting"
+  },
+  {
+    "title": "Allow fan stop at low temperatures",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.fans",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "setting"
+  },
+  {
+    "title": "Calibrate",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.fans",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "action"
+  },
+  {
+    "title": "Spin up",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.fans",
+    "tabs": [
+      "Fans"
+    ],
+    "where": "Fan Control \u203A Fans",
+    "kind": "action"
+  },
+  {
+    "title": "Temperature from",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.curves",
+    "tabs": [
+      "Curves"
+    ],
+    "where": "Fan Control \u203A Curves",
+    "kind": "setting"
+  },
+  {
+    "title": "Ignore changes under",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.curves",
+    "tabs": [
+      "Curves"
+    ],
+    "where": "Fan Control \u203A Curves",
+    "kind": "row"
+  },
+  {
+    "title": "Fastest rise",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.curves",
+    "tabs": [
+      "Curves"
+    ],
+    "where": "Fan Control \u203A Curves",
+    "kind": "row"
+  },
+  {
+    "title": "Fastest drop",
+    "page": "fans",
+    "section": null,
+    "anchor": "fans.curves",
+    "tabs": [
+      "Curves"
+    ],
+    "where": "Fan Control \u203A Curves",
+    "kind": "row"
+  },
+  {
+    "title": "Application settings",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.app",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Startup",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.startup",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Start with Windows",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.startup",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Start in background",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.startup",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Window",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.window",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Close in background",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.window",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Open on",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.startpage",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Keep on top",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.ontop",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Notifications",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.window",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Quit",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.window",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Quit Tecnica",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.window",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "About and updates",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.updates",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Changelog",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.about",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Discord",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.about",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Project page",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.about",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Updates",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.updates",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Check for updates",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.updates",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Check now",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.updates",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Install updates automatically",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.updates",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Appearance",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.look",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Accent",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.accent",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Animations",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.look",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Performance",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.performance",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Sensor update rate",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.sensorrate",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Background usage",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.background",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Lighter drawing while iRacing runs",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.light",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Hardware access",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.access",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "What is PawnIO, and is it safe?",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.pawnio",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Data and configuration",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.data",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Export / import settings",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.export",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Export",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.export",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Import",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.export",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Settings file",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.folder",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Open folder",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.folder",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Back to defaults",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.reset",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Reset Tecnica",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.reset",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Uninstall",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.uninstall",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Uninstall Tecnica",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.uninstall",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Diagnostics",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.diagnostics",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Rescan hardware",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.rescan",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Refresh sensors",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.diagnostics",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Open logs",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.logs",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Export diagnostic report",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.report",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Copy system information",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.diagnostics",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  }
+]

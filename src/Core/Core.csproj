@@ -54,6 +54,7 @@
     <EmbeddedResource Include="LiveryShop\Web\**" LogicalName="livery-shop/%(RecursiveDir)%(Filename)%(Extension)" />
     <EmbeddedResource Include="LiveryShop\LiveryMonkey.js" LogicalName="livery-monkey.js" />
     <EmbeddedResource Include="LiveryShop\CarTemplates.txt" LogicalName="livery-car-templates.txt" />
+    <EmbeddedResource Include="Assets\search-index-*.json" LogicalName="%(Filename)%(Extension)" />
     <EmbeddedResource Include="Assets\TrackMaps.zip" LogicalName="TrackMaps.zip" Condition="Exists('Assets\TrackMaps.zip')" />
     <!-- OpenXR layer that shows VR widgets in OpenXR games (built by devtools\tools\vr-layer.cmd from src\VrLayer). -->
     <EmbeddedResource Include="Assets\VelocitaXr.dll" LogicalName="VelocitaXr.dll" Condition="Exists('Assets\VelocitaXr.dll')" />

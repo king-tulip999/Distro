@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
@@ -25,7 +25,7 @@ internal interface IHudEditorHost
     void ShowSettings(string anchor);
 }
 
-internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdit, IHudEditorHost, IStagedBuild
+internal sealed class RaceHudSection : StackPanel, IScreenshotStates, IHudEditorHost, IStagedBuild
 {
     private static readonly string[] Tabs = { "Widgets", "Alerts", "Fuel", "Overlay settings", "VR settings" };
     private const int WidgetsTab = 0, AlertsTabIndex = 1, FuelTabIndex = 2, SettingsTab = 3, VrTab = 4;
@@ -138,8 +138,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         while (BuildStep()) { }
     }
 
-    private Tile? _rulesCard;
-
     private readonly StackPanel _arrange = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private Button? _editLayout;
 
@@ -223,7 +221,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     {
         if (!_shown) return;
         _shown = false;
-        _rules?.SetEditing(false);
         if (_changedHost is { } h) h.Changed -= OnHostChanged;
         _changedHost = null;
         _watched?.Watch(false);
@@ -315,8 +312,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             _statusChip = chip;
             _statusShown = (text, soft, deep);
         }
-        string why = h?.MatchedRule is { } rule ? $"Layout picked by a rule: {rule.Describe()} · "
-            : h?.PickedForCar is { Length: > 0 } car ? $"Layout picked for {car} · " : "";
+        string why = h?.PickedForCar is { Length: > 0 } car ? $"Layout picked for {car} · " : "";
         string state = h?.OnScreen == true ? (why.Length == 0 ? "On screen" : "on screen") : ShowWhenText(why.Length == 0);
         _status.Text = _app.Demo || !S.Enabled || AppIdentity.SimHub ? ""
             : why + state + (h?.Editing == true ? " · arranging" : "");
@@ -335,9 +331,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         var keep = _widgets?.Keep();
         _steps = 2;
         _tick = null;
-        _rules = null;
         _carsCard = null;
-        _ruleCount = null;
         _alertGroups = null;
         _widgets = null;
         _layoutPick = null;
@@ -403,7 +397,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         var delete = Ui.IconButton("I.Trash", "Delete this layout", async () =>
         {
             string name = ShownLayout;
-            if (S.Layouts.Count <= 1 || !await _window.Confirm($"Delete “{name}”?", "Its widgets and the rules that pick it are removed.", "Delete", danger: true)) return;
+            if (S.Layouts.Count <= 1 || !await _window.Confirm($"Delete “{name}”?", "Its widgets are removed.", "Delete", danger: true)) return;
             S.DeleteLayout(name);
             Changed();
             _app.Hotkeys.RegisterAll();
@@ -428,71 +422,12 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         add.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
         row.Children.Add(add);
 
-        var rules = new StackPanel();
-        var addRule = Ui.LabeledButton("I.Plus", "Add rule", () =>
-        {
-            S.Rules.Add(new HudLayoutRule { Layout = ShownLayout, Session = "Race" });
-            Changed();
-            _rules?.Fill();
-            _rulesEmpty!.Visibility = S.Rules.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            RefreshRuleCount();
-        }, "SoftButton");
-        _rules = new ArrangeList(
-            () => S.Rules.Select(r => (r.Id, r.Describe(), (Func<FrameworkElement>)(() => RuleRow(r)))).ToList(),
-            () => S.Rules.Select(r => r.Id).ToList(),
-            order =>
-            {
-                S.Rules = order.Select(id => S.Rules.First(r => r.Id == id)).ToList();
-                Changed();
-                RefreshStatus();
-            },
-            "Arrange", "Drag the rules into order: when two fit a session equally, the higher one wins");
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        _rules.Button.Margin = Ui.AfterButton;
-        actions.Children.Add(_rules.Button);
-        actions.Children.Add(addRule);
-        _ruleCount = new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
-        var useRules = Ui.Switch(S.AutoSwitch, on =>
-        {
-            S.AutoSwitch = on;
-            Changed();
-            RefreshStatus();
-            if (_rulesCard is not null) _rulesCard.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-            RefreshRuleCount();
-        });
-        System.Windows.Automation.AutomationProperties.SetName(useRules, "Advanced rules");
-        var switchLabel = ToggleCards.RowTitle("Advanced rules");
-        Ui.AddInfo(switchLabel, "Rules pick a layout by session, class, car and track, and beat the cars set on layouts. The most specific matching rule wins, then the higher one.");
-        switchLabel.TextWrapping = TextWrapping.NoWrap;
-        ToggleCards.Row(useRules, switchLabel, null, trailing: _ruleCount);
-        useRules.VerticalAlignment = VerticalAlignment.Center;
-        useRules.HorizontalAlignment = HorizontalAlignment.Left;
-        useRules.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
-        row.Children.Add(useRules);
-        _rules.Fill();
-        _rulesEmpty = Caption("No rules yet: layouts follow the cars set above.", 0);
-        _rulesEmpty.VerticalAlignment = VerticalAlignment.Center;
-        _rulesEmpty.Visibility = S.Rules.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        var ruleBar = new DockPanel { LastChildFill = true };
-        DockPanel.SetDock(actions, Dock.Right);
-        ruleBar.Children.Add(actions);
-        ruleBar.Children.Add(_rulesEmpty);
-        rules.Children.Add(ruleBar);
-        _rules.View.Margin = new Thickness(0, 6, 0, 0);
-        rules.Children.Add(_rules.View);
-        RefreshRuleCount();
-        _rulesCard = new Tile
-        {
-            Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Padding = new Thickness(13, 10, 13, 10), Child = rules,
-            Visibility = S.AutoSwitch ? Visibility.Visible : Visibility.Collapsed,
-        };
         Ui.Anchor(row, LayoutsAnchor);
         _carsCard = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Padding = new Thickness(13, 10, 13, 10) };
         FillCars();
         if (!AppIdentity.SimHub)
         {
             root.Children.Add(_carsCard);
-            root.Children.Add(_rulesCard);
             _layoutSlot.Content = row;
         }
 
@@ -501,7 +436,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         return root;
     }
 
-    private ArrangeList? _rules;
     private Tile? _carsCard;
 
     private bool _carsOpen;
@@ -517,24 +451,28 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         title.Margin = new Thickness(0, 0, 10, 0);
         head.Children.Add(title);
         head.Children.Add(Ui.LabeledButton("I.Plus", "Add classes or cars", () => PickCars(layout, me)));
+        var sessionsNote = Caption("Practice, qualifying or race: set per widget under When shown.", 0);
+        sessionsNote.TextWrapping = TextWrapping.NoWrap;
+        sessionsNote.VerticalAlignment = VerticalAlignment.Center;
+        sessionsNote.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
+        head.Children.Add(sessionsNote);
 
         bool isTheDefault = string.Equals(S.DefaultLayout, layout.Name, StringComparison.OrdinalIgnoreCase);
         var isDefault = Ui.Switch(isTheDefault, on =>
         {
-            if (!on) return;
-            S.DefaultLayout = layout.Name;
+            S.DefaultLayout = on ? layout.Name : "";
             Changed();
             Dispatcher.BeginInvoke(FillCars, DispatcherPriority.Background);
         });
-        isDefault.IsEnabled = !isTheDefault;
-        if (isTheDefault)
+        if (layout.Cars.Count + layout.Classes.Count > 0)
         {
-            isDefault.ToolTip = "To move the default, open another layout and tick it there";
+            isDefault.IsEnabled = false;
+            isDefault.ToolTip = "Remove its classes and cars to use it for other cars";
             ToolTipService.SetShowOnDisabled(isDefault, true);
         }
         System.Windows.Automation.AutomationProperties.SetName(isDefault, "Default for other cars");
         var defaultLabel = ToggleCards.RowTitle("Default for other cars");
-        Ui.AddInfo(defaultLabel, "Shows for any car not set on a layout. One layout is always the default: tick it on another layout to move it there.");
+        Ui.AddInfo(defaultLabel, "Shows for any car not added to a layout. Untick it and those cars show no widgets.");
         defaultLabel.TextWrapping = TextWrapping.NoWrap;
         ToggleCards.Row(isDefault, defaultLabel, null);
         isDefault.VerticalAlignment = VerticalAlignment.Center;
@@ -661,79 +599,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         return tile;
     }
 
-    private TextBlock? _rulesEmpty;
-    private TextBlock? _ruleCount;
-
-    private void RefreshRuleCount()
-    {
-        if (_ruleCount is null) return;
-        _ruleCount.Text = S.Rules.Count == 0 ? "No rules" : RaceFormat.Count(S.Rules.Count, "rule");
-        _ruleCount.Visibility = S.AutoSwitch || S.Rules.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
-    }
-
-    private FrameworkElement RuleRow(HudLayoutRule rule)
-    {
-        var f = Preview.Race.Frame;
-        var me = f.Session.Player;
-        var parts = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
-        FrameworkElement Part(string label, ComboBox combo)
-        {
-            var stack = new StackPanel { Margin = new Thickness(0, 0, 10, 5) };
-            stack.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 0, 0, 2) });
-            stack.Children.Add(combo);
-            return stack;
-        }
-        ComboBox Pick(IEnumerable<string> known, string? value, string any, Action<string?> set, double width)
-        {
-            var names = known.ToList();
-            if (value is not null && !names.Contains(value, StringComparer.OrdinalIgnoreCase)) names.Insert(0, value);
-            var combo = new SearchCombo { MinWidth = width };
-            foreach (var c in names.Select(n => new Choice(n, n)).Prepend(new Choice("", any))) combo.Items.Add(c);
-            combo.SelectedItem = combo.Items.Cast<Choice>().FirstOrDefault(c => string.Equals(c.Id, value ?? "", StringComparison.OrdinalIgnoreCase)) ?? combo.Items[0];
-            combo.SelectionChanged += (_, _) => { if (combo.SelectedItem is Choice c) { set(c.Id is { Length: > 0 } s ? s : null); Changed(); RefreshStatus(); } };
-            return combo;
-        }
-        parts.Children.Add(Part("Show layout", Ui.Combo(S.Layouts.Select(l => new Choice(l.Name, l.Name)), rule.Layout, c => { rule.Layout = c.Id!; Changed(); RefreshStatus(); }, 122)));
-        parts.Children.Add(Part("Session", Ui.Combo(new[]
-        {
-            new Choice("", "Every session"), new Choice("Practice", "Practice"), new Choice("Qualify", "Qualifying"), new Choice("Race", "Race"),
-            new Choice("TimeTrial", "Time trials"),
-        }, rule.Session ?? "", c => { rule.Session = c.Id is { Length: > 0 } s ? s : null; Changed(); RefreshStatus(); }, 113)));
-        parts.Children.Add(Part("Class", Pick(SessionNames.Merge(rule.Class, S.KnownClasses.Append(me?.ClassName), SessionNames.Classes), rule.Class, "Any class", v => rule.Class = v, 150)));
-        parts.Children.Add(Part("Car", Pick(SessionNames.Merge(rule.Car, S.KnownCars.Append(me?.CarName), Core.SimRacing.Setups.SetupCars.BuiltInNames), rule.Car, "Any car", v => rule.Car = v, 230)));
-        parts.Children.Add(Part("Track", Pick(SessionNames.Merge(rule.Track, S.KnownTracks.Append(f.Session.TrackDisplayName), SessionNames.Tracks), rule.Track, "Any track", v => rule.Track = v, 250)));
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.Children.Add(parts);
-        var remove = Ui.IconButton("I.Trash", "Remove this rule", () =>
-        {
-            int at = S.Rules.IndexOf(rule);
-            void Refresh()
-            {
-                Changed();
-                RefreshStatus();
-                _rules?.Fill();
-                if (_rulesEmpty is not null) _rulesEmpty.Visibility = S.Rules.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-                RefreshRuleCount();
-            }
-            S.Rules.Remove(rule);
-            Refresh();
-            _app.Notify("Rule removed", "", action: new NoticeAction("Undo", () =>
-            {
-                if (S.Rules.Contains(rule)) return;
-                S.Rules.Insert(Math.Clamp(at, 0, S.Rules.Count), rule);
-                Refresh();
-            }));
-        }, "QuietIconButton");
-        remove.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(remove, 1);
-        grid.Children.Add(remove);
-        var tile = Hairline.Frame(new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(10, 6, 6, 3), Child = grid });
-        tile.SetResourceReference(Border.BorderBrushProperty, "Line");
-        return tile;
-    }
-
     internal static void NewLayoutBox(Button anchor, RaceHudSettings settings, HudLayout? current, Action<HudLayout> add)
     {
         var name = new TextBox { Text = settings.UniqueName(current is null ? "Layout" : current.Name + " copy"), Width = 211, MaxLength = Ui.NameLength };
@@ -842,7 +707,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         reset.IsEnabled = S.Layout(old) is { } shown && !HudPresets.IsDefault(shown);
         reset.ToolTip = reset.IsEnabled ? "This layout back to the overlay's default widgets and places" : "This layout is the default already";
         ToolTipService.SetShowOnDisabled(reset, true);
-        _ = _window.ShowModal(Ui.Dialog(_window, "Edit layout", "Rules that pick it follow a new name.", Ui.FieldRow("Name", box), buttons, error, 430, reset));
+        _ = _window.ShowModal(Ui.Dialog(_window, "Edit layout", "", Ui.FieldRow("Name", box), buttons, error, 430, reset));
         box.Focus();
         box.SelectAll();
     }
@@ -1688,11 +1553,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     public IEnumerable<(string Name, Func<Task> Enter)> ScreenshotStates()
     {
         yield return ("hud", () => { SelectTab(WidgetsTab); return Task.CompletedTask; });
-        yield return ("hud-rules", () => { _rulesCard?.BringIntoView(); return Task.CompletedTask; });
         yield return ("hud-cars", () => { if (S.Layout(ShownLayout) is { } l) PickCars(l, Preview.Race.Frame.Session.Player); return Task.CompletedTask; });
         yield return ("hud-cars-done", () => { _window.CloseModal(false); return Task.CompletedTask; });
-        yield return ("hud-rules-arrange", () => { _rules?.SetEditing(true); _rulesCard?.BringIntoView(); return Task.CompletedTask; });
-        yield return ("hud-rules-done", () => { _rules?.SetEditing(false); return Task.CompletedTask; });
         yield return ("hud-widgets", () => { _widgets?.Select("relative"); return Task.CompletedTask; });
         yield return ("hud-standings", () => { _widgets?.Select("standings"); return Task.CompletedTask; });
         yield return ("hud-standings-every-column", () =>
@@ -1765,8 +1627,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         yield return ("hud-vr-settings", () => { ShowSettings(VrAnchor); return Task.CompletedTask; });
         yield return ("hud-vr-widget", async () => { SelectTab(WidgetsTab); await Task.Delay(300); _widgets?.ShowInVr("standings"); });
     }
-
-    public bool CancelEdit() => _rules?.Cancel() == true;
 
     private void SelectTab(int tab)
     {

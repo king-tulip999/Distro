@@ -19,7 +19,7 @@ internal static class WebPreview
     {
         double seconds = double.TryParse(secondsText, NumberStyles.Float, CultureInfo.InvariantCulture, out var s) && s > 0 ? s : 300;
         var settings = new RaceHudSettings();
-        settings.Normalize(HudPresets.DefaultLayouts, HudPresets.DefaultRules);
+        settings.Normalize(HudPresets.DefaultLayouts);
         var race = new RaceState(() => settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
         var demo = new DemoTelemetry();
         var frame = new TelemetryFrame();

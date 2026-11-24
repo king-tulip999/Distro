@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Core.Views;
@@ -154,12 +155,17 @@ internal static class ScreenshotRunner
                 await CaptureSetupAsync(window, folder);
             if (Environment.GetCommandLineArgs().Contains("--setup-only", StringComparer.OrdinalIgnoreCase))
                 return;
+            if (Arg("--search-index") is { } indexFile)
+            {
+                await SearchHarvest.RunAsync(window, indexFile, RecordError);
+                return;
+            }
 
             var only = Arg("--pages")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             IReadOnlyList<string> pages = only is null ? window.NavKeys : window.NavKeys.Where(k => only.Contains(k, StringComparer.OrdinalIgnoreCase)).ToList();
             var views = only?.Where(o => !pages.Contains(o, StringComparer.OrdinalIgnoreCase)).ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>();
             var viewPages = window.NavKeys.Where(k => !pages.Contains(k) && views.Any(v => v.StartsWith(k + "-", StringComparison.OrdinalIgnoreCase))).ToList();
-            if (only is not null && pages.Count == 0 && viewPages.Count == 0)
+            if (only is not null && pages.Count == 0 && viewPages.Count == 0 && !views.Contains(SearchShot) && !views.Contains(SearchSweep))
                 RecordError(new ArgumentException($"--pages: none of '{string.Join(",", only)}' is a page ({string.Join(", ", window.NavKeys)}) or a page-view"));
             var matchedViews = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             int n = 1;
@@ -230,6 +236,8 @@ internal static class ScreenshotRunner
                 n++;
             }
 
+            if (views.Remove(SearchShot)) await CaptureSearchAsync(window, folder);
+            if (views.Remove(SearchSweep)) await SweepSearchAsync(window, folder);
             foreach (var missing in views.Where(v => !v.EndsWith('*') && !matchedViews.Contains(v)))
                 RecordError(new ArgumentException($"--pages: '{missing}' is not a page or a page-view"));
             await LintSizesAsync(window, pages);
@@ -545,6 +553,175 @@ internal static class ScreenshotRunner
         {
             RecordError(ex);
         }
+    }
+
+    private const string SearchShot = "search", SearchSweep = "search-sweep";
+
+    private static async Task SweepSearchAsync(MainWindow window, string folder)
+    {
+        var lines = new List<string>();
+        for (int i = 0; i < 50 && !SettingsIndex.Everything(window.Services).Any(e => e.Category.StartsWith("iRacing Controller ›", StringComparison.Ordinal)) && !AppIdentity.IsTecnica; i++)
+            await Task.Delay(200);
+        var entries = SettingsIndex.Everything(window.Services).Where(e => window.NavKeys.Contains(e.Page))
+            .GroupBy(e => e.Page + "|" + e.Title, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).ToList();
+        if (Arg("--sweep-only")?.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) is { Length: > 0 } only)
+            entries = entries.Where(e => only.Contains(e.Title, StringComparer.OrdinalIgnoreCase)).ToList();
+        int failed = 0;
+        foreach (var hit in entries)
+        {
+            try
+            {
+                KeepOnScreen(window);
+                await window.OpenHitAsync(hit);
+                await Task.Delay(150);
+                await window.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                string? problem = null;
+                if (window.CurrentPage != hit.Page) problem = $"on {window.CurrentPage}";
+                else if (window.PageFor(hit.Page) is not { } page) problem = "page missing";
+                else if (hit.Locate is { } label && Ui.FindLabel(page, label) is null
+                    && !(hit.LocateOptional && hit.Anchor is not null && Ui.FindAnchor(page, hit.Anchor) is FrameworkElement { IsVisible: true })) problem = "label not visible";
+                else if (hit.Locate is null && hit.Anchor is not null && Ui.FindAnchor(page, hit.Anchor) is not FrameworkElement { IsVisible: true }) problem = "anchor not visible";
+                if (problem is not null && ++failed <= 3) Capture(window, Path.Combine(folder, $"sweep-fail-{failed}.png"));
+                lines.Add($"{(problem is null ? "ok  " : "FAIL")}  {hit.Title}  [{hit.Category}]  {hit.Page}{(hit.Anchor is null ? "" : "#" + hit.Anchor)}{(hit.Tabs.Count > 0 ? " tabs " + string.Join("/", hit.Tabs) : "")}{(problem is null ? "" : "  -> " + problem)}");
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                lines.Add($"FAIL  {hit.Title}  {hit.Page}  -> {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+        lines.Insert(0, $"{entries.Count} entries, {failed} failed");
+        File.WriteAllLines(Path.Combine(folder, "search-sweep.txt"), lines);
+    }
+
+    private static async Task CaptureSearchAsync(MainWindow window, string folder)
+    {
+        try
+        {
+            KeepOnScreen(window);
+            window.Navigate(window.NavKeys[0]);
+            await Task.Delay(Wait(1200));
+            window.Nav.SearchTip.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            window.Nav.SearchTip.IsOpen = true;
+            await Task.Delay(600);
+            Capture(window, Path.Combine(folder, "search-tooltip.png"));
+            window.Nav.SearchTip.IsOpen = false;
+            string word = AppIdentity.IsTecnica ? "fan" : "fuel";
+            foreach (var (name, query) in new[] { ("search-empty", ""), ("search-" + word, word), ("search-vr", AppIdentity.IsTecnica ? "hdr" : "vr"), ("search-none", "qqqq") })
+            {
+                window.Nav.OpenSearch();
+                await Task.Delay(400);
+                window.Nav.SetSearchText(query);
+                await Task.Delay(500);
+                Capture(window, Path.Combine(folder, name + ".png"));
+            }
+            await DriveSearchAsync(window, folder, word);
+        }
+        catch (Exception ex)
+        {
+            RecordError(ex);
+        }
+    }
+
+    private static async Task DriveSearchAsync(MainWindow window, string folder, string word)
+    {
+        var log = new List<string>();
+        var nav = window.Nav;
+        void Check(bool ok, string what)
+        {
+            log.Add((ok ? "ok    " : "FAIL  ") + what);
+            if (!ok) RecordError(new InvalidOperationException("Search: " + what));
+        }
+        void Press(Key key)
+        {
+            if (nav.SearchBox is not { } box || PresentationSource.FromVisual(box) is not { } source) return;
+            foreach (var routed in new[] { Keyboard.PreviewKeyDownEvent, Keyboard.KeyDownEvent })
+                box.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key) { RoutedEvent = routed });
+        }
+        async Task Idle(int ms)
+        {
+            await Task.Delay(ms);
+            await window.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
+        async Task Reset()
+        {
+            if (nav.SearchOpen) { nav.SetSearchText(""); Press(Key.Escape); }
+            KeepOnScreen(window);
+            window.Navigate(window.NavKeys[0]);
+            await Idle(700);
+        }
+
+        var hits = window.Search(word);
+        Check(hits.Count >= 2, $"“{word}” finds at least two results ({hits.Count})");
+        var start = window.NavKeys[0];
+
+        await Reset();
+        Check(window.TryOpenSearch(Key.F, ModifierKeys.Control, window), "Ctrl+F opens search");
+        await Idle(400);
+        Check(nav.SearchOpen, "search box is open after Ctrl+F");
+        Check(ReferenceEquals(Keyboard.FocusedElement, nav.SearchBox), "typing goes straight into the search box");
+        Check(!window.TryOpenSearch(Key.F, ModifierKeys.None, window), "plain F does not open search");
+        Check(!window.TryOpenSearch(Key.F, ModifierKeys.Control | ModifierKeys.Shift, window), "Ctrl+Shift+F does not open search");
+        Check(!window.TryOpenSearch(Key.F, ModifierKeys.Control, new System.Windows.Controls.TextBox()), "Ctrl+F leaves a focused page search box alone");
+
+        nav.SetSearchText(word);
+        await Idle(300);
+        int shown = nav.SearchResultRows.Count();
+        Check(shown == Math.Min(hits.Count, TitleNav.SearchRows), $"shows {Math.Min(hits.Count, TitleNav.SearchRows)} rows ({shown})");
+        Press(Key.Escape);
+        await Idle(200);
+        Check(nav.SearchOpen && nav.SearchBox?.Text == "", "first Esc clears the text and keeps the box open");
+        Press(Key.Escape);
+        await Idle(300);
+        Check(!nav.SearchOpen, "second Esc closes the box");
+
+        await Reset();
+        nav.OpenSearch();
+        await Idle(400);
+        nav.SetSearchText("qqqq");
+        await Idle(200);
+        Press(Key.Enter);
+        await Idle(300);
+        Check(nav.SearchOpen && window.CurrentPage == start, "Enter with no results does nothing");
+
+        nav.SetSearchText(word);
+        await Idle(200);
+        Press(Key.Down);
+        Press(Key.Enter);
+        await Idle(1000);
+        Check(!nav.SearchOpen, "Enter closes the box");
+        Check(window.CurrentPage == hits[1].Page, $"Down + Enter opens the second result “{hits[1].Title}” on {hits[1].Page} (now {window.CurrentPage})");
+        Capture(window, Path.Combine(folder, "search-down-enter.png"));
+
+        await Reset();
+        nav.OpenSearch();
+        await Idle(400);
+        nav.SetSearchText(word);
+        await Idle(200);
+        Press(Key.Up);
+        Press(Key.Enter);
+        await Idle(1000);
+        var last = hits[Math.Min(hits.Count, TitleNav.SearchRows) - 1];
+        Check(window.CurrentPage == last.Page, $"Up from the first row wraps to the last result “{last.Title}” on {last.Page} (now {window.CurrentPage})");
+
+        await Reset();
+        foreach (var hit in hits.Take(TitleNav.SearchRows).Select((h, i) => (h, i)))
+        {
+            nav.OpenSearch();
+            await Idle(400);
+            nav.SetSearchText(word);
+            await Idle(200);
+            var row = nav.SearchResultRows.ElementAt(hit.i);
+            row.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left) { RoutedEvent = UIElement.MouseLeftButtonUpEvent, Source = row });
+            await Idle(1000);
+            bool landed = window.CurrentPage == hit.h.Page;
+            bool anchored = hit.h.Anchor is null || (window.PageFor(hit.h.Page) is { } page && Ui.FindAnchor(page, hit.h.Anchor) is FrameworkElement { IsVisible: true });
+            Check(!nav.SearchOpen && landed && anchored, $"click “{hit.h.Title}” opens {hit.h.Page}{(hit.h.Anchor is null ? "" : "#" + hit.h.Anchor)} with it visible (now {window.CurrentPage})");
+            if (hit.i == 0) Capture(window, Path.Combine(folder, "search-click.png"));
+            await Reset();
+        }
+
+        File.WriteAllLines(Path.Combine(folder, "search-drive.txt"), log);
     }
 
     private static async Task CheckSearchAsync(MainWindow window, string folder, int n)

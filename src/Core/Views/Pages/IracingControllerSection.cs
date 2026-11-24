@@ -13,7 +13,7 @@ using Core.Theme;
 
 namespace Core.Views.Pages;
 
-internal sealed partial class IracingControllerSection : StackPanel, IStagedBuild
+internal sealed partial class IracingControllerSection : StackPanel, IStagedBuild, ISearchFilter
 {
     private static readonly string[] Tabs = { "All settings", "Keybinds", "Health and backups" };
     private const int MaxRows = 80;
@@ -33,6 +33,36 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
     private readonly Tile _pending = new();
     private int _tabIndex;
     private string _search = "";
+
+    public void ShowFiltered(string text)
+    {
+        _tabIndex = 0;
+        _search = text;
+        _changedOnly = false;
+        Build();
+    }
+
+    public void ClearFilter()
+    {
+        if (_search.Length == 0 && !_changedOnly) return;
+        _search = "";
+        _changedOnly = false;
+        Build();
+    }
+
+    private static Workspace? _loaded;
+
+    internal static IEnumerable<Setting> SearchableSettings(AppServices app)
+    {
+        if (_loaded is null && _preload is { Load.IsCompleted: true })
+            _loaded = LoadWorkspace(app);
+        if (_loaded?.Session is not { } session)
+        {
+            Preload(app);
+            return Array.Empty<Setting>();
+        }
+        return session.Sections.Where(Shown).SelectMany(sec => session.In(sec).Where(s => !s.IsHidden)).ToList();
+    }
     private int _area;
     private bool _simRunning;
     private readonly HashSet<string> _searchFolded = new(StringComparer.OrdinalIgnoreCase);
@@ -107,13 +137,13 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
             _preload = null;
             if (ReferenceEquals(preload.Settings, settings) && preload.Demo == app.Demo)
             {
-                try { return preload.Load.GetAwaiter().GetResult(); }
+                try { return _loaded = preload.Load.GetAwaiter().GetResult(); }
                 catch (Exception ex) { App.LogError(ex); }
             }
         }
         var ws = new Workspace(settings, app.Demo);
         ws.Load();
-        return ws;
+        return _loaded = ws;
     }
 
     private IracingControllerSettings S => _app.Config.SimRacing.IracingController;

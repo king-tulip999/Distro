@@ -30,6 +30,7 @@ internal sealed class ListDetail
         DockPanel.SetDock(ListFooter, Dock.Bottom);
         column.Children.Add(ListFooter);
         column.Children.Add(List);
+        Ui.NoSearch(List);
         grid.Children.Add(column);
         Grid.SetColumn(Detail, 2);
         grid.Children.Add(Detail);
@@ -55,6 +56,7 @@ internal sealed class ListDetail
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             Padding = new Thickness(0, 3, 0, 3),
         };
+        Ui.NoSearch(row);
         row.Checked += (_, _) => picked();
         return row;
     }

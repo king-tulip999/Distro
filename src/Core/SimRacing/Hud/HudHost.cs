@@ -25,7 +25,7 @@ internal sealed class HudHost : IDisposable
     private HudToolbar? _toolbar;
     private HudSimBar? _simBar;
     private bool _toolbarDirty;
-    private bool _active, _holding, _hidden, _editing, _editSimulated, _preview, _overrideRules;
+    private bool _active, _holding, _hidden, _editing, _editSimulated, _preview, _pickedByHand;
     private readonly HashSet<HudWidgetConfig> _hiddenWidgets = new(ReferenceEqualityComparer.Instance);
     private string _layoutName = "";
     private bool _raceSimulated;
@@ -171,8 +171,6 @@ internal sealed class HudHost : IDisposable
 
     public string LayoutName => _layoutName;
 
-    public HudLayoutRule? MatchedRule { get; private set; }
-
     public string? PickedForCar { get; private set; }
 
     public bool Editing => _editing;
@@ -293,7 +291,7 @@ internal sealed class HudHost : IDisposable
     {
         if (Settings.Layout(name) is null) return;
         Settings.ActiveLayout = Settings.Layout(name)!.Name;
-        _overrideRules = true;
+        _pickedByHand = true;
         SettingsChanged();
     }
 
@@ -420,21 +418,17 @@ internal sealed class HudHost : IDisposable
         string session = connected ? f.SessionKind.ToString() : "";
         if (key != _sessionKey)
         {
-            _overrideRules = false;
+            _pickedByHand = false;
             if (session.Length > 0 && !f.Simulated && Settings.Remember(player?.ClassName, player?.CarName, f.Session.TrackDisplayName))
                 Save();
         }
         _sessionKey = key;
         HudLayout? layout;
-        MatchedRule = null;
         PickedForCar = null;
-        if (!_overrideRules && session.Length > 0 && !AppIdentity.SimHub)
+        if (!_pickedByHand && session.Length > 0 && !AppIdentity.SimHub)
         {
-            layout = Settings.Resolve(session, player?.CarName ?? "", f.Session.TrackDisplayName, player?.ClassName ?? "");
-            if (Settings.AutoSwitch)
-                MatchedRule = Settings.Rules.Where(r => Settings.Layout(r.Layout) == layout && r.Matches(session, player?.CarName ?? "", f.Session.TrackDisplayName, player?.ClassName ?? ""))
-                    .OrderByDescending(r => r.Specificity).FirstOrDefault();
-            if (MatchedRule is null && layout is not null)
+            layout = Settings.Resolve(player?.CarName ?? "", player?.ClassName ?? "");
+            if (layout is not null)
                 PickedForCar = Settings.LayoutForCar(player?.CarName ?? "") == layout ? player?.CarName
                     : Settings.LayoutForClass(player?.CarName ?? "", player?.ClassName ?? "") is { } byClass && byClass.Layout == layout ? $"the {byClass.Class} class" : null;
         }
@@ -442,11 +436,11 @@ internal sealed class HudHost : IDisposable
         string name = layout?.Name ?? "";
         if (!force && name == _layoutName) return;
         bool changed = name != _layoutName;
-        bool byRule = changed && _layoutName.Length > 0 && (MatchedRule is not null || PickedForCar is not null);
+        bool pickedForCar = changed && _layoutName.Length > 0 && PickedForCar is not null;
         _layoutName = name;
         NoteEditStart();
         Sync(layout);
-        if (byRule && _editor is null && _vr.Showing) ShowLayoutMenu(MatchedRule is null ? "Picked for this car" : "Picked by a rule for this session");
+        if (pickedForCar && _editor is null && _vr.Showing) ShowLayoutMenu("Picked for this car");
         if (changed) Changed?.Invoke();
     }
 

@@ -134,7 +134,6 @@ internal static class SimHubEngine
         hud.WebRemote = false;
         hud.WebPort = Port;
         hud.Interactive = false;
-        hud.AutoSwitch = false;
     }
 
     public static void TurnOff()

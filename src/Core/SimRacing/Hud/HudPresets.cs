@@ -35,8 +35,6 @@ internal static class HudPresets
         return new() { layout };
     }
 
-    public static List<HudLayoutRule> DefaultRules() => new();
-
     public const string CustomName = "Custom";
 
     public static string? Fork(RaceHudSettings settings) => settings.MarkCustomized(IsDefault, () => DefaultLayouts()[0]);

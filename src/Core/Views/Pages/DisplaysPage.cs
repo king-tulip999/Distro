@@ -10,7 +10,7 @@ using Core.Theme;
 
 namespace Core.Views.Pages;
 
-internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates, IShowAnchor
+internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates, IShowAnchor, IRevealAnchor
 {
     private readonly AppServices _app;
     private readonly MainWindow _window;
@@ -236,8 +236,10 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates, ISho
             return;
         }
         _setupDetail = new DisplaySetupDetail(_app, _window, _selectedSetup, _selectedSetup == _app.DisplayProfiles.Active, () => HasPending, () => ShowDetail(animate: false), SaveCurrentButton("GhostButton"));
+        Ui.Anchor(_setupDetail, SetupAnchor);
         _split.Show(_setupDetail, animate);
         _split.ListFooter.Content = _setupDetail.Changes;
+        if (_setupDetail.Changes is { } footer) Ui.Anchor(footer, SetupAnchor);
         if (animate && _setupDetail.Changes is { } changes) Motion.FadeIn(changes);
     }
 
@@ -288,10 +290,25 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates, ISho
         canvasBox.Background = Ui.Res<Brush>("SurfaceAlt");
         arrange.Children.Add(canvasBox);
         _details.Margin = new Thickness(0, 15, 0, 0);
-        Ui.Anchor(_details, "displays.details");
+        Ui.Anchor(_details, DetailsAnchor);
         arrange.Children.Add(_details);
-        Ui.Anchor(arrange, "displays.arrange");
+        Ui.Anchor(arrange, ArrangeAnchor);
     }
+
+    public bool Reveal(string anchor)
+    {
+        if (anchor == SetupAnchor)
+        {
+            if (_setupDetail is not null || (_selectedSetup ?? _app.Config.Displays.Profiles.FirstOrDefault()) is not { } setup) return false;
+            Pick(setup);
+            return true;
+        }
+        if (_onCurrent || anchor is not (DetailsAnchor or ArrangeAnchor)) return false;
+        Pick(null);
+        return true;
+    }
+
+    internal const string DetailsAnchor = "displays.details", ArrangeAnchor = "displays.arrange", SetupAnchor = "displays.setup";
 
     public void ShowAnchor(DependencyObject target)
     {

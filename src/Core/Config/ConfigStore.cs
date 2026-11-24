@@ -183,7 +183,7 @@ public static class ConfigStore
         (config.SimRacing.Setups ??= new()).Normalize();
         config.SimRacing.MigratePanelLayout();
         (config.SessionStats ??= new()).Normalize();
-        (config.SimRacing.Hud ??= new()).Normalize(SimRacing.Hud.HudPresets.DefaultLayouts, SimRacing.Hud.HudPresets.DefaultRules);
+        (config.SimRacing.Hud ??= new()).Normalize(SimRacing.Hud.HudPresets.DefaultLayouts);
         if (config.Ui.StartPage is null || config.Ui.StartPage.Equals("home", StringComparison.OrdinalIgnoreCase) || config.Ui.StartPage.Equals("plugins", StringComparison.OrdinalIgnoreCase))
             config.Ui.StartPage = UiSettings.LastUsedPage;
         config.Ui.PageSections ??= new(StringComparer.OrdinalIgnoreCase);

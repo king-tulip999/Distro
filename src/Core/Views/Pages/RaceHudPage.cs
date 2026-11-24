@@ -1,10 +1,10 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using Core.Services;
 
 namespace Core.Views.Pages;
 
-internal sealed class RaceHudPage : UserControl, IPage, IScreenshotStates, ICancelEdit, IRevealAnchor
+internal sealed class RaceHudPage : UserControl, IPage, IScreenshotStates, IRevealAnchor
 {
     private const string SectionId = "hud";
 
@@ -53,8 +53,6 @@ internal sealed class RaceHudPage : UserControl, IPage, IScreenshotStates, ICanc
         if (built) _view.Build(SectionId);
         return built || _hud?.ShowTabFor(anchor) == true;
     }
-
-    public bool CancelEdit() => _hud?.CancelEdit() == true;
 
     public IEnumerable<(string Name, Func<Task> Enter)> ScreenshotStates()
     {

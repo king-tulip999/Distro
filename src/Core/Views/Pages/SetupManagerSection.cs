@@ -104,6 +104,7 @@ internal sealed class SetupManagerSection : StackPanel
         var split = new Grid();
         split.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(CarListWidth) });
         split.ColumnDefinitions.Add(new ColumnDefinition());
+        Ui.NoSearch(_carList);
         _carScroll = new ScrollViewer { Content = _carList, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(0, 0, 6, 0) };
         var carColumn = Hairline.Frame(new Border { Child = _carScroll, Padding = new Thickness(0, 0, 10, 0), BorderBrush = Ui.Res<Brush>("Line") }, Sides.Right);
         split.Children.Add(carColumn);
@@ -881,6 +882,7 @@ internal sealed class SetupManagerSection : StackPanel
         body.ColumnDefinitions.Add(new ColumnDefinition());
         body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(202) });
         _treeScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(3, 3, 3, 10) };
+        Ui.NoSearch(_treeScroll);
         var tree = new SetupTree(_treeScroll) { Focusable = true, FocusVisualStyle = null };
         _treeScroll.Content = tree;
         var items = TreeItems(car, search, target, new HashSet<SetupNode>(sel), _store.NewSince).ToList();

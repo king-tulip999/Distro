@@ -264,7 +264,7 @@ internal sealed class DisplayProfileEditor
             DockPanel.SetDock(browse, Dock.Right);
             row.Children.Add(browse);
             row.Children.Add(box);
-            right.Children.Add(Ui.FieldRow(name, row, RightLabel));
+            right.Children.Add(Ui.NoSearch(Ui.FieldRow(name, row, RightLabel)));
         }
 
         right.Children.Add(ListDetail.Section("Apps"));
@@ -292,7 +292,7 @@ internal sealed class DisplayProfileEditor
         DockPanel.SetDock(remove, Dock.Right);
         row.Children.Add(remove);
         row.Children.Add(box);
-        field = Ui.FieldRow(Display.ProfileApps.DisplayName(path) is { Length: > 0 } n ? n : "App", row, RightLabel);
+        field = Ui.NoSearch(Ui.FieldRow(Display.ProfileApps.DisplayName(path) is { Length: > 0 } n ? n : "App", row, RightLabel));
         _appRows.Children.Add(field);
     }
 

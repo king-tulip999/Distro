@@ -10,7 +10,7 @@ using Core.SimRacing.IracingFiles;
 
 namespace Core.Views;
 
-internal sealed class KeybindTree : Tile
+internal sealed class KeybindTree : Tile, ISearchFilter
 {
     private const double RowIndent = 32, RowHeight = 34, KeyWidth = 160, CellWidth = 373, CellGap = 13, GroupWidth = 437;
     private const int FlatStack = 2;
@@ -68,6 +68,10 @@ internal sealed class KeybindTree : Tile
             Rebuild();
         }
     }
+
+    public void ShowFiltered(string text) => Query = text;
+
+    public void ClearFilter() => Query = "";
 
     private bool Searching => _query.Length > 0;
 

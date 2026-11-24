@@ -42,6 +42,8 @@ public partial class MainWindow : Window, IModalHost
         Title = AppIdentity.Name;
         Nav.Picked += OpenNavItem;
         Nav.GroupsMoved += MoveNavGroups;
+        Nav.Searcher = Search;
+        Nav.SearchPicked += OpenHit;
         Nav.ItemsMoved += MoveNavItems;
         Width = DefaultWindowWidth;
         Root.LayoutTransform = WindowScale.Transform;
@@ -460,6 +462,8 @@ public partial class MainWindow : Window, IModalHost
 
     internal IReadOnlyList<string> NavKeys => _nav.Keys.ToList();
 
+    internal string NavTitle(string key) => _nav.GetValueOrDefault(key, key);
+
     private void BuildNav()
     {
         _nav.Clear();
@@ -756,8 +760,67 @@ public partial class MainWindow : Window, IModalHost
     private bool _launched;
 
     internal List<SearchEntry> Search(string query) => SettingsIndex.Find(
+        SettingsIndex.Everything(_app),
+        query, e => _nav.ContainsKey(e.Page), TitleNav.SearchRows);
+
+    internal List<SearchEntry> SearchIndexOnly(string query) => SettingsIndex.Find(
         SettingsIndex.With(_app.Plugins.Active),
         query, e => _nav.ContainsKey(e.Page));
+
+    private async void OpenHit(SearchEntry hit)
+    {
+        try { await OpenHitAsync(hit); }
+        catch (Exception ex) { App.LogError(ex); }
+    }
+
+    internal async Task OpenHitAsync(SearchEntry hit)
+    {
+        if (hit.Section is { } section) OpenSection(hit.Page, section);
+        bool exact = hit.Locate is not null || hit.Filter is not null || hit.Tabs.Count > 0;
+        GoTo(hit.Page, hit.Anchor, flash: !exact);
+        if (!exact || _current != hit.Page || PageFor(hit.Page) is not { } page) return;
+        await Settle();
+        for (int i = 0; i < 20 && Ui.VisibleTree(page).OfType<IStagedBuild>().FirstOrDefault(s => !s.Done) is { } pending; i++)
+        {
+            while (pending.BuildStep()) { }
+            await Settle();
+        }
+        if (hit.Filter is null)
+        {
+            foreach (var earlier in Ui.VisibleTree(page).OfType<ISearchFilter>().ToList()) earlier.ClearFilter();
+            await Settle();
+        }
+        foreach (var tab in hit.Tabs)
+        {
+            if (Ui.FindTab(page, tab) is { } radio && radio.IsChecked != true)
+            {
+                radio.IsChecked = true;
+                await Settle();
+            }
+        }
+        var scope = (hit.Anchor is not null ? Ui.FindAnchor(page, hit.Anchor) : null) ?? page;
+        if (hit.Filter is { } filter && Ui.FindVisible<ISearchFilter>(scope) is { } filtered)
+        {
+            filtered.ShowFiltered(filter);
+            await Settle();
+        }
+        if (hit.Locate is not { } label || (Ui.FindLabel(scope, label) ?? Ui.FindLabel(page, label)) is not { } target)
+        {
+            if (hit.Anchor is not null && Ui.FindAnchor(page, hit.Anchor) is { } anchor) HighlightAdorner.Flash(anchor);
+            return;
+        }
+        if (page is ISectionedPage sectioned) sectioned.ShowSectionOf(target);
+        if (page is IShowAnchor shows) shows.ShowAnchor(target);
+        target.UpdateLayout();
+        target.BringIntoView();
+        HighlightAdorner.Flash(target);
+    }
+
+    private async Task Settle()
+    {
+        await Task.Delay(60);
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
+    }
 
     internal FrameworkElement? PageFor(string key) => _pages.GetValueOrDefault(key);
 
@@ -866,6 +929,16 @@ public partial class MainWindow : Window, IModalHost
             e.Handled = true;
             return;
         }
+        if (TryOpenSearch(e.Key, Keyboard.Modifiers, Keyboard.FocusedElement))
+            e.Handled = true;
+    }
+
+    internal bool TryOpenSearch(Key key, ModifierKeys modifiers, IInputElement? focused)
+    {
+        if (_modal is not null || SetupOpen || modifiers != ModifierKeys.Control || key != Key.F || focused is TextBox)
+            return false;
+        Nav.OpenSearch();
+        return true;
     }
 
     private void OnEscapeEdit(object sender, KeyEventArgs e)

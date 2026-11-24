@@ -126,13 +126,17 @@ public static class TextCase
         {
             string text = tb.Text;
             string upper = Untracked(tb) ? Capitals(Plain(text)) : Upper(text);
-            if (upper != text) tb.SetCurrentValue(TextBlock.TextProperty, upper);
+            if (upper == text) return;
+            tb.SetValue(RawProperty, text);
+            tb.SetCurrentValue(TextBlock.TextProperty, upper);
             return;
         }
         UpperRuns(tb.Inlines, Untracked(tb));
     }
 
     private static readonly DependencyProperty RawProperty = DependencyProperty.RegisterAttached("Raw", typeof(string), typeof(TextCase));
+
+    public static string? Original(TextBlock tb) => tb.GetValue(RawProperty) as string;
 
     public static void Set(TextBlock tb, string text)
     {

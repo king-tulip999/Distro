@@ -157,7 +157,7 @@ internal static class DemoData
         config.LiveryShop.ShowPage = true;
         fans.Normalize();
         var hud = config.SimRacing.Hud;
-        hud.Normalize(SimRacing.Hud.HudPresets.DefaultLayouts, SimRacing.Hud.HudPresets.DefaultRules);
+        hud.Normalize(SimRacing.Hud.HudPresets.DefaultLayouts);
         hud.Enabled = true;
         hud.Remember("GT3", "Ferrari 296 GT3", "Circuit de Spa-Francorchamps");
         hud.Remember("GTP", "Porsche 963 GTP", "Daytona International Speedway");

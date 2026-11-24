@@ -26,6 +26,9 @@ internal sealed class TitleNav : Grid
     public event Action<NavItem>? Picked;
     public event Action<IReadOnlyList<string>>? GroupsMoved;
     public event Action<string, IReadOnlyList<string>>? ItemsMoved;
+    public event Action<SearchEntry>? SearchPicked;
+
+    public Func<string, List<SearchEntry>>? Searcher { get; set; }
 
     private readonly GroupRow _groups = new("Accent", leadAt: -3, leadOpacity: 0.7, between: true);
     private readonly GroupRow _end = new("LineStrong", leadAt: 0, leadOpacity: 1, between: false);
@@ -158,6 +161,9 @@ internal sealed class TitleNav : Grid
     }
 
     public const string SettingsIcon = "I.Settings";
+    private const string SearchIcon = "I.Search";
+    private static readonly NavGroup SearchGroup = new("app.search", "Search", Array.Empty<NavItem>(), Movable: false);
+    private Entry? _searchEntry;
 
     private const double GlyphSize = 19;
 
@@ -177,6 +183,10 @@ internal sealed class TitleNav : Grid
             _groups.Children.Add(entry.Box);
             _drag.Add(entry.Box, entry.Box, group.Key);
         }
+        _searchEntry = MakeEntry(SearchGroup, SearchIcon);
+        _searchEntry.Box.ToolTip = SearchTip;
+        SearchTip.PlacementTarget = _searchEntry.Box;
+        _end.Children.Add(_searchEntry.Box);
         _end.Children.Add(MakeEntry(settings, SettingsIcon).Box);
         if (updateButton.Parent is Panel old) old.Children.Remove(updateButton);
         updateButton.VerticalAlignment = VerticalAlignment.Center;
@@ -241,6 +251,12 @@ internal sealed class TitleNav : Grid
 
     private void Activate(Entry entry, bool keyboard)
     {
+        if (ReferenceEquals(entry.Group, SearchGroup))
+        {
+            if (!keyboard && ReferenceEquals(_closedEntry, entry) && Environment.TickCount64 - _closedAt < 250) return;
+            OpenSearch();
+            return;
+        }
         if (!entry.Group.IsMenu)
         {
             if (entry.Group.Items.Count == 1) Picked?.Invoke(entry.Group.Items[0]);
@@ -294,6 +310,150 @@ internal sealed class TitleNav : Grid
         Paint(entry);
         if (keyboard && list.Children.OfType<FrameworkElement>().FirstOrDefault(r => r.Tag is true) is { } current) current.Focus();
         else if (keyboard) first?.Focus();
+    }
+
+    private const double SearchWidth = 440;
+    internal const int SearchRows = 12;
+    private TextBox? _searchBox;
+
+    internal ToolTip SearchTip { get; } = new() { Content = "Search (Ctrl+F)" };
+
+    public void OpenSearch()
+    {
+        if (_searchEntry is not { } entry || Searcher is not { } searcher) return;
+        if (_menu is { IsOpen: true } && ReferenceEquals(_menuEntry, entry)) { FocusSearchBox(); return; }
+        _menu?.SetCurrentValue(Popup.IsOpenProperty, false);
+        var box = Ui.Search(new TextBox { Tag = "Search anything", Margin = new Thickness(4, 4, 4, 0) });
+        AutomationProperties.SetName(box, "Search");
+        var results = new StackPanel { Margin = new Thickness(0, 4, 0, 0), Visibility = Visibility.Collapsed };
+        var none = new TextBlock { Text = "Nothing found", Style = Ui.Res<Style>("Muted"), Margin = new Thickness(11, 8, 11, 6), Visibility = Visibility.Collapsed };
+        var body = new StackPanel();
+        body.Children.Add(box);
+        body.Children.Add(none);
+        body.Children.Add(results);
+        var popup = new Popup { PlacementTarget = entry.Box, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade, UseLayoutRounding = true };
+        Ui.DropBelow(popup);
+        var found = new List<SearchEntry>();
+        var rows = new List<Action<bool>>();
+        int selected = 0;
+        void Pick(SearchEntry hit)
+        {
+            popup.IsOpen = false;
+            SearchPicked?.Invoke(hit);
+        }
+        void Highlight(int at)
+        {
+            selected = at;
+            for (int i = 0; i < rows.Count; i++) rows[i](i == at);
+        }
+        void Refresh()
+        {
+            bool typed = box.Text.Trim().Length > 0;
+            found = typed ? searcher(box.Text) : new List<SearchEntry>();
+            results.Children.Clear();
+            rows.Clear();
+            for (int i = 0; i < found.Count && i < SearchRows; i++)
+            {
+                var hit = found[i];
+                int at = i;
+                var (row, paint) = SearchRow(hit, () => Pick(hit), () => Highlight(at));
+                results.Children.Add(row);
+                rows.Add(paint);
+            }
+            none.Visibility = typed && rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            results.Visibility = rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            Highlight(0);
+        }
+        box.TextChanged += (_, _) => Refresh();
+        box.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape && box.Text.Length == 0) { popup.IsOpen = false; e.Handled = true; }
+            else if (e.Key == Key.Enter && rows.Count > 0) { Pick(found[selected]); e.Handled = true; }
+            else if (e.Key is Key.Down or Key.Up && rows.Count > 0)
+            {
+                Highlight((selected + (e.Key == Key.Down ? 1 : -1) + rows.Count) % rows.Count);
+                e.Handled = true;
+            }
+        };
+        var frame = new Tile
+        {
+            Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(4), BorderThickness = new Thickness(1, 2, 1, 1),
+            Width = SearchWidth, Child = body,
+        };
+        frame.SetResourceReference(BackgroundProperty, "TileRaised");
+        frame.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
+        var accentEdge = new Border { Height = 2, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false };
+        accentEdge.SetResourceReference(BackgroundProperty, "Accent");
+        var face = new Grid();
+        face.Children.Add(frame);
+        face.Children.Add(accentEdge);
+        popup.Child = face;
+        popup.Opened += (_, _) => FocusSearchBox();
+        popup.Closed += (_, _) =>
+        {
+            _closedEntry = entry;
+            _closedAt = Environment.TickCount64;
+            if (ReferenceEquals(_menu, popup)) { _menu = null; _menuEntry = null; _searchBox = null; _searchResults = null; Paint(entry); }
+        };
+        _menu = popup;
+        _menuEntry = entry;
+        _searchBox = box;
+        _searchResults = results;
+        WindowScale.Follow(popup);
+        popup.IsOpen = true;
+        Paint(entry);
+    }
+
+    internal void SetSearchText(string text)
+    {
+        if (_searchBox is not null) _searchBox.Text = text;
+    }
+
+    internal bool SearchOpen => _searchBox is not null && _menu is { IsOpen: true };
+
+    internal TextBox? SearchBox => _searchBox;
+
+    internal IEnumerable<FrameworkElement> SearchResultRows => _searchResults?.Children.OfType<FrameworkElement>() ?? Enumerable.Empty<FrameworkElement>();
+
+    private StackPanel? _searchResults;
+
+    private void FocusSearchBox()
+    {
+        if (_searchBox is not { } box) return;
+        box.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (Window.GetWindow(this) is { IsActive: false } window) window.Activate();
+            box.Focus();
+            Keyboard.Focus(box);
+            box.SelectAll();
+        }), System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    private static (Border Row, Action<bool> Paint) SearchRow(SearchEntry hit, Action pick, Action hover)
+    {
+        var title = TextFit.TipWhenTrimmed(new TextBlock { Text = hit.Title, Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+        var where = new TextBlock { Text = hit.Category, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+        where.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        var line = new Grid();
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        line.Children.Add(title);
+        SetColumn(where, 1);
+        line.Children.Add(where);
+        var row = new Tile { Height = RowHeight, Child = line, Padding = new Thickness(11, 0, 11, 0), Cursor = Cursors.Hand };
+        AutomationProperties.SetName(row, hit.Title);
+        row.SetResourceReference(Border.BorderBrushProperty, "Accent");
+        void Paint(bool on)
+        {
+            row.BorderThickness = new Thickness(on ? 3 : 0, 0, 0, 0);
+            line.Margin = new Thickness(on ? -3 : 0, 0, 0, 0);
+            if (on) row.SetResourceReference(BackgroundProperty, "AccentSoft");
+            else row.Background = Brushes.Transparent;
+            title.SetResourceReference(TextBlock.ForegroundProperty, on ? "Heading" : "Text");
+        }
+        row.MouseEnter += (_, _) => hover();
+        row.MouseLeftButtonUp += (_, e) => { e.Handled = true; pick(); };
+        return (row, Paint);
     }
 
     private bool IsCurrent(NavItem item) =>

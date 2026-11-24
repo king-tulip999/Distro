@@ -174,12 +174,6 @@ public sealed class HotkeyBox : TextBox
             Cancel();
             return;
         }
-        if (key == Key.Tab && Keyboard.Modifiers == ModifierKeys.None)
-        {
-            e.Handled = false;
-            return;
-        }
-
         if (NumpadByPosition && !_lastExtended && NumpadName(key) is { } pad)
         {
             var mods = Keyboard.Modifiers;

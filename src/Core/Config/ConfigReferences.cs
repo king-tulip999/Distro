@@ -51,7 +51,6 @@ internal static class ConfigReferences
         {
             var hudLayouts = hud.Layouts.Select(l => l.Name).ToList();
             if (hudLayouts.Count > 0) Check("active iRacing Overlay layout", hud.ActiveLayout, hudLayouts);
-            foreach (var r in hud.Rules) Check("iRacing Overlay rule layout", r.Layout, hudLayouts);
             Check("iRacing Overlay default layout", hud.DefaultLayout, hudLayouts);
         }
         return found;

@@ -51,7 +51,7 @@ internal static class IracingKeybindsView
     }
 }
 
-internal sealed class KeybindsBoard : StackPanel
+internal sealed class KeybindsBoard : StackPanel, ISearchFilter
 {
     private enum Filter { All, Set, Keyboard, NotSet, Changed, Wheel }
 
@@ -84,6 +84,13 @@ internal sealed class KeybindsBoard : StackPanel
     private Clash? _clash;
 
     private sealed record Clash(HotkeyEntry Entry, HotkeyEntry Other, string Keys, string? Before);
+
+    public void ShowFiltered(string text) => _search.Text = text;
+
+    public void ClearFilter()
+    {
+        if (_search.Text.Length > 0) _search.Text = "";
+    }
 
     public KeybindsBoard(AppServices app, Workspace ws)
     {

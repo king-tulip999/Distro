@@ -1,0 +1,4352 @@
+[
+  {
+    "title": "Trading Paints",
+    "page": "simracing",
+    "section": "companions",
+    "anchor": "simracing.tradingpaints",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A Companion apps",
+    "kind": "heading"
+  },
+  {
+    "title": "tradingpaints.com",
+    "page": "simracing",
+    "section": "companions",
+    "anchor": "simracing.tradingpaints",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A Companion apps",
+    "kind": "action"
+  },
+  {
+    "title": "Launch Trading Paints",
+    "page": "simracing",
+    "section": "companions",
+    "anchor": "simracing.tradingpaints",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A Companion apps",
+    "kind": "action"
+  },
+  {
+    "title": "Start with Velocita",
+    "page": "simracing",
+    "section": "companions",
+    "anchor": "simracing.tradingpaints",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A Companion apps",
+    "kind": "setting"
+  },
+  {
+    "title": "Start with iRacing",
+    "page": "simracing",
+    "section": "companions",
+    "anchor": "simracing.tradingpaints",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A Companion apps",
+    "kind": "setting"
+  },
+  {
+    "title": "Car pictures in your paint",
+    "page": "simracing",
+    "section": "companions",
+    "anchor": "simracing.tradingpaints",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A Companion apps",
+    "kind": "setting"
+  },
+  {
+    "title": "Garage 61",
+    "page": "simracing",
+    "section": "companions",
+    "anchor": "simracing.garage61",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A Companion apps",
+    "kind": "heading"
+  },
+  {
+    "title": "garage61.net",
+    "page": "simracing",
+    "section": "companions",
+    "anchor": "simracing.garage61",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A Companion apps",
+    "kind": "action"
+  },
+  {
+    "title": "Launch Garage 61",
+    "page": "simracing",
+    "section": "companions",
+    "anchor": "simracing.garage61",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A Companion apps",
+    "kind": "action"
+  },
+  {
+    "title": "Center screen",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "heading"
+  },
+  {
+    "title": "Aspect",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "setting"
+  },
+  {
+    "title": "Curved",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "setting"
+  },
+  {
+    "title": "Side screens",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "heading"
+  },
+  {
+    "title": "Different size",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "setting"
+  },
+  {
+    "title": "Top-down view",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "heading"
+  },
+  {
+    "title": "Measure your rig",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "heading"
+  },
+  {
+    "title": "iRacing settings",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov.iracing",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "heading"
+  },
+  {
+    "title": "Import from iRacing",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov.iracing",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "action"
+  },
+  {
+    "title": "Import a file",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov.iracing",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "action"
+  },
+  {
+    "title": "Save copies",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov.iracing",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "action"
+  },
+  {
+    "title": "Write into iRacing",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.fov.iracing",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "action"
+  },
+  {
+    "title": "Compare setups",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.compare",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "heading"
+  },
+  {
+    "title": "Compare with",
+    "page": "simracing",
+    "section": "fov",
+    "anchor": "simracing.compare",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A FOV calculator",
+    "kind": "action"
+  },
+  {
+    "title": "All settings",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller",
+    "kind": "tab"
+  },
+  {
+    "title": "Keybinds",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "Keybinds"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller",
+    "kind": "tab"
+  },
+  {
+    "title": "Health and backups",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "Health and backups"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller",
+    "kind": "tab"
+  },
+  {
+    "title": "Graphics and display",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "View and HUD",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Wheel and controls",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Sound",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Spotter and chat",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Pit and setups",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Replay and broadcast",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Telemetry and system",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Changed only",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Collapse all",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Graphics",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "rendererDX11Monitor.ini [Graphics Options]",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Frame rate",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Limit frame rate",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Vertical sync",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Multithreaded scene sort",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Occlusion culling",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Frame rate cap",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Anti-aliasing",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Sharpening",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Sharpening limit",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Sharpening strength",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Lighting",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "HDR rendering",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Auto exposure",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Night shadows",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Walls cast night shadows",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Objects cast night shadows",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Ambient occlusion",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Headlights in mirrors",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Night shadow lights",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Contrast",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Brightness",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Gamma",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Night lights per pass",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Textures and memory",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Compress car textures",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Compress model data",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Detail",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Two-pass trees",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Driver hands",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Tyre marks",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "32-bit depth buffer",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Low-quality trees",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Track surface displacement",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Reduce cockpit flicker",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Near clip distance",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Car detail drop limit",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Car detail boost limit",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "World detail drop limit",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "World detail boost limit",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Pit objects drawn",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Cars drawn",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Mirrors",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Virtual mirror",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Cockpit mirrors",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Mirror car drop limit",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Mirror car boost limit",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Mirror world drop limit",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Mirror world boost limit",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Pit objects in mirrors",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Cars drawn in mirrors",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Shadows",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Trackside self-shadows",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Shadow maps",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Trim small shadow casters",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Car shadows",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Effects",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Replay render modes",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Distortion effects",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "TV camera motion blur",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "In-car motion blur",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Heat haze",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Depth of field",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Full-res particles",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Display mode",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "rendererDX11Monitor.ini [Display]",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Full screen",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Window",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Window border",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Display output",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Screen geometry",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "rendererDX11Monitor.ini [MonitorSetup]",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Screens",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Position",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Side screen angle",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Rendering",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "NVIDIA multi-projection",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Separate view per screen",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Ease angles when zoomed",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Keep HUD off bezels",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Max cars",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "app.ini [Graphics]",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Laser scan",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "heading"
+  },
+  {
+    "title": "rendererDX11Monitor.ini [Laser Scan]",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "action"
+  },
+  {
+    "title": "Scan dot size",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Scan dot min size",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Scan dot max size",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "All settings"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A All settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Profile",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing.keybinds",
+    "tabs": [
+      "Keybinds"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Keybinds",
+    "kind": "heading"
+  },
+  {
+    "title": "changed from default",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing.keybinds",
+    "tabs": [
+      "Keybinds"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Keybinds",
+    "kind": "action"
+  },
+  {
+    "title": "Wheel or controller",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing.keybinds",
+    "tabs": [
+      "Keybinds"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Keybinds",
+    "kind": "action"
+  },
+  {
+    "title": "Driving",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing.keybinds",
+    "tabs": [
+      "Keybinds"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Keybinds",
+    "kind": "heading"
+  },
+  {
+    "title": "Shifting",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing.keybinds",
+    "tabs": [
+      "Keybinds"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Keybinds",
+    "kind": "heading"
+  },
+  {
+    "title": "Engine",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing.keybinds",
+    "tabs": [
+      "Keybinds"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Keybinds",
+    "kind": "heading"
+  },
+  {
+    "title": "Limiters",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing.keybinds",
+    "tabs": [
+      "Keybinds"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Keybinds",
+    "kind": "heading"
+  },
+  {
+    "title": "Car",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing.keybinds",
+    "tabs": [
+      "Keybinds"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Keybinds",
+    "kind": "heading"
+  },
+  {
+    "title": "Driver",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing.keybinds",
+    "tabs": [
+      "Keybinds"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Keybinds",
+    "kind": "heading"
+  },
+  {
+    "title": "Changed from iRacing\u0027s default",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "Health and backups"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Health and backups",
+    "kind": "heading"
+  },
+  {
+    "title": "Reset to default",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "Health and backups"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Health and backups",
+    "kind": "action"
+  },
+  {
+    "title": "Backups",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "Health and backups"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Health and backups",
+    "kind": "heading"
+  },
+  {
+    "title": "Back up now",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "Health and backups"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Health and backups",
+    "kind": "action"
+  },
+  {
+    "title": "No backups in demo",
+    "page": "simracing",
+    "section": "iracing",
+    "anchor": "simracing.iracing",
+    "tabs": [
+      "Health and backups"
+    ],
+    "where": "Sim Racing Tools \u203A iRacing Controller \u203A Health and backups",
+    "kind": "heading"
+  },
+  {
+    "title": "Import",
+    "page": "simracing",
+    "section": "setups",
+    "anchor": "simracing.setups",
+    "tabs": [],
+    "where": "Sim Racing Tools \u203A iRacing Setup Manager",
+    "kind": "action"
+  },
+  {
+    "title": "Widgets",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets"
+    ],
+    "where": "iRacing Overlay",
+    "kind": "tab"
+  },
+  {
+    "title": "Alerts",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay",
+    "kind": "tab"
+  },
+  {
+    "title": "Overlay settings",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay",
+    "kind": "tab"
+  },
+  {
+    "title": "VR settings",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay",
+    "kind": "tab"
+  },
+  {
+    "title": "Columns",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Columns"
+    ],
+    "where": "iRacing Overlay",
+    "kind": "tab"
+  },
+  {
+    "title": "Rows",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Rows"
+    ],
+    "where": "iRacing Overlay",
+    "kind": "tab"
+  },
+  {
+    "title": "Header and footer",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Header and footer"
+    ],
+    "where": "iRacing Overlay",
+    "kind": "tab"
+  },
+  {
+    "title": "Look",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Look"
+    ],
+    "where": "iRacing Overlay",
+    "kind": "tab"
+  },
+  {
+    "title": "When shown",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "When shown"
+    ],
+    "where": "iRacing Overlay",
+    "kind": "tab"
+  },
+  {
+    "title": "Placement",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Placement"
+    ],
+    "where": "iRacing Overlay",
+    "kind": "tab"
+  },
+  {
+    "title": "Collapse all",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "action"
+  },
+  {
+    "title": "2 of 2 on",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "action"
+  },
+  {
+    "title": "Fuel and strategy",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "heading"
+  },
+  {
+    "title": "Fuel low",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "laps",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Not enough fuel to finish",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "1 of 3 on",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "action"
+  },
+  {
+    "title": "Traffic and spotter",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "heading"
+  },
+  {
+    "title": "Faster class approaching",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Slower class ahead",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Car alongside",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "2 of 5 on",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "action"
+  },
+  {
+    "title": "Laps and position",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "heading"
+  },
+  {
+    "title": "Personal best",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Lap with incidents",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Pace dropping",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Place gained / lost",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Track limits",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "off-tracks",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Car and telemetry",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "heading"
+  },
+  {
+    "title": "Engine warning",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Telemetry lost",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "4 of 4 on",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "action"
+  },
+  {
+    "title": "Pit and stint",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "heading"
+  },
+  {
+    "title": "Pit window open",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Pit speed limit exceeded",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "KM/H",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Pit limiter off",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Stint time",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "min",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Fuel tab",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "action"
+  },
+  {
+    "title": "6 of 6 on",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "action"
+  },
+  {
+    "title": "Flags and penalties",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "heading"
+  },
+  {
+    "title": "Yellow / caution",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Blue flag",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Penalty / black flag",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Incident limit close",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "points",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Incident points",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "3 of 3 on",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "action"
+  },
+  {
+    "title": "Weather",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "heading"
+  },
+  {
+    "title": "Rain",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Track wetness changed",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Track temperature changing",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "\u00B0C / 10 min",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.alerts",
+    "tabs": [
+      "Alerts"
+    ],
+    "where": "iRacing Overlay \u203A Alerts",
+    "kind": "setting"
+  },
+  {
+    "title": "Measuring",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "heading"
+  },
+  {
+    "title": "Laps measured",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Extra consumption",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Extra fuel",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "heading"
+  },
+  {
+    "title": "Safety reserve",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Margin at the flag",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Fixed reserve",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Extra distance",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Stops",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "heading"
+  },
+  {
+    "title": "A pit stop costs",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Longest stint",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "How the numbers are worked out",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "heading"
+  },
+  {
+    "title": "Measured",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "heading"
+  },
+  {
+    "title": "Fuel per lap",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Lap to lap",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Laps of fuel",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Laps to go",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Rest of this lap",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "To the flag",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "heading"
+  },
+  {
+    "title": "Expected",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Fuel to the flag",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Plan",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "heading"
+  },
+  {
+    "title": "Spare after reserve",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Left at the flag",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Add at the next stop",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Pit window",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "no stop needed",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "row"
+  },
+  {
+    "title": "Show the sums",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.fuelformulas",
+    "tabs": [
+      "Fuel"
+    ],
+    "where": "iRacing Overlay \u203A Fuel",
+    "kind": "action"
+  },
+  {
+    "title": "Overlay",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Show the widgets",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "row"
+  },
+  {
+    "title": "Click-through",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Hide app when iRacing connects",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Units",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "row"
+  },
+  {
+    "title": "Speed in mph",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Clock",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "row"
+  },
+  {
+    "title": "Night mode",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "row"
+  },
+  {
+    "title": "Browser sources",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.web",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Other devices",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.web",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Port",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.web",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "row"
+  },
+  {
+    "title": "Overlay list",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.web",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "row"
+  },
+  {
+    "title": "Open the overlay list",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.web",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "action"
+  },
+  {
+    "title": "Colors",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "row"
+  },
+  {
+    "title": "Background",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "row"
+  },
+  {
+    "title": "Corners",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "row"
+  },
+  {
+    "title": "Outline",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Arranging on screen",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Snap while arranging",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Show the grid while arranging",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Grid",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "row"
+  },
+  {
+    "title": "Keybinds",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Show / hide",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Arrange",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "In-game editor",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Next layout",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Previous layout",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Night mode on / off",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Dismiss alerts",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Lap timing and delta",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.settings",
+    "tabs": [
+      "Overlay settings"
+    ],
+    "where": "iRacing Overlay \u203A Overlay settings",
+    "kind": "setting"
+  },
+  {
+    "title": "VR headsets",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.vr",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "heading"
+  },
+  {
+    "title": "VR widgets",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.vr",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Brightness",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.vr",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "row"
+  },
+  {
+    "title": "Move every cockpit widget",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Sideways",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "row"
+  },
+  {
+    "title": "Height",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "row"
+  },
+  {
+    "title": "Recenter VR widgets",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "action"
+  },
+  {
+    "title": "Edit in the headset",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "heading"
+  },
+  {
+    "title": "Edit VR widgets in the headset",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "action"
+  },
+  {
+    "title": "Look-at button in the headset",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "setting"
+  },
+  {
+    "title": "VR widgets brighter",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "setting"
+  },
+  {
+    "title": "VR widgets dimmer",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Next VR widget (while adjusting)",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Next VR setting (while adjusting)",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Nudge left (while adjusting)",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Nudge right (while adjusting)",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Nudge up (while adjusting)",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Nudge down (while adjusting)",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "VR settings"
+    ],
+    "where": "iRacing Overlay \u203A VR settings",
+    "kind": "setting"
+  },
+  {
+    "title": "Simulate data",
+    "page": "hud",
+    "section": null,
+    "anchor": null,
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "action"
+  },
+  {
+    "title": "Arrange on screen",
+    "page": "hud",
+    "section": null,
+    "anchor": null,
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "action"
+  },
+  {
+    "title": "iRacing Overlay",
+    "page": "hud",
+    "section": null,
+    "anchor": null,
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Show the overlay",
+    "page": "hud",
+    "section": null,
+    "anchor": null,
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "row"
+  },
+  {
+    "title": "Layout",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.layouts",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "heading"
+  },
+  {
+    "title": "New layout",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud.layouts",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "action"
+  },
+  {
+    "title": "Default for other cars",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Use this layout for",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "heading"
+  },
+  {
+    "title": "Add classes or cars",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "action"
+  },
+  {
+    "title": "Duplicate",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "action"
+  },
+  {
+    "title": "Default options",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "action"
+  },
+  {
+    "title": "Position in class",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "License and iRating badge",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Car number",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Driver",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Pit lane / stops",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Places gained / lost",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Last lap",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Interval (car ahead)",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Gap",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Position (overall)",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Car logo",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Team",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "iRating gain / loss (est.)",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Gap to you",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Best lap",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Average lap",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Last lap vs yours",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Laps completed",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Incidents",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Flags",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Out lap",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Laps since pit stop",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Tires",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Driver names",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "heading"
+  },
+  {
+    "title": "Full name",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "First initial and last name",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Last name only",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "First name and last initial",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "No numbers in names",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "PRO / AM",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Values",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "heading"
+  },
+  {
+    "title": "Gap to",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Lap times",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Pit column shows",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Time in the pit lane",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "setting"
+  },
+  {
+    "title": "Preview",
+    "page": "hud",
+    "section": null,
+    "anchor": "simracing.hud",
+    "tabs": [
+      "Widgets",
+      "Columns"
+    ],
+    "where": "iRacing Overlay \u203A Widgets \u203A Columns",
+    "kind": "heading"
+  },
+  {
+    "title": "Panels",
+    "page": "stats",
+    "section": null,
+    "anchor": null,
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "action"
+  },
+  {
+    "title": "Conditions",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.all",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Dallara IR18",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.all",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Results",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.all",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Positions and ratings",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.all",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Incidents, pit lane and weather",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.all",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Race by race",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.all",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Recent sessions",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.sessions",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Show more (35 left)",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.sessions",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "action"
+  },
+  {
+    "title": "Driving activity",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.activity",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Session mix",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.activity",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "When you drive",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.activity",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Driving per week",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.activity",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Cars and tracks",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.cars",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Cars",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.cars",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Totals",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.cars",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Tracks",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.cars",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Telemetry files",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.telemetry",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "heading"
+  },
+  {
+    "title": "Record telemetry to disk",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.telemetry",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "setting"
+  },
+  {
+    "title": "Open telemetry folder",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.telemetry",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "action"
+  },
+  {
+    "title": "Nothing to clear",
+    "page": "stats",
+    "section": null,
+    "anchor": "stats.telemetry",
+    "tabs": [],
+    "where": "Session Stats",
+    "kind": "action"
+  },
+  {
+    "title": "Driver and leagues",
+    "page": "grr",
+    "section": "cup",
+    "anchor": null,
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "action"
+  },
+  {
+    "title": "GRR theme",
+    "page": "grr",
+    "section": "cup",
+    "anchor": null,
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "action"
+  },
+  {
+    "title": "Full schedule",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "action"
+  },
+  {
+    "title": "Round 11",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "P10",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "action"
+  },
+  {
+    "title": "Round 12",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "Round 13",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "Sam Driver",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "Driver history",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "action"
+  },
+  {
+    "title": "Championship",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "Title fight",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "Full standings",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "action"
+  },
+  {
+    "title": "Results",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "Bristol Motor Speedway",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "Hard charger",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "Most laps led",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "Cleanest",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "Fastest lap",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "heading"
+  },
+  {
+    "title": "Latest results",
+    "page": "grr",
+    "section": "cup",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A Cup Series",
+    "kind": "action"
+  },
+  {
+    "title": "Round 6 of 12 \u00B7 GT League Season 9",
+    "page": "grr",
+    "section": "gt",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A GT League",
+    "kind": "heading"
+  },
+  {
+    "title": "Road Atlanta",
+    "page": "grr",
+    "section": "gt",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A GT League",
+    "kind": "heading"
+  },
+  {
+    "title": "Round 5",
+    "page": "grr",
+    "section": "gt",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A GT League",
+    "kind": "heading"
+  },
+  {
+    "title": "Round 6",
+    "page": "grr",
+    "section": "gt",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A GT League",
+    "kind": "heading"
+  },
+  {
+    "title": "Round 7",
+    "page": "grr",
+    "section": "gt",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A GT League",
+    "kind": "heading"
+  },
+  {
+    "title": "Spa-Francorchamps",
+    "page": "grr",
+    "section": "gt",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A GT League",
+    "kind": "heading"
+  },
+  {
+    "title": "Round 3 of 12 \u00B7 IndyCar Season 1",
+    "page": "grr",
+    "section": "indycar",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A IndyCar",
+    "kind": "heading"
+  },
+  {
+    "title": "Long Beach Street Circuit",
+    "page": "grr",
+    "section": "indycar",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A IndyCar",
+    "kind": "heading"
+  },
+  {
+    "title": "Round 2",
+    "page": "grr",
+    "section": "indycar",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A IndyCar",
+    "kind": "heading"
+  },
+  {
+    "title": "Round 3",
+    "page": "grr",
+    "section": "indycar",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A IndyCar",
+    "kind": "heading"
+  },
+  {
+    "title": "Round 4",
+    "page": "grr",
+    "section": "indycar",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A IndyCar",
+    "kind": "heading"
+  },
+  {
+    "title": "Barber Motorsports Park",
+    "page": "grr",
+    "section": "indycar",
+    "anchor": "grr.dashboard",
+    "tabs": [],
+    "where": "GRR League \u203A IndyCar",
+    "kind": "heading"
+  },
+  {
+    "title": "Appearance",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.look",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Theme",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.theme",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Animations",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.look",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Application settings",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.app",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Startup",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.startup",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Start with Windows",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.startup",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Start in background",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.startup",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Window",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.window",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Close in background",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.window",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Open on",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.startpage",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Keep on top",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.ontop",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Notifications",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.window",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Quit",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.window",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Quit Velocita",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.window",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "GRR League page",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.grr",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Livery Shop page",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.livery",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Sim Racing Tools page",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.simtools",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "iRacing Overlay page",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.overlaypage",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Session Stats page",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.statspage",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "About and updates",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.updates",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Changelog",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.about",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Discord",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.about",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Project page",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.about",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Updates",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.updates",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Check for updates",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.updates",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Check now",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.updates",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Install updates automatically",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.updates",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Performance",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.performance",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Lighter drawing while iRacing runs",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.light",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "setting"
+  },
+  {
+    "title": "Data and configuration",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.data",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Export / import settings",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.export",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Export",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.export",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Import",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.export",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Settings file",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.folder",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Open folder",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.folder",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Storage",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.storage",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Back to defaults",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.reset",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Reset Velocita",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.reset",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Uninstall",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.uninstall",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "row"
+  },
+  {
+    "title": "Uninstall Velocita",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.uninstall",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Diagnostics",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.diagnostics",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "heading"
+  },
+  {
+    "title": "Open logs",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.logs",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Export diagnostic report",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.report",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  },
+  {
+    "title": "Copy system information",
+    "page": "settings",
+    "section": "general",
+    "anchor": "settings.diagnostics",
+    "tabs": [],
+    "where": "Settings \u203A General",
+    "kind": "action"
+  }
+]

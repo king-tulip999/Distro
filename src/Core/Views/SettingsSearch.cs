@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -7,7 +7,21 @@ using Core.Theme;
 
 namespace Core.Views;
 
-internal sealed record SearchEntry(string Title, string Description, string Category, string Page, string? Anchor = null, string Keywords = "");
+internal sealed record SearchEntry(string Title, string Description, string Category, string Page, string? Anchor = null, string Keywords = "")
+{
+    public string? Section { get; init; }
+    public IReadOnlyList<string> Tabs { get; init; } = Array.Empty<string>();
+    public string? Filter { get; init; }
+    public string? Locate { get; init; }
+    public bool LocateOptional { get; init; }
+}
+
+internal interface ISearchFilter
+{
+    void ShowFiltered(string text);
+
+    void ClearFilter();
+}
 
 internal static class SettingsIndex
 {
@@ -57,7 +71,7 @@ internal static class SettingsIndex
         new("Edit VR widgets", "Open the VR widget editor in the headset: a button, a look-at button above the windshield, keys or wheel buttons, the tray menu or SimHub's Controls and events.", "iRacing Overlay", "hud", Pages.RaceHudSection.VrAnchor, "vr edit editor look gaze button wheel tray simhub controls events recenter"),
         new("Move VR widgets", "Shift every cockpit VR widget at once, or adjust them in the headset with keybinds.", "iRacing Overlay", "hud", Pages.RaceHudSection.VrAnchor, "vr move shift offset adjust nudge headset cockpit seat position"),
         new("iRacing Overlay", "In-game widgets from iRacing's live telemetry: Relative, Standings, fuel, delta, alerts and more.", "iRacing Overlay", "hud", "simracing.hud.panel", "hud race hud overlay relative standings leaderboard fuel strategy out lap delta lap timing flags telemetry iracing widgets widget keybind show hide"),
-        new("iRacing Overlay layouts", "Layouts of widgets that switch by session, car, class or track; arrange them on screen.", "iRacing Overlay", "hud", Pages.RaceHudSection.LayoutsAnchor, "hud layout race qualifying practice endurance multiclass arrange move resize scale snap grid rules auto switch"),
+        new("iRacing Overlay layouts", "Layouts of widgets that switch by car or class; arrange them on screen.", "iRacing Overlay", "hud", Pages.RaceHudSection.LayoutsAnchor, "hud layout race qualifying practice endurance multiclass arrange move resize scale snap grid class car auto switch"),
         new("iRacing Overlay alerts", "Fuel, pit speed, traffic, flags, incidents and best-lap alerts in groups you can fold and arrange, with thresholds and cooldowns.", "iRacing Overlay", "hud", Pages.RaceHudSection.AlertsAnchor, "alerts notifications fuel low pit limiter speeding blue flag yellow incident limit personal best groups arrange"),
         new("iRacing Overlay look", "Colors, background, corners and outline of the overlay; its keybinds.", "iRacing Overlay", "hud", Pages.RaceHudSection.SettingsAnchor, "hud look appearance colors colours theme custom palette background transparency opacity corners outline keybinds hotkeys hud settings"),
         new("Fuel formulas", "How the overlay works out fuel per lap, laps to go, fuel to the flag, stops and the pit window, with the numbers now.", "iRacing Overlay", "hud", Pages.RaceHudSection.FuelAnchor, "fuel formula calculation per lap laps to go stops pit window estimate maths math"),
@@ -115,6 +129,9 @@ internal static class SettingsIndex
             catch (Exception ex) { App.LogError(ex); return new List<SearchEntry>(); }
         }));
 
+    public static IEnumerable<SearchEntry> Everything(Services.AppServices app) =>
+        With(app.Plugins.Active).Concat(SearchSources.Live(app)).Concat(SearchSources.Harvested);
+
     public static List<SearchEntry> Find(string query, Func<SearchEntry, bool> available, int max = 8) => Find(All, query, available, max);
 
     public static List<SearchEntry> Find(IEnumerable<SearchEntry> entries, string query, Func<SearchEntry, bool> available, int max = 8)
@@ -123,16 +140,17 @@ internal static class SettingsIndex
         if (words.Length == 0)
             return new();
         var results = new List<(SearchEntry Entry, int Score)>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var e in entries)
         {
-            if (!available(e))
+            if (!available(e) || !seen.Add(e.Page + "|" + e.Title))
                 continue;
             string title = e.Title.ToLowerInvariant(), keys = e.Keywords.ToLowerInvariant(),
                 desc = e.Description.ToLowerInvariant(), cat = e.Category.ToLowerInvariant();
             int score = 0;
             foreach (var w in words)
             {
-                int s = title.StartsWith(w, StringComparison.Ordinal) ? 100 : title.Contains(w) ? 60 : keys.Contains(w) ? 35 : cat.Contains(w) ? 15 : HasWordStarting(desc, w) ? 10 : 0;
+                int s = title.StartsWith(w, StringComparison.Ordinal) ? (title.Length == w.Length || !char.IsLetterOrDigit(title[w.Length]) ? 110 : 100) : title.Contains(w) ? 60 : keys.Contains(w) ? 35 : cat.Contains(w) ? 15 : HasWordStarting(desc, w) ? 10 : 0;
                 if (s == 0) { score = 0; break; }
                 score += s;
             }

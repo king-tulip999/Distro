@@ -33,6 +33,7 @@ internal sealed class ReorderGrid : Panel
     public ReorderGrid()
     {
         Background = Brushes.Transparent;
+        Ui.NoSearch(this);
         AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(OnPress), true);
         PreviewMouseMove += OnMove;
         PreviewMouseLeftButtonUp += (_, e) =>

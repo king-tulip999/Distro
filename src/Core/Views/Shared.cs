@@ -362,6 +362,7 @@ internal static class Ui
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var name = new TextBlock { Text = label, Style = Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+        name.SetValue(SearchLabelProperty, true);
         grid.Children.Add(new Border { MinHeight = FieldLine, VerticalAlignment = VerticalAlignment.Top, Padding = new Thickness(0, 0, 10, 0), Child = name });
         var slot = new Grid { MinHeight = FieldLine, VerticalAlignment = VerticalAlignment.Top };
         if (control is FrameworkElement fe)
@@ -500,6 +501,64 @@ internal static class Ui
             if (child is DependencyObject d && FindAnchor(d, id) is { } found)
                 return found;
         return null;
+    }
+
+    public static readonly DependencyProperty SearchLabelProperty = DependencyProperty.RegisterAttached("SearchLabel", typeof(bool), typeof(Ui));
+
+    public static bool IsSearchLabel(DependencyObject element) => (bool)element.GetValue(SearchLabelProperty);
+
+    public static readonly DependencyProperty NoSearchProperty = DependencyProperty.RegisterAttached("NoSearch", typeof(bool), typeof(Ui));
+
+    public static bool GetNoSearch(FrameworkElement element) => (bool)element.GetValue(NoSearchProperty);
+
+    public static T NoSearch<T>(T element) where T : FrameworkElement
+    {
+        element.SetValue(NoSearchProperty, true);
+        return element;
+    }
+
+    public static string RawText(TextBlock text) => TextCase.Original(text) is { Length: > 0 } raw ? raw : text.Text;
+
+    public static IEnumerable<FrameworkElement> VisibleTree(DependencyObject root)
+    {
+        var stack = new Stack<DependencyObject>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (node is UIElement { IsVisible: false }) continue;
+            if (node is FrameworkElement fe) yield return fe;
+            var children = LogicalTreeHelper.GetChildren(node).OfType<DependencyObject>().ToList();
+            for (int i = children.Count - 1; i >= 0; i--) stack.Push(children[i]);
+        }
+    }
+
+    public static string? LabelOf(FrameworkElement element) => element switch
+    {
+        TextBlock t => t.Inlines.Count > 1 ? new TextRange(t.ContentStart, t.ContentEnd).Text : RawText(t),
+        RadioButton { Content: string s } r when r.Style == Res<Style>("PageTab") => s,
+        ContentControl { Content: string s } => s,
+        _ => null,
+    };
+
+    public static bool IsPageTab(FrameworkElement e) => e is RadioButton { Content: string } r && r.Style == Res<Style>("PageTab");
+
+    public static RadioButton? FindTab(DependencyObject root, string name) =>
+        VisibleTree(root).OfType<RadioButton>().FirstOrDefault(r => r.Content is string s && r.Style == Res<Style>("PageTab") && string.Equals(s, name, StringComparison.OrdinalIgnoreCase));
+
+    public static T? FindVisible<T>(DependencyObject root) where T : class =>
+        VisibleTree(root).OfType<T>().FirstOrDefault();
+
+    public static FrameworkElement? FindLabel(DependencyObject root, string label)
+    {
+        FrameworkElement? named = null, partial = null;
+        foreach (var e in VisibleTree(root))
+        {
+            if (string.Equals(LabelOf(e), label, StringComparison.OrdinalIgnoreCase)) return e;
+            if (named is null && string.Equals(AutomationProperties.GetName(e), label, StringComparison.OrdinalIgnoreCase)) named = e;
+            if (partial is null && LabelOf(e) is { Length: > 0 } text && text.Contains(label, StringComparison.OrdinalIgnoreCase)) partial = e;
+        }
+        return named ?? partial;
     }
 
     public static StackPanel PageTitle(string text)
