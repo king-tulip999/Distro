@@ -53,10 +53,10 @@ internal sealed class SessionWidget : HudWidget
             : f.SessionTimeTotal is > 0 && f.SessionTimeRemain is { } rem ? 1 - rem / f.SessionTimeTotal.Value : null;
         switch (v.Options.Choice("style"))
         {
-            case StripStyle: DrawStrip(p, title, track, bar, done); break;
+            case StripStyle: DrawStrip(p, v, title, track, bar, done); break;
             case PositionFirst: DrawPosition(p, v, title, track, bar, done); break;
-            case Grid: DrawGrid(p, title, track, bar, done); break;
-            default: DrawTall(p, title, track, bar, done); break;
+            case Grid: DrawGrid(p, v, title, track, bar, done); break;
+            default: DrawTall(p, v, title, track, bar, done); break;
         }
     }
 
@@ -180,7 +180,13 @@ internal sealed class SessionWidget : HudWidget
         if (done is { } d) p.Bar(r, d, p.P.Accent, p.Solid(p.Raised(0.10), 130));
     }
 
-    private void DrawTall(HudPainter p, string title, string track, bool bar, double? done)
+    private static readonly string[] TallParts = { "title", "hero", "progress", "rows" };
+    private static readonly string[] StripParts = { "fields", "title" };
+    private static readonly string[] StripStackParts = { "body", "progress" };
+    private static readonly string[] GridParts = { "fields", "progress" };
+    private static readonly string[] PositionRightParts = { "main", "progress", "more" };
+
+    private void DrawTall(HudPainter p, HudView v, string title, string track, bool bar, double? done)
     {
         const float HeroPx = 46;
         float d = p.Density, pad = 12 * d, gap = 10 * d, rowPad = 7 * d, barH = 3 * d;
@@ -206,27 +212,26 @@ internal sealed class SessionWidget : HudWidget
         p.Need(w, h);
         p.Panel();
 
-        float x = pad, cw = w - pad * 2, y = pad;
+        float x = pad, cw = w - pad * 2, y;
+        Span<RectangleF> parts = stackalloc RectangleF[4];
+        p.Arrange(v, "session.tall", new RectangleF(x, pad, cw, h - pad * 2), false, gap, TallParts,
+            stackalloc float[] { titled ? lcap + 6 * d + scap + 2 * d : -1, cells.Count > 0 ? hcap + 8 * d + lcap : -1, bar ? barH : -1, rows > 0 ? rows * rowH - rowPad : -1 }, parts);
         if (titled)
         {
+            y = parts[0].Y;
             Title(p, title, x, y, cw, HAlign.Left);
-            y += lcap + 6 * d;
-            Ink(p, track, p.Small, p.P.Muted, x, y, cw);
-            y += scap + gap + 2 * d;
+            Ink(p, track, p.Small, p.P.Muted, x, y + lcap + 6 * d, cw);
         }
         if (cells.Count > 0)
         {
+            y = parts[1].Y;
             var (id, label, value) = cells[0];
             p.Display(value, HeroPx, p.P.Heading, new RectangleF(x, y, cw, hcap), HAlign.Left, VAlign.Bottom);
             Label(p, label, x, y + hcap + 8 * d, cw);
             p.Item("fields", id, new RectangleF(x, y, cw, hcap + 8 * d + lcap));
-            y += hcap + 8 * d + lcap + gap;
         }
-        if (bar)
-        {
-            Progress(p, new RectangleF(x, y, cw, barH), done);
-            y += barH + gap;
-        }
+        if (bar) Progress(p, parts[2], done);
+        y = parts[3].Y;
         for (int i = 1; i < cells.Count; i++)
         {
             var (id, label, value) = cells[i];
@@ -239,7 +244,7 @@ internal sealed class SessionWidget : HudWidget
         }
     }
 
-    private void DrawStrip(HudPainter p, string title, string track, bool bar, double? done)
+    private void DrawStrip(HudPainter p, HudView v, string title, string track, bool bar, double? done)
     {
         const float HeroPx = 30;
         float d = p.Density, pad = 12 * d, side = 14 * d, top = 12 * d, labelGap = 7 * d, barH = 3 * d;
@@ -250,9 +255,10 @@ internal sealed class SessionWidget : HudWidget
         float lcap = Cap(lf), vcap = Math.Max(DisplayCap(p, HeroPx), Cap(vf));
         float scap = Cap(p.Small);
 
-        float w = pad * 2;
+        float fieldsW = 0;
         for (int i = 0; i < cells.Count; i++)
-            w += Column(p, i, vf, HeroPx) + (i > 0 ? side * 2 : 0);
+            fieldsW += Column(p, i, vf, HeroPx) + (i > 0 ? side * 2 : 0);
+        float w = pad * 2 + fieldsW;
         float place = titled ? Math.Max(TitleWidth(p, title), Math.Min(p.Measure(track, p.Small), 200 * d)) : 0;
         if (titled) w += place + (cells.Count > 0 ? side * 2 : 0);
         w = MathF.Ceiling(w);
@@ -261,36 +267,43 @@ internal sealed class SessionWidget : HudWidget
         p.Need(w, h);
         p.Panel();
 
-        float x = pad, baseline = top + vcap;
+        Span<RectangleF> stack = stackalloc RectangleF[2];
+        p.Arrange(v, "session.stripStack", new RectangleF(0, 0, w, h), false, 0, StripStackParts, stackalloc float[] { body, bar ? barH : -1 }, stack);
+        float y0 = stack[0].Y;
+        Span<RectangleF> parts = stackalloc RectangleF[2];
+        p.Arrange(v, "session.strip", new RectangleF(pad, y0, w - pad * 2, body), true, side * 2, StripParts,
+            stackalloc float[] { cells.Count > 0 ? fieldsW : -1, titled ? place : -1 }, parts);
+        bool fieldsFirst = !titled || cells.Count == 0 || parts[0].X <= parts[1].X;
+        if (cells.Count > 0 && titled) p.Divider(Math.Min(parts[0].Right, parts[1].Right) + side, y0, y0 + body);
+
+        float x = parts[0].X, baseline = y0 + top + vcap;
         for (int i = 0; i < cells.Count; i++)
         {
             var (id, label, value) = cells[i];
             float cw = Column(p, i, vf, HeroPx);
             if (i > 0)
             {
-                p.Divider(x + side, 0, body);
+                p.Divider(x + side, y0, y0 + body);
                 x += side * 2;
             }
-            if (i == 0) p.Display(value, HeroPx, p.P.Heading, new RectangleF(x, top, cw, vcap), HAlign.Left, VAlign.Bottom);
+            float lead = i > 0 || !fieldsFirst ? side : pad;
+            if (i == 0) p.Display(value, HeroPx, p.P.Heading, new RectangleF(x, y0 + top, cw, vcap), HAlign.Left, VAlign.Bottom);
             else Ink(p, value, vf, p.P.Heading, x, baseline - Cap(vf), cw, HAlign.Left, false);
             Label(p, label, x, baseline + labelGap, cw);
-            p.Item("fields", id, new RectangleF(x - (i > 0 ? side : pad), 0, cw + (i > 0 ? side : pad) + side, body));
+            p.Item("fields", id, new RectangleF(x - lead, y0, cw + lead + side, body));
             x += cw;
         }
         if (titled)
         {
-            if (cells.Count > 0)
-            {
-                p.Divider(x + side, 0, body);
-                x += side * 2;
-            }
-            Title(p, title, x, baseline - lcap, place, HAlign.Right);
-            Ink(p, track, p.Small, p.P.Muted, x, baseline + labelGap, place, HAlign.Right);
+            var titleAlign = fieldsFirst ? HAlign.Right : HAlign.Left;
+            Title(p, title, parts[1].X, baseline - lcap, place, titleAlign);
+            Ink(p, track, p.Small, p.P.Muted, parts[1].X, baseline + labelGap, place, titleAlign);
         }
         if (bar)
         {
-            var clip = p.ClipEnds(p.Bounds, p.Look.Corner, false, true);
-            Progress(p, new RectangleF(0, h - barH, w, barH), done);
+            bool barTop = stack[1].Y < stack[0].Y;
+            var clip = p.ClipEnds(p.Bounds, p.Look.Corner, barTop, !barTop);
+            Progress(p, stack[1], done);
             p.Unclip(clip);
         }
     }
@@ -301,7 +314,7 @@ internal sealed class SessionWidget : HudWidget
         return Math.Max(LabelWidth(p, label), i == 0 ? DisplayWidth(p, id, value, heroPx) : ValueWidth(p, id, value, vf));
     }
 
-    private void DrawGrid(HudPainter p, string title, string track, bool bar, double? done)
+    private void DrawGrid(HudPainter p, HudView v, string title, string track, bool bar, double? done)
     {
         float d = p.Density, pad = 12 * d, side = 14 * d, cellPad = 9 * d, labelGap = 6 * d, barH = 3 * d;
         var lf = p.Label;
@@ -329,26 +342,31 @@ internal sealed class SessionWidget : HudWidget
         p.Need(w, h);
         p.Header(title, track);
 
+        float barBlock = pad + barH + pad;
+        Span<RectangleF> parts = stackalloc RectangleF[2];
+        p.Arrange(v, "session.grid", new RectangleF(0, top, w, gridH + (bar ? barBlock : 0)), false, 0, GridParts,
+            stackalloc float[] { gridH > 0 ? gridH : -1, bar ? barBlock : -1 }, parts);
+        float gridTop = gridH > 0 ? parts[0].Y : top;
         if (cells.Count > 0)
         {
             var (id, label, value) = cells[0];
-            float capTop = top + (gridH - heroInk) / 2;
+            float capTop = gridTop + (gridH - heroInk) / 2;
             Label(p, label, pad, capTop, hw - pad - side);
             Ink(p, value, hf, p.P.Heading, pad, capTop + lcap + labelGap, hw - pad - side, HAlign.Left, false);
-            p.Item("fields", id, new RectangleF(0, top, hw, gridH));
+            p.Item("fields", id, new RectangleF(0, gridTop, hw, gridH));
         }
         for (int k = 0; k < others; k++)
         {
             var (id, label, value) = cells[k + 1];
             int r = k / cols, c = k % cols;
-            float x0 = hw + c * cw, y0 = top + r * cellH;
+            float x0 = hw + c * cw, y0 = gridTop + r * cellH;
             p.Divider(x0, y0 + (r == 0 ? cellPad / 2 : 0), y0 + cellH - (r == rows - 1 ? cellPad / 2 : 0));
             if (r > 0) p.Line(x0, y0, x0 + cw - (c == cols - 1 ? 1 : 0), y0, Rule(p));
             Label(p, label, x0 + side, y0 + cellPad, cw - side * 2);
             Ink(p, value, vf, p.P.Heading, x0 + side, y0 + cellPad + lcap + labelGap, cw - side * 2, HAlign.Left, false);
             p.Item("fields", id, new RectangleF(x0, y0, cw, cellH));
         }
-        if (bar) Progress(p, new RectangleF(pad, top + gridH + pad, w - pad * 2, barH), done);
+        if (bar) Progress(p, new RectangleF(pad, parts[1].Y + pad, w - pad * 2, barH), done);
     }
 
     private static readonly string[] PositionParts = { "position", "details" };
@@ -406,9 +424,10 @@ internal sealed class SessionWidget : HudWidget
         w = MathF.Ceiling(w);
 
         float miniRowH = mcap + 6 * d + lcap;
+        float minisH = miniRows > 0 ? miniRows * miniRowH + (miniRows - 1) * gap : 0;
         float rightH = (line1 > 0 ? ccap : 0);
         if (bar) rightH += (rightH > 0 ? gap : 0) + barH;
-        if (miniRows > 0) rightH += (rightH > 0 ? gap + 2 * d : 0) + miniRows * miniRowH + (miniRows - 1) * gap;
+        if (miniRows > 0) rightH += (rightH > 0 ? gap + 2 * d : 0) + minisH;
         float leftH = pcap + 9 * d + bcap;
         float bodyH = Math.Max(leftH, rightH);
         float bodyTop = top + gap + 2 * d;
@@ -428,8 +447,12 @@ internal sealed class SessionWidget : HudWidget
         p.Divider(Math.Min(boxes[0].Right, boxes[1].Right) + split, bodyTop, bodyTop + bodyH);
 
         float rx = boxes[1].X, ry = bodyTop + (bodyH - rightH) / 2;
+        Span<RectangleF> rightParts = stackalloc RectangleF[3];
+        p.Arrange(v, "session.positionRight", new RectangleF(rx, ry, rightW, rightH), false, gap, PositionRightParts,
+            stackalloc float[] { line1 > 0 ? ccap : -1, bar ? barH : -1, miniRows > 0 ? minisH + (line1 > 0 || bar ? 2 * d : 0) : -1 }, rightParts);
         if (line1 > 0)
         {
+            ry = rightParts[0].Y;
             if (hero >= 0)
             {
                 var (id, label, value) = _cells[hero];
@@ -447,17 +470,11 @@ internal sealed class SessionWidget : HudWidget
                 Ink(p, value, mf, p.P.Heading, right - lw - 6 * d - vw - 1, ry + ccap - mcap, vw + 1, HAlign.Left, false);
                 p.Item("fields", id, new RectangleF(right - lw - 6 * d - vw, ry, lw + 6 * d + vw, ccap));
             }
-            ry += ccap;
         }
-        if (bar)
-        {
-            if (line1 > 0) ry += gap;
-            Progress(p, new RectangleF(rx, ry, rightW, barH), done);
-            ry += barH;
-        }
+        if (bar) Progress(p, rightParts[1], done);
         if (miniRows > 0)
         {
-            if (line1 > 0 || bar) ry += gap + 2 * d;
+            ry = rightParts[2].Bottom - minisH;
             for (int k = 0; k < rest.Count; k++)
             {
                 var (id, label, value) = _cells[rest[k]];

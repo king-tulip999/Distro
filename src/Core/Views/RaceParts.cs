@@ -657,7 +657,7 @@ internal static class RaceParts
         if (c.Rubber.Length > 0) Row(rows, "Rubber", Value(ConditionsText.Rubber(c.Rubber)), "Rubber on the racing line at the start");
 
         string sky = c.Skies is { } skies and >= 0 and < 4 ? ConditionsText.SkyNames[skies] : "";
-        string? simTime = c.SimStart.Length > 0 ? Pages.StatsSessionView.SimTime(c.SimStart) : null;
+        string? simTime = c.SimStart.Length > 0 ? Dates.SimTime(c.SimStart) : null;
         if (rows.Children.Count == 0 && sky.Length == 0) return null;
 
         var block = new StackPanel { Margin = new Thickness(16, 12, 16, 14) };

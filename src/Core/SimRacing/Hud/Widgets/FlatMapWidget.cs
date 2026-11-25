@@ -33,18 +33,25 @@ internal sealed class FlatMapWidget : HudWidget
         HudOption.Number("dotSize", "Dot size", 100, 50, 300, 10, "%"),
         HudOption.Color("myColor", "My color", "Until one is picked, the overlay's accent color"),
         HudOption.Color("carColor", "Other cars' color", "Until one is picked, grey or iRacing's class colors. A picked color is used for every class"),
+        HudOption.Number("trackWidth", "Track width", 100, 50, 250, 10, "%"),
+        HudOption.Number("edgeWidth", "Border width", 1, 0, 6, 0.5, "px", "0 for no border"),
+        MapTrackLook.Look,
+        MapTrackLook.TrackColor,
+        MapTrackLook.EdgeColor,
+        HudOption.Bool("startLine", "Start / finish line", true),
         HudClassFilter.Scope,
         HudClassFilter.List,
     };
 
 
     private const float StripDot = 7, AroundDot = 6.5f, LaneDot = 6.5f, ProfileDot = 6, BarDot = 5;
-    private const float EdgeWidth = 8, TrackWidth = 6, PitWidth = 3;
+    private const float TrackWidth = 6, PitWidth = 3;
     private const float StripTrackY = 36, StripPitY = 22, StripHeight = 79, LabelAbove = 17;
     private const float AroundTrackY = 38, AroundGapY = 20, AroundHeight = 79;
     private const float LaneLabel = 40, LaneGap = 6, LanePad = 4, LaneHeight = 107f / 3;
     private const float ProfileHeight = 101, ProfileAmp = 0.3f, ProfileDrop = 4, ProfileLabel = 15;
     private const float BarHeight = 34, UprightWidth = 64, UprightEnd = 16;
+    private static readonly string[] LaneParts = { "labels", "lanes" }, UprightParts = { "labels", "track" };
     private const double PitIn = 0.04, PitInBend = 0.02, PitOut = 0.035, PitOutBend = 0.02;
 
     private readonly HudMapSource _maps = new();
@@ -81,6 +88,9 @@ internal sealed class FlatMapWidget : HudWidget
     private bool _upright;
     private float _x0, _x1, _y, _pitY, _cx, _halfW, _mid, _amp, _top, _bottom;
     private double _myPct, _range;
+    private float _trackW, _edgeW;
+    private Color _trackColor, _edgeColor;
+    private bool _startLine;
 
     public override void Dispose()
     {
@@ -101,6 +111,10 @@ internal sealed class FlatMapWidget : HudWidget
         int me = f.PlayerCarIdx;
         _myPct = me >= 0 && me < TelemetryFrame.MaxCars && f.CarLapDistPct[me] >= 0 ? f.CarLapDistPct[me] : 0;
         _upright = bar && v.Options.Bool("upright");
+        _trackW = TrackWidth * d * (float)(v.Options.Number("trackWidth") / 100);
+        _edgeW = (float)v.Options.Number("edgeWidth") * d;
+        (_trackColor, _edgeColor) = MapTrackLook.Colors(p, v.Options);
+        _startLine = v.Options.Bool("startLine");
         _labels.Clear();
         RectangleF area;
         if (bar)
@@ -157,24 +171,28 @@ internal sealed class FlatMapWidget : HudWidget
 
     private float X(double pct) => _x0 + (_x1 - _x0) * (float)(pct - Math.Floor(pct));
 
-    private (Color Track, Color Edge, Color Pit) Colors(HudPainter p) => (
-        p.P.MapTrack ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.3),
-        p.P.MapEdge ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.55),
-        p.P.MapPit ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.18));
+    private static Color PitColor(HudPainter p) => p.P.MapPit ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.18);
 
     private void Track(HudPainter p, float x1, float y1, float x2, float y2)
     {
-        var (track, edge, _) = Colors(p);
-        float d = p.Density;
-        p.Line(x1, y1, x2, y2, edge, EdgeWidth * d);
-        p.Line(x1, y1, x2, y2, track, TrackWidth * d);
+        if (_edgeW > 0) p.Line(x1, y1, x2, y2, _edgeColor, _trackW + 2 * _edgeW);
+        p.Line(x1, y1, x2, y2, _trackColor, _trackW);
     }
 
-    private static void StartLine(HudPainter p, float x, float y, float half) =>
-        p.Line(x, y - half * p.Density, x, y + half * p.Density, p.P.Heading, 3 * p.Density);
+    private float Reach(HudPainter p, float half, float beyond) => Math.Max(half * p.Density, _trackW / 2 + _edgeW + beyond * p.Density);
 
-    private static void Tick(HudPainter p, float x, float y, float half) =>
-        p.Line(x, y - half * p.Density, x, y + half * p.Density, p.P.Faint, 1);
+    private void StartLine(HudPainter p, float x, float y, float half)
+    {
+        if (!_startLine) return;
+        float r = Reach(p, half, 3);
+        p.Line(x, y - r, x, y + r, p.P.Heading, 3 * p.Density);
+    }
+
+    private void Tick(HudPainter p, float x, float y, float half)
+    {
+        float r = Reach(p, half, 2);
+        p.Line(x, y - r, x, y + r, p.P.Faint, 1);
+    }
 
     private readonly List<RectangleF> _labels = new();
 
@@ -227,7 +245,7 @@ internal sealed class FlatMapWidget : HudWidget
     private void PitLane(HudPainter p, (double Start, double End) span)
     {
         float d = p.Density, w = _x1 - _x0;
-        var pen = p.Pen(Colors(p).Pit, PitWidth * d);
+        var pen = p.Pen(PitColor(p), PitWidth * d);
         var g = p.G;
         float xs = X(span.Start), xe = X(span.End), join = _y + 4 * d;
         float inEnd = xs + (float)PitIn * w, outStart = xe - (float)PitOut * w;
@@ -325,9 +343,11 @@ internal sealed class FlatMapWidget : HudWidget
         float laneH = LaneHeight * d;
         p.NeedBelow(area, laneH * count + LanePad * d);
         var font = p.Font(10.5f, true);
-        float labelX = area.X + 4 * d;
-        _x0 = labelX + (LaneLabel + LaneGap) * d;
-        _x1 = area.Right - 12 * d;
+        Span<RectangleF> cols = stackalloc RectangleF[2];
+        p.Arrange(v, "flatmap.lanes", RectangleF.FromLTRB(area.X + 4 * d, area.Y, area.Right - 12 * d, area.Bottom), true, LaneGap * d, LaneParts, stackalloc float[] { LaneLabel * d, 0 }, cols);
+        float labelX = cols[0].X;
+        _x0 = cols[1].X;
+        _x1 = cols[1].Right;
         for (int i = 0; i < count; i++)
         {
             float y = area.Y + laneH * i + laneH / 2;
@@ -396,9 +416,8 @@ internal sealed class FlatMapWidget : HudWidget
                 _profile[i] = new PointF(_x0 + (_x1 - _x0) * (float)pct, ProfileY(i == n ? 0.999999 : pct));
             }
         }
-        var (track, edge, _) = Colors(p);
-        p.G.DrawLines(p.Pen(edge, EdgeWidth * d), _profile);
-        p.G.DrawLines(p.Pen(track, TrackWidth * d), _profile);
+        if (_edgeW > 0) p.G.DrawLines(p.Pen(_edgeColor, _trackW + 2 * _edgeW), _profile);
+        p.G.DrawLines(p.Pen(_trackColor, _trackW), _profile);
         StartLine(p, _x0, ProfileY(0), 9);
         if (v.Options.Bool("turns"))
             for (int i = 0; i < _turnPct.Length; i++)
@@ -428,21 +447,26 @@ internal sealed class FlatMapWidget : HudWidget
         }
         p.Need(UprightWidth * d, (float)v.Config.H);
         float width = Math.Min(area.Width, UprightWidth * d);
-        _cx = area.X + width / 2 + 6 * d;
+        Span<RectangleF> cols = stackalloc RectangleF[2];
+        p.Arrange(v, "flatmap.upright", new RectangleF(area.X, area.Y, width, area.Height), true, 0, UprightParts, stackalloc float[] { Math.Max(1, width / 2 - 7 * d), 26 * d }, cols);
+        var labels = cols[0];
+        _cx = cols[1].X + 13 * d;
         _bottom = area.Bottom - UprightEnd * d;
         _top = area.Y + UprightEnd * d;
-        var (track, edge, _) = Colors(p);
-        p.Line(_cx, _bottom, _cx, _top, edge, EdgeWidth * d);
-        p.Line(_cx, _bottom, _cx, _top, track, TrackWidth * d);
-        p.Line(_cx - 9 * d, _bottom, _cx + 9 * d, _bottom, p.P.Heading, 3 * d);
+        Track(p, _cx, _bottom, _cx, _top);
+        if (_startLine)
+        {
+            float r = Reach(p, 9, 3);
+            p.Line(_cx - r, _bottom, _cx + r, _bottom, p.P.Heading, 3 * d);
+        }
         var font = p.Tiny;
         float h = p.LineHeight(font), last = float.MaxValue;
         for (int i = 0; i < _turnPct.Length; i++)
         {
             float y = UprightY(_turnPct[i]);
-            float room = _cx - 13 * d - area.X;
+            float room = labels.Width;
             if (last - y < 12 * d || p.Measure(_turnText[i], font) > room - 2 * d) continue;
-            p.Text(_turnText[i], font, p.P.Muted, new RectangleF(area.X, y - h / 2, room, h), HAlign.Right, VAlign.Center, false);
+            p.Text(_turnText[i], font, p.P.Muted, new RectangleF(labels.X, y - h / 2, room, h), labels.X < cols[1].X ? HAlign.Right : HAlign.Left, VAlign.Center, false);
             last = y;
         }
     }

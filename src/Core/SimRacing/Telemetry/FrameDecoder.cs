@@ -4,6 +4,7 @@ internal sealed class FrameDecoder
 {
     private IReadOnlyDictionary<string, IrsdkVar> _vars = new Dictionary<string, IrsdkVar>();
     private IrsdkVar? _sessionNum, _sessionState, _sessionFlags, _sessionTime, _sessionTimeRemain, _sessionTimeTotal, _lapsRemain, _lapsRemainEx, _lapsTotal, _raceLaps;
+    private IrsdkVar? _camGroup, _camNumber, _replayTime, _replaySession, _replayEnd;
     private IrsdkVar? _isOnTrack, _inGarage, _replay, _playerIdx, _camIdx, _onPitRoad, _surface, _playerPos, _playerClassPos;
     private IrsdkVar? _speed, _rpm, _gear, _throttle, _brake, _clutch, _steer, _steerMax, _throttleRaw, _brakeRaw, _clutchRaw;
     private IrsdkVar? _fuel, _fuelPct, _fuelPerHour, _lap, _lapCompleted, _lapPct, _lapDist, _lapCur, _lapLast, _lapBest;
@@ -28,6 +29,7 @@ internal sealed class FrameDecoder
         _sessionTime = V("SessionTime"); _sessionTimeRemain = V("SessionTimeRemain"); _sessionTimeTotal = V("SessionTimeTotal");
         _lapsRemain = V("SessionLapsRemain"); _lapsRemainEx = V("SessionLapsRemainEx"); _lapsTotal = V("SessionLapsTotal"); _raceLaps = V("RaceLaps");
         _isOnTrack = V("IsOnTrack"); _inGarage = V("IsInGarage"); _replay = V("IsReplayPlaying");
+        _camGroup = V("CamGroupNumber"); _camNumber = V("CamCameraNumber"); _replayTime = V("ReplaySessionTime"); _replaySession = V("ReplaySessionNum"); _replayEnd = V("ReplayFrameNumEnd");
         _playerIdx = V("PlayerCarIdx"); _camIdx = V("CamCarIdx"); _onPitRoad = V("OnPitRoad"); _surface = V("PlayerTrackSurface");
         _playerPos = V("PlayerCarPosition"); _playerClassPos = V("PlayerCarClassPosition");
         _speed = V("Speed"); _rpm = V("RPM"); _gear = V("Gear"); _throttle = V("Throttle"); _brake = V("Brake"); _clutch = V("Clutch");
@@ -95,6 +97,11 @@ internal sealed class FrameDecoder
         f.IsReplayPlaying = B(_replay);
         f.PlayerCarIdx = I(_playerIdx) ?? f.Session.PlayerCarIdx;
         f.CamCarIdx = I(_camIdx) ?? -1;
+        f.CamGroup = I(_camGroup);
+        f.CamCamera = I(_camNumber);
+        f.ReplaySessionTime = D(_replayTime) is >= 0 and var replayAt ? replayAt : null;
+        f.ReplaySessionNum = I(_replaySession);
+        f.ReplayFramesToLive = I(_replayEnd) is >= 0 and var toLive ? toLive : null;
         f.OnPitRoad = B(_onPitRoad);
         f.PlayerPosition = I(_playerPos);
         f.PlayerClassPosition = I(_playerClassPos);

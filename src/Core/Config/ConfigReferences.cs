@@ -9,9 +9,6 @@ internal static class ConfigReferences
             e.CurveName = newName;
             if (newName is null && e.Mode == FanMode.Curve) e.Mode = FanMode.Auto;
         }
-        foreach (var group in config.Fans.CoolingTest?.Groups ?? [])
-            if (Same(group.CurveName, oldName))
-                group.CurveName = newName;
         foreach (var mix in config.Fans.Curves)
         {
             for (int i = mix.MixOf.Count - 1; i >= 0; i--)

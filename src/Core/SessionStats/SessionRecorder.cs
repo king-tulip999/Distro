@@ -41,7 +41,7 @@ internal sealed class SessionRow
 }
 
 internal sealed record LapRow(int Lap, double Time, bool Clean, double? TopSpeed, double? FuelUsed, double? FullThrottle, double? Brake, int Shifts, double? PeakLatG,
-    IReadOnlyList<double>? Sectors = null, LapFlags Flags = LapFlags.None, int? Incidents = null, int? Run = null, string? Setup = null);
+    IReadOnlyList<double>? Sectors = null, LapFlags Flags = LapFlags.None, int? Incidents = null, int? Run = null, string? Setup = null, int? Position = null);
 
 [Flags]
 internal enum LapFlags { None = 0, PitLane = 1, OffTrack = 2, Incident = 4, Refuel = 8, Untimed = 16, TimeDiffers = 32 }
@@ -49,7 +49,7 @@ internal enum LapFlags { None = 0, PitLane = 1, OffTrack = 2, Incident = 4, Refu
 internal sealed class SessionRecorder
 {
     private const double Gravity = 9.80665, FullThrottle = 0.98, Braking = 0.05, GlitchG = 6;
-    internal const double OfficialWait = 3, OfficialAgrees = 1;
+    internal const double OfficialWait = 3, OfficialAgrees = 1, PositionWait = 5;
     private readonly string _source;
     private readonly TraceBuilder? _trace;
     private IReadOnlyList<double> _sectorStarts = Array.Empty<double>();
@@ -76,6 +76,9 @@ internal sealed class SessionRecorder
     private SessionInfo? _fieldInfo;
     private (LapRow Lap, double Cross, double? Before, LapTrace? Trace)? _pending;
     private bool _officialTimes;
+    private int? _positionLap;
+    private double _positionDue;
+    private int _positionNow;
     private readonly TyreWearTracker _tyres = new();
     private readonly double[] _wear = new double[TyreReading.Values];
 
@@ -168,12 +171,17 @@ internal sealed class SessionRecorder
         if (row.SessionType == nameof(SessionKind.Race)) RacePositions(f, row);
         Official(f, row);
         Lap(f, row, driving, dt);
+        if (_positionLap is not null && f.SessionTime is { } at && (at >= _positionDue || at < _positionDue - PositionWait)) PlacePosition(row);
         return ended;
     }
 
     public (SessionRow Row, List<LapRow> Laps)? Finish()
     {
-        if (_row is { } open) Settle(open, null);
+        if (_row is { } open)
+        {
+            Settle(open, null);
+            PlacePosition(open);
+        }
         var row = _row;
         _row = null;
         _identity = "";
@@ -187,6 +195,8 @@ internal sealed class SessionRecorder
         _lapsAtCheckered = _lineLap = null;
         _fieldInfo = null;
         _officialTimes = false;
+        _positionLap = null;
+        _positionNow = 0;
         _tyres.Reset();
         if (row is null) return null;
         var laps = _laps.ToList();
@@ -299,6 +309,7 @@ internal sealed class SessionRecorder
         }
         int pos = f.CarClassPosition[me] > 0 ? f.CarClassPosition[me] : f.PlayerClassPosition is > 0 and var classPos ? classPos : 0;
         if (pos <= 0) return;
+        if (f.Phase is SessionPhase.Racing or SessionPhase.Checkered) _positionNow = pos;
         if (row.StartPos is null && f.Phase == SessionPhase.Racing)
         {
             row.StartPos = pos;
@@ -382,6 +393,12 @@ internal sealed class SessionRecorder
                     _lapDt > 0 ? 100 * _throttleDt / _lapDt : null, _lapDt > 0 ? 100 * _brakeDt / _lapDt : null, _shifts, _peakG > 0 ? _peakG : null,
                     SectorTimes(start, cross), flags, lapIncidents, _lapRun > 0 ? _lapRun : null, setup.Length > 0 ? setup : null);
                 _pending = (lap, cross, f.LapLast, _trace?.Finish(start, time));
+                if (row.SessionType == nameof(SessionKind.Race) && f.Phase is SessionPhase.Racing or SessionPhase.Checkered)
+                {
+                    if (_positionLap is not null) PlacePosition(row);
+                    _positionLap = number;
+                    _positionDue = cross + PositionWait;
+                }
             }
             ResetLap();
             _lapStart = cross;
@@ -429,6 +446,22 @@ internal sealed class SessionRecorder
         row.Laps = _laps.Count;
         LapDone?.Invoke(row, _laps.Skip(_savedLaps).ToList());
         _savedLaps = _laps.Count;
+    }
+
+    private void PlacePosition(SessionRow row)
+    {
+        if (_positionLap is not { } number) return;
+        _positionLap = null;
+        if (_positionNow <= 0) return;
+        if (_pending is { } p && p.Lap.Lap == number)
+        {
+            _pending = p with { Lap = p.Lap with { Position = _positionNow } };
+            return;
+        }
+        int at = _laps.FindLastIndex(l => l.Lap == number);
+        if (at < 0) return;
+        _laps[at] = _laps[at] with { Position = _positionNow };
+        if (at < _savedLaps) _savedLaps = at;
     }
 
     private List<double>? SectorTimes(double start, double end)

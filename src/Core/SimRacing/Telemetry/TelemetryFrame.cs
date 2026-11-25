@@ -61,6 +61,9 @@ internal sealed class TelemetryFrame
 
     public int PlayerCarIdx = -1;
     public int CamCarIdx = -1;
+    public int? CamGroup, CamCamera;
+    public double? ReplaySessionTime;
+    public int? ReplaySessionNum, ReplayFramesToLive;
     public bool OnPitRoad;
     public TrackSurface? PlayerSurface;
     public int? PlayerPosition, PlayerClassPosition;
@@ -133,6 +136,8 @@ internal sealed class TelemetryFrame
         SessionTime = SessionTimeRemain = SessionTimeTotal = null;
         SessionLapsRemain = SessionLapsTotal = RaceLaps = null;
         IsOnTrack = IsInGarage = IsReplayPlaying = OnPitRoad = false;
+        CamGroup = CamCamera = ReplaySessionNum = ReplayFramesToLive = null;
+        ReplaySessionTime = null;
         PlayerSurface = null;
         PlayerPosition = PlayerClassPosition = null;
         Speed = Rpm = Throttle = Brake = Clutch = Steering = SteeringMax = null;

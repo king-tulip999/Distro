@@ -20,6 +20,7 @@ internal static class Program
         AppIdentity.Use(kind);
         if (StartedProtected(args)) return;
         if (kind != AppKind.Tecnica && SimRacing.Hud.Vr.OpenXrLayer.RunMachineStep(args) is int code) Environment.Exit(code);
+        if (kind != AppKind.Tecnica && SimRacing.Hud.Vr.OpenXrLayer.RunCleanupStep(args)) return;
         RunApp();
     }
 
@@ -28,6 +29,7 @@ internal static class Program
         AppIdentity.UseSimHub();
         if (StartedProtected(args)) return;
         if (SimRacing.Hud.Vr.OpenXrLayer.RunMachineStep(args) is int code) Environment.Exit(code);
+        if (SimRacing.Hud.Vr.OpenXrLayer.RunCleanupStep(args)) return;
         RunApp();
     }
 

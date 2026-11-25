@@ -13,26 +13,27 @@ using Core.Theme;
 
 namespace Core.Views.Pages;
 
-internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHistory
+internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHistory, IStatsHost, IRevealAnchor
 {
     private readonly AppServices _app;
     private readonly MainWindow _window;
     private readonly StackPanel _body = new() { Margin = new Thickness(23, 0, 23, 23) };
     private readonly TextBlock _driver = TextFit.TipWhenTrimmed(new TextBlock { FontSize = 13.5, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
-    private readonly TextBlock _number = new() { FontSize = 13.5, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-    private readonly Tile _numberPlate = new() { MinWidth = 36, Height = 24, Padding = new Thickness(7, 0, 7, 0), BorderThickness = new Thickness(1.5), Margin = new Thickness(0, 0, 8, 0) };
+    private readonly TextBlock _number = new() { FontSize = 15, FontWeight = FontWeights.ExtraBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Tile _numberPlate = new() { MinWidth = 36, Height = 22, Padding = new Thickness(7, 0, 7, 0), Margin = new Thickness(0, 0, 9, 0) };
     private readonly StackPanel _driverPlate = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
     private readonly DockPanel _crumbs = new() { LastChildFill = true, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
-    private readonly TextBlock _sessionsCount = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(11, 0, 0, 0) };
     private readonly StackPanel _tools = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly ContentControl _progress = new() { Focusable = false }, _content = new() { Focusable = false };
     private readonly ScrollViewer _scroll;
     private readonly SessionFilter _filter = new();
-    private readonly HashSet<int> _ticked = new();
     private long? _sessionId;
     private List<int>? _analysisLaps;
     private string _reference = "session";
     private ReplayMemory _replay = new();
+    private readonly StatsTabState _tabState = new();
+    private readonly ContentControl _tabBarHost = new() { Focusable = false };
+    private Border? _tabStrip;
 
     private double _overviewOffset;
     private int _version;
@@ -71,46 +72,198 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         Panel.SetZIndex(left, -1);
         header.Children.Add(new DockPanel { LastChildFill = true, Children = { _tools, left } });
         _body.Children.Add(header);
+        _body.Children.Add(_tabBarHost);
         _body.Children.Add(_progress);
         _body.Children.Add(_content);
         Ui.Anchor(_content, "stats.all");
         if (Stats is { } stats)
         {
             BuildDriverPlate();
-            _tools.Children.Add(StatsUi.RangePicker(stats, "page", Changed));
-            var more = Ui.IconButton("I.Sliders", "Units and car number", () => { });
+            var more = Ui.IconButton("I.Sliders", "Units, car number and telemetry files", () => { });
             more.Click += (_, _) => OpenOptions(more, stats);
-            more.Margin = new Thickness(8, 0, 0, 0);
-            var panels = Ui.LabeledButton("I.Eye", "Panels", () => { });
-            panels.ToolTip = "Show or hide panels on this page";
-            panels.Click += (_, _) => OpenPanels(panels, stats);
-            panels.Margin = new Thickness(8, 0, 0, 0);
-            _tools.Children.Add(panels);
+            Ui.Anchor(more, "stats.telemetry");
             _tools.Children.Add(more);
+            BuildTabBar(stats);
         }
+    }
+
+    private void BuildTabBar(SessionStatsService stats)
+    {
+        string tab = StatsTabs.Normalize(stats.Settings.Tab);
+        _tabStrip = Ui.PageTabs(StatsTabs.All.Select(t => t.Name).ToList(), Array.FindIndex(StatsTabs.All, t => t.Id == tab), i => SwitchTab(StatsTabs.All[i].Id), "statsTabs");
+        _tabStrip.HorizontalAlignment = HorizontalAlignment.Left;
+        if (_tabStrip.Child is Panel strip)
+            for (int i = 0; i < strip.Children.Count && i < StatsTabs.All.Length; i++)
+                if (strip.Children[i] is FrameworkElement button) Ui.Anchor(button, "stats.tab." + StatsTabs.All[i].Id);
+        var label = new TextBlock { Text = "Period", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        label.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
+        var tips = new[] { "Since Monday", "This calendar month", "This iRacing season (12 weeks + week 13)", "Everything" };
+        var choices = new[] { "week", "month", "season", "all" }.Select((id, i) => new Choice(id, StatsTabs.Ranges[i])).ToList();
+        var period = Ui.Combo(choices, stats.Settings.Range, c =>
+        {
+            if (stats.Settings.Range == c.Id) return;
+            stats.Settings.Range = c.Id ?? "season";
+            Changed();
+        }, 170);
+        period.ToolTip = string.Join("\n", StatsTabs.Ranges.Select((name, i) => $"{name}: {tips[i]}"));
+        System.Windows.Automation.AutomationProperties.SetName(period, "Period");
+        Ui.Anchor(period, "stats.period");
+        var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(19, 0, 0, 0), Children = { label, period } };
+        var row = new TabBarRow();
+        row.Children.Add(_tabStrip);
+        row.Children.Add(right);
+        _tabBarHost.Content = Ui.TabBar(_tabStrip, row);
+    }
+
+    private void SwitchTab(string tab)
+    {
+        if (Stats is not { } stats || stats.Settings.Tab == tab && _sessionId is null) return;
+        stats.Settings.Tab = tab;
+        _app.Save();
+        _sessionId = null;
+        _analysisLaps = null;
+        Refresh();
+        _scroll.ScrollToTop();
+    }
+
+    AppServices IStatsHost.App => _app;
+    MainWindow IStatsHost.Window => _window;
+    StatsTabState IStatsHost.State => _tabState;
+    void IStatsHost.OpenAnalysis(long id, List<int> laps) => Open(id, laps);
+    void IStatsHost.Changed() => Changed();
+
+    void IStatsHost.ShowTab(string tab)
+    {
+        if (Stats is not { } stats) return;
+        tab = StatsTabs.Normalize(tab);
+        if (_tabStrip is not null) Ui.SetSegment(_tabStrip, Array.FindIndex(StatsTabs.All, t => t.Id == tab));
+        if (stats.Settings.Tab != tab || _sessionId is not null) SwitchTab(tab);
+    }
+
+    FrameworkElement IStatsHost.TraceButton() => Stats is { } stats ? TraceSettings.Button(_app, stats, _window) : new Border();
+
+    FrameworkElement IStatsHost.LiveEvents() => EventsPanel();
+
+    public bool Reveal(string anchor)
+    {
+        string? tab = anchor switch
+        {
+            "stats.sessions" or "stats.traces" => "sessions",
+            "stats.raceevents" or "stats.events" => "events",
+            "stats.season" => "season",
+            "stats.activity" or "stats.cars" => "driving",
+            "stats.pairs" => "cars",
+            _ => null,
+        };
+        if (tab is null || Stats is not { } stats || stats.Settings.Tab == tab && _sessionId is null) return false;
+        ((IStatsHost)this).ShowTab(tab);
+        return true;
+    }
+
+    private Button _events = new();
+    private TextBlock _eventsStatus = new();
+    private System.Windows.Shapes.Ellipse _eventsDot = new();
+    private bool? _eventsLive;
+    private RaceEventBars _eventBars = new();
+    private long _eventsVersion = -1;
+
+    private FrameworkElement EventsPanel()
+    {
+        var title = new TextBlock { Text = "Race events", Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronRight"), Width = 14, Height = 14, VerticalAlignment = VerticalAlignment.Center };
+        chevron.SetResourceReference(Control.ForegroundProperty, "TextMuted");
+        var head = new Grid { Height = 20 };
+        head.ColumnDefinitions.Add(new ColumnDefinition());
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(chevron, 1);
+        head.Children.Add(title);
+        head.Children.Add(chevron);
+        _eventBars.Run(false);
+        _eventBars = new RaceEventBars { Height = 44, Margin = new Thickness(0, 10, 0, 0), ToolTip = "Events per lap: passes, off tracks, incidents and pit stops" };
+        _eventsVersion = -1;
+        _eventsStatus = new TextBlock { Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        _eventsDot = new System.Windows.Shapes.Ellipse { Width = 7, Height = 7, Margin = new Thickness(0, 0, 7, 0), VerticalAlignment = VerticalAlignment.Center };
+        var status = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Children = { _eventsDot, _eventsStatus } };
+        var body = new Grid { Height = 92 };
+        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        body.RowDefinitions.Add(new RowDefinition());
+        Grid.SetRow(_eventBars, 1);
+        Grid.SetRow(status, 2);
+        body.Children.Add(head);
+        body.Children.Add(_eventBars);
+        body.Children.Add(status);
+        _events = new Button
+        {
+            Style = Ui.Res<Style>("GhostButton"), Content = body, Height = double.NaN, Padding = new Thickness(13, 11, 13, 12),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Top,
+            ToolTip = "Every pass, off track, incident and pit stop of the session you're in: click one to watch it in iRacing's replay",
+        };
+        _events.SetResourceReference(Control.BackgroundProperty, "TileRaised");
+        _events.Click += (_, _) => Views.RaceEvents.RaceEventsWindow.Open(AppServices.Current);
+        System.Windows.Automation.AutomationProperties.SetName(_events, "Race events");
+        Ui.Anchor(_events, "stats.raceevents");
+        _eventsLive = null;
+        SyncEventsButton();
+        return _events;
+    }
+
+    private void SyncEventsButton()
+    {
+        var snap = SessionStatsPlugin.RaceEventsFeed(_app)?.Snapshot();
+        bool live = snap is { Connected: true } || _app.Telemetry.Status == SimRacing.Telemetry.SimStatus.Connected;
+        string text = !live ? "Waiting for iRacing" : snap is { HasRace: true } ? $"Live · {SimRacing.Race.RaceFormat.Count(snap.Events.Count, "event")}" : "Live";
+        TextCase.Set(_eventsStatus, text);
+        SyncEventBars(snap, live);
+        if (_eventsLive == live) return;
+        _eventsLive = live;
+        string key = live ? StatsUi.Hue("Sage").Deep : "TextFaint";
+        _eventsDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, key);
+        _eventsStatus.SetResourceReference(TextBlock.ForegroundProperty, live ? key : "TextMuted");
+    }
+
+    private void SyncEventBars(SimRacing.Race.RaceEventsSnapshot? snap, bool live)
+    {
+        bool race = snap is { HasRace: true };
+        long version = race ? snap!.Version * 2 + (live ? 1 : 0) : -2;
+        if (version != _eventsVersion)
+        {
+            _eventsVersion = version;
+            if (!race) _eventBars.Show(Array.Empty<int[]>(), 0, -1);
+            else
+            {
+                int current = SimRacing.Race.RaceEventLaps.Current(snap!);
+                var (bars, group) = SimRacing.Race.RaceEventLaps.Count(snap!.Events, SimRacing.Race.RaceEventLaps.Slots(snap, current));
+                int filled = current <= 0 ? 0 : (current - 1) / group + 1;
+                _eventBars.Show(bars, filled, live && current > 0 ? filled - 1 : -1);
+            }
+        }
+        _eventBars.Run(_shown && (!race || live));
     }
 
     private SessionStatsService? Stats => SessionStatsPlugin.Of(_app);
 
     private void BuildDriverPlate()
     {
-        _numberPlate.SetResourceReference(Tile.BackgroundProperty, "TileRaised");
-        _numberPlate.SetResourceReference(Tile.BorderBrushProperty, "InputEdge");
+        _numberPlate.CornerRadius = ThemeManager.Round(6);
+        _numberPlate.SetResourceReference(Tile.BackgroundProperty, "Accent");
         _numberPlate.VerticalAlignment = VerticalAlignment.Center;
-        _number.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
-        _number.SetResourceReference(TextBlock.FontFamilyProperty, "MetricFont");
+        _number.SetResourceReference(TextBlock.ForegroundProperty, "OnAccent");
+        _number.SetResourceReference(TextBlock.FontFamilyProperty, "RaceFont");
+        TextCase.Verbatim(_number);
         _numberPlate.Child = _number;
         _numberPlate.ToolTip = "Your car number";
         _driver.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
-        _driver.MaxWidth = 292;
+        _driver.FontSize = 14;
+        _driver.MaxWidth = 260;
         var edit = Ui.IconButton("I.Pencil", "Your car number (blank = the one you used most, league races first)", () => _ = EditNumberAsync(), "QuietIconButton");
-        edit.Margin = new Thickness(5, 0, 0, 0);
+        edit.Margin = new Thickness(6, 0, 0, 0);
         edit.VerticalAlignment = VerticalAlignment.Center;
-        _sessionsCount.Style = Ui.Res<Style>("Caption");
-        _driverPlate.Children.Add(_numberPlate);
-        _driverPlate.Children.Add(_driver);
-        _driverPlate.Children.Add(edit);
-        _driverPlate.Children.Add(_sessionsCount);
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Children = { _numberPlate, _driver, edit } };
+        var pill = new Tile { CornerRadius = ThemeManager.Round(8), BorderThickness = Hairline.Edges(), Padding = new Thickness(4, 0, 2, 0), Child = row, VerticalAlignment = VerticalAlignment.Center };
+        pill.SetResourceReference(Tile.BackgroundProperty, "TileRaised");
+        pill.SetResourceReference(Tile.BorderBrushProperty, "Line");
+        _driverPlate.Children.Add(pill);
     }
 
     private void OpenOptions(Button anchor, SessionStatsService stats)
@@ -127,34 +280,23 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         var number = new MenuItem { Header = "Car number…" };
         number.Click += (_, _) => _ = EditNumberAsync();
         menu.Items.Add(number);
+        var files = new MenuItem { Header = "Telemetry files…" };
+        files.Click += (_, _) => _ = OpenTelemetryAsync(stats);
+        menu.Items.Add(files);
         menu.IsOpen = true;
     }
 
-    private void OpenPanels(Button anchor, SessionStatsService stats)
+    private async Task OpenTelemetryAsync(SessionStatsService stats)
     {
-        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom, MinWidth = 178 };
-        Ui.DropBelow(menu);
-        var hidden = stats.Settings.HiddenPanels;
-        foreach (var (id, name) in Config.SessionStatsSettings.Panels)
-        {
-            bool shown = !hidden.Contains(id);
-            var lamp = new Core.Controls.Lamp { On = shown };
-            var label = new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center, Opacity = shown ? 1 : ToggleCards.OffOpacity };
-            var item = new MenuItem { Header = ToggleCards.WithLamp(lamp, label), StaysOpenOnClick = true };
-            System.Windows.Automation.AutomationProperties.SetName(item, name);
-            System.Windows.Automation.AutomationProperties.SetItemStatus(item, shown ? "On" : "Off");
-            item.Click += (_, _) =>
-            {
-                bool hide = !hidden.Contains(id);
-                if (hide) hidden.Add(id); else hidden.Remove(id);
-                lamp.On = !hide;
-                label.Opacity = hide ? ToggleCards.OffOpacity : 1;
-                System.Windows.Automation.AutomationProperties.SetItemStatus(item, hide ? "Off" : "On");
-                Changed();
-            };
-            menu.Items.Add(item);
-        }
-        menu.IsOpen = true;
+        var card = new TelemetryFilesCard(_app, _window, stats, bare: true);
+        _telemetry = card;
+        var close = new Button { Content = "Close", Style = Ui.Res<Style>("PrimaryButton"), IsDefault = true, IsCancel = true };
+        close.Click += (_, _) => _window.CloseModal(false);
+        var buttons = new StackPanel { Children = { close } };
+        var shown = _window.ShowModal(Ui.Dialog(_window, "Telemetry files", "", card, buttons, null, 640));
+        close.Focus();
+        await shown;
+        _telemetry = null;
     }
 
     private const double CrumbSize = 15.5;
@@ -166,14 +308,14 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         _crumbs.Visibility = drilled ? Visibility.Visible : Visibility.Collapsed;
         _driverPlate.Visibility = !drilled && _driver.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         _tools.Visibility = drilled ? Visibility.Collapsed : Visibility.Visible;
-        if (_shown) _window.Nav.ShowBack(drilled ? Back : null);
+        _tabBarHost.Visibility = drilled ? Visibility.Collapsed : Visibility.Visible;
         if (!drilled) return;
         void Crumb(string text, Action? go)
         {
             if (_crumbs.Children.Count > 0)
             {
-                var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronRight"), Width = 13, Height = 13, Margin = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
-                chevron.SetResourceReference(Control.ForegroundProperty, "TextMuted");
+                var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronRight"), Width = 12, Height = 12, Margin = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
+                chevron.SetResourceReference(Control.ForegroundProperty, "TextFaint");
                 _crumbs.Children.Add(chevron);
             }
             if (go is null)
@@ -184,26 +326,13 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
                 return;
             }
             var button = new Button { Style = Ui.Res<Style>("QuietButton"), Content = text, FontSize = CrumbSize, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, ToolTip = "Back (Esc)" };
-            button.SetResourceReference(Control.ForegroundProperty, "Text");
+            button.SetResourceReference(Control.ForegroundProperty, "TextMuted");
             button.Click += (_, _) => go();
             _crumbs.Children.Add(button);
         }
-        Crumb("Overview", () => { _analysisLaps = null; _sessionId = null; Refresh(restoreOffset: true); _window.RecordHistory(); });
         string when = session is null ? "Session" : $"{Dates.Short(session.StartUtc.ToLocalTime())} {StatsSessions.TypeName(session.Type)}";
-        if (_analysisLaps is null) Crumb(session is null ? when : $"{when} · {session.Place}", null);
-        else
-        {
-            Crumb(when, () => { _analysisLaps = null; Refresh(); _window.RecordHistory(); });
-            Crumb("Lap analysis", null);
-            if (session is null) return;
-            var about = TextFit.TipWhenTrimmed(new TextBlock
-            {
-                Text = $"{session.Car} · {session.Place} · {Dates.Day(session.StartUtc.ToLocalTime())}", Style = Ui.Res<Style>("Body"), TextWrapping = TextWrapping.NoWrap,
-                TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 640, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 0, 0),
-            });
-            about.SetResourceReference(TextBlock.ForegroundProperty, "Text");
-            _crumbs.Children.Add(about);
-        }
+        Crumb(when, Back);
+        Crumb("Lap analysis", null);
     }
 
     private async Task EditNumberAsync()
@@ -220,7 +349,9 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     public void OnShown()
     {
         _shown = true;
-        _window.Nav.ShowBack(_sessionId is not null ? Back : null);
+        _app.Tick -= SyncEventsButton;
+        _app.Tick += SyncEventsButton;
+        SyncEventsButton();
         if (Stats is { } stats)
         {
             stats.Changed += OnStatsChanged;
@@ -236,8 +367,9 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
 
     public void OnHidden()
     {
+        _app.Tick -= SyncEventsButton;
         _shown = false;
-        _window.Nav.ShowBack(null);
+        _eventBars.Run(false);
         if (Stats is { } stats) stats.Changed -= OnStatsChanged;
     }
 
@@ -262,10 +394,10 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         Refresh();
     }
 
-    private void Open(long session, List<int>? laps = null)
+    private void Open(long session, List<int> laps)
     {
         if (_sessionId is null) _overviewOffset = _scroll.VerticalOffset;
-        if (_sessionId != session) { _ticked.Clear(); _reference = "session"; _replay = new(); }
+        if (_sessionId != session) { _reference = "session"; _replay = new(); }
         _sessionId = session;
         _analysisLaps = laps;
         Refresh();
@@ -275,9 +407,10 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
 
     private void Back()
     {
-        if (_analysisLaps is not null) _analysisLaps = null;
-        else _sessionId = null;
-        Refresh(restoreOffset: _sessionId is null);
+        if (_sessionId is { } id) _tabState.Session = id;
+        _analysisLaps = null;
+        _sessionId = null;
+        Refresh(restoreOffset: true);
         _window.RecordHistory();
     }
 
@@ -288,11 +421,14 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     public void RestoreHistory(object? state)
     {
         if (state is not View view) return;
-        bool toOverview = view.Session is null && _sessionId is not null;
-        if (_sessionId is null && view.Session is not null) _overviewOffset = _scroll.VerticalOffset;
-        if (_sessionId != view.Session) { _ticked.Clear(); _reference = "session"; _replay = new(); }
-        _sessionId = view.Session;
-        _analysisLaps = view.Laps?.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToList();
+        var laps = view.Laps?.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToList();
+        long? session = laps is null ? null : view.Session;
+        bool toOverview = session is null && _sessionId is not null;
+        if (_sessionId is not null && session is null) _tabState.Session = _sessionId;
+        if (_sessionId is null && session is not null) _overviewOffset = _scroll.VerticalOffset;
+        if (_sessionId != session) { _reference = "session"; _replay = new(); }
+        _analysisLaps = laps;
+        _sessionId = session;
         Refresh(restoreOffset: toOverview);
         if (!toOverview) _scroll.ScrollToTop();
     }
@@ -307,37 +443,38 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     {
         long id = _sessionId!.Value;
         var traces = stats.Traces;
-        if (_analysisLaps is { } laps)
-        {
-            string reference = _reference;
-            var data = await Task.Run(() => traces is null ? null : LoadAnalysis(store, traces, id, laps, reference));
-            if (version != _version || !_shown) return;
-            if (data is null || data.Laps.Count == 0) { _analysisLaps = null; Refresh(); return; }
-            var actions = new AnalysisActions(
-                pick => { _reference = pick; Refresh(); },
-                lap => { _analysisLaps = _analysisLaps?.Where(l => l != lap).ToList(); _ticked.Remove(lap); Refresh(); },
-                lap => ExportLap(store, traces!, id, lap),
-                () => _ = ImportLapAsync(traces!, data.Session),
-                shared => _ = DeleteSharedAsync(traces!, shared),
-                _app.Save);
-            var view = LapAnalysisView.Build(data, stats.Settings, _reference, actions, _replay, out _);
-            _content.Content = Drilled(view, data.Session);
-            return;
-        }
-        string driver = _driver.Text;
-        var detail = await Task.Run(() =>
-        {
-            if (store.Session(id) is not { } s) return null;
-            var (tank, tyres) = store.CarExtras(id);
-            var race = RaceParts.Raced(s) ? RaceInfo.Read(store, driver).Data(s) : null;
-            var (trackId, trackName) = store.TrackIdentity(id);
-            return new SessionDetail(s, store.Laps(id), traces?.LapsWithTrace(id) ?? new HashSet<int>(), store.BestLap(s.Car, s.Track, s.Config), store.Conditions(id), tank, tyres, race, trackId, trackName,
-                StatsCharts.ReadCombo(store, s.Car, s.Track, s.Config, trackId, trackName));
-        });
+        if (_analysisLaps is not { } laps) { _sessionId = null; Refresh(); return; }
+        string reference = _reference;
+        var data = await Task.Run(() => traces is null ? null : LoadAnalysis(store, traces, id, laps, reference));
         if (version != _version || !_shown) return;
-        if (detail is null) { _sessionId = null; Refresh(); return; }
-        var performance = detail.Performance is { } combo ? StatsSections.Performance(combo, stats, Changed) : null;
-        _content.Content = Drilled(StatsSessionView.Build(detail, stats.Settings, StatsSessions.NoTraceReason(detail.Session, stats.Settings, DateTime.UtcNow), _ticked, picked => Open(id, picked.ToList()), performance), detail.Session);
+        if (data is null || data.Laps.Count == 0) { Back(); return; }
+        _reference = LapAnalysisView.Usable(data, _reference);
+        var actions = new AnalysisActions(
+            pick => { _reference = pick; Refresh(); },
+            lap =>
+            {
+                _analysisLaps = new List<int> { lap }.Concat((_analysisLaps ?? new()).Skip(1).Where(l => l != lap)).ToList();
+                _replay.Turn = -1;
+                Refresh();
+            },
+            lap =>
+            {
+                var list = (_analysisLaps ?? new()).ToList();
+                if (list.Skip(1).Contains(lap)) list.Remove(lap);
+                else
+                {
+                    list.Add(lap);
+                    while (list.Count > 1 + LapAnalysisView.MaxExtras) list.RemoveAt(1);
+                }
+                _analysisLaps = list;
+                Refresh();
+            },
+            lap => ExportLap(store, traces!, id, lap),
+            () => _ = ImportLapAsync(traces!, data.Session),
+            shared => _ = DeleteSharedAsync(traces!, shared),
+            _app.Save, Back);
+        var view = LapAnalysisView.Build(data, stats.Settings, _reference, actions, _replay, out _);
+        _content.Content = Drilled(view, data.Session);
     }
 
     internal static AnalysisData? LoadAnalysis(StatsStore store, TraceStore traces, long id, IReadOnlyList<int> picked, string reference = "session")
@@ -346,7 +483,8 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         var traced = traces.LapsWithTrace(id);
         var all = store.Laps(id).Where(l => traced.Contains(l.Lap)).Select(l => (Row: l, Trace: traces.Load(id, l.Lap))).Where(x => x.Trace is not null).ToList();
         if (all.Count == 0) return null;
-        var shown = all.Where(x => picked.Contains(x.Row.Lap)).Select(x => (x.Row.Lap, x.Row.Time, x.Trace!)).ToList();
+        var shown = picked.Select(p => all.FirstOrDefault(x => x.Row.Lap == p)).Where(x => x.Trace is not null).Select(x => (x.Row.Lap, x.Row.Time, x.Trace!)).ToList();
+        if (shown.Count == 0) shown = all.Take(1).Select(x => (x.Row.Lap, x.Row.Time, x.Trace!)).ToList();
         var pool = all.Where(x => x.Row.Clean).ToList();
         if (pool.Count == 0) pool = all;
         var best = pool.MinBy(x => x.Row.Time);
@@ -369,7 +507,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         if (reference.StartsWith("shared:") && long.TryParse(reference[7..], out long sid) && shared.FirstOrDefault(x => x.Id == sid) is { } info && traces.LoadShared(sid) is { } lap)
             sharedPicked = (info, lap.Trace);
         return new AnalysisData(session, shown, best.Trace is { } t && best.Row is { } br ? (br.Lap, t) : null, trackBest, optimal, starts,
-            store.DriverOf(id), shared, sharedPicked, MapOf(store, session));
+            store.DriverOf(id), shared, sharedPicked, MapOf(store, session), all.Select(x => (x.Row.Lap, x.Row.Time, x.Row.Clean, x.Trace!)).ToList());
     }
 
     private static SimRacing.TrackMaps.TrackMap? MapOf(StatsStore store, SessionSummary session)
@@ -498,30 +636,28 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         var charts = await Task.Run(() => StatsCharts.Read(store, q, range));
         var traces = stats.Traces;
         string driver = name ?? "";
-        var (sessions, traced, races, lastConditions) = await Task.Run(() =>
+        var (sessions, traced, races) = await Task.Run(() =>
         {
             var list = store.Sessions(q.From, q.To);
-            var conditions = list.FirstOrDefault(RaceParts.Raced) is { } raced ? store.Conditions(raced.Id) : null;
-            return (list, traces?.SessionsWithTraces(list.Select(s => s.Id)) ?? new HashSet<long>(), RaceInfo.Read(store, driver, list.Select(s => s.Id)), conditions);
+            return (list, traces?.SessionsWithTraces(list.Select(s => s.Id)) ?? new HashSet<long>(), RaceInfo.Read(store, driver, list.Select(s => s.Id)));
         });
         await Motion.PageSettled(Dispatcher);
         if (version != _version || !_shown || _sessionId is not null) return;
 
-        _sessionsCount.Text = $"{SimRacing.Race.RaceFormat.Count(charts.Sessions, "session")} · {StatsUi.RangeName(range)}";
         var page = new StackPanel();
         if (stats.Leagues is { Count: 0 }) page.Children.Add(LeagueNote(store));
+        _telemetry = null;
         if (charts.Sessions == 0)
         {
-            page.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Child = Ui.Text("No sessions in this range yet: pick a longer one to see the rest.", "Muted") });
+            page.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Child = Ui.EmptyState("I.Stats", "No sessions in this period", "Pick a longer period at the top right to see the rest.") });
             _content.Content = page;
             _built = inputs;
             return;
         }
-        var sessionsCard = StatsSessions.Card(sessions, traced, _filter, stats.Settings, Refresh, s => Open(s.Id), TraceSettings.Button(_app, stats, _window), races);
-        var lastRace = sessions.FirstOrDefault(RaceParts.Raced);
-        _telemetry = null;
-        var sections = StatsSections.Page(results, charts, stats, q, sessionsCard, lastRace is null ? null : RaceParts.Card(races.Data(lastRace) with { Driver = "", Conditions = lastConditions, Imperial = stats.Settings.Imperial }, "Last race"), () => _telemetry = new TelemetryFilesCard(_app, _window, stats), staged: !restoreOffset);
-        page.Children.Add(sections);
+        string tab = StatsTabs.Normalize(stats.Settings.Tab);
+        if (_tabStrip is not null) Ui.SetSegment(_tabStrip, Array.FindIndex(StatsTabs.All, t => t.Id == tab));
+        var data = new StatsTabData(stats, store, q, range, results, charts, sessions, traced, races);
+        page.Children.Add(StatsTabs.Build(tab, data, this));
         bool arriving = _content.Content is null;
         _content.Content = page;
         if (arriving) Motion.FadeIn(page);
@@ -547,36 +683,36 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             await Task.Delay(300);
         });
         long? Traced() => Stats?.Store?.Sessions(0, long.MaxValue).FirstOrDefault(s => Stats.Traces?.Has(s.Id) == true)?.Id;
-        yield return ("session", async () =>
-        {
-            if (Traced() is { } id) Open(id);
-            await Task.Delay(500);
-        });
-        yield return ("session-race", async () =>
-        {
-            if (Stats?.Store?.Sessions(0, long.MaxValue).FirstOrDefault(s => s.Type == "Race" && s.Laps > 18) is { } race) Open(race.Id);
-            await Task.Delay(600);
-        });
-        yield return ("session-runs", async () =>
-        {
-            await Task.Delay(100);
-            _scroll.ScrollToVerticalOffset(_scroll.ScrollableHeight * 0.55);
-            await Task.Delay(300);
-        });
-        yield return ("session-tools", async () =>
-        {
-            _scroll.ScrollToVerticalOffset(_scroll.ScrollableHeight);
-            await Task.Delay(300);
-        });
         yield return ("analysis", async () =>
         {
             if (Traced() is { } id && Stats?.Traces?.LapsWithTrace(id).OrderBy(l => l).Take(3).ToList() is { Count: > 0 } laps) Open(id, laps);
             await Task.Delay(700);
         });
+        async Task Tab(int tab, int delay = 600)
+        {
+            _replay.Tab = tab;
+            Refresh();
+            await Task.Delay(delay);
+        }
+        yield return ("analysis-corners", () => Tab(1));
+        yield return ("analysis-consistency", () => Tab(2));
+        yield return ("analysis-whole", () => Tab(3));
+        yield return ("analysis-coach-turn", async () =>
+        {
+            _replay.Turn = 0;
+            await Tab(0);
+        });
+        yield return ("analysis-coach-bottom", async () =>
+        {
+            _scroll.ScrollToVerticalOffset(_scroll.ScrollableHeight);
+            await Task.Delay(400);
+        });
         yield return ("analysis-one-lap", async () =>
         {
             if (Traced() is { } id && Stats?.Traces?.LapsWithTrace(id).OrderBy(l => l).FirstOrDefault() is { } lap and > 0)
             {
+                _replay.Tab = 0;
+                _replay.Turn = -1;
                 Open(id, new List<int> { lap });
                 _reference = "lap:" + lap;
                 Refresh();
@@ -585,12 +721,13 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         });
         yield return ("analysis-one-lap-replay", async () =>
         {
+            await Tab(LapAnalysisView.ReplayTab, 700);
             FindChild<LapReplayView>(this)?.BringIntoView();
             await Task.Delay(400);
         });
         yield return ("analysis-again", async () =>
         {
-            if (Traced() is { } id && Stats?.Traces?.LapsWithTrace(id).OrderBy(l => l).Take(3).ToList() is { Count: > 0 } laps) { _reference = "session"; Open(id, laps); }
+            if (Traced() is { } id && Stats?.Traces?.LapsWithTrace(id).OrderBy(l => l).Take(3).ToList() is { Count: > 0 } laps) { _reference = "session"; _replay.Tab = 3; Open(id, laps); }
             await Task.Delay(700);
         });
         yield return ("analysis-zoomed", async () =>
@@ -610,7 +747,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
                 stats.Settings.ReplayZoom = 0.8;
                 if (stats.Traces?.SharedAt("Circuit de Spa-Francorchamps", "Grand Prix Pits").FirstOrDefault() is { } rival) _reference = "shared:" + rival.Id;
             }
-            _replay = new ReplayMemory { Distance = 2350 };
+            _replay = new ReplayMemory { Distance = 2350, Tab = LapAnalysisView.ReplayTab };
             Refresh();
             await Task.Delay(800);
             FindChild<LapReplayView>(this)?.BringIntoView();
@@ -620,6 +757,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         {
             if (Stats is { } stats) { stats.Settings.ReplaySync = sync; stats.Settings.ReplayZoom = zoom; }
             _replay.Distance = distance;
+            _replay.Tab = LapAnalysisView.ReplayTab;
             Refresh();
             await Task.Delay(700);
             FindChild<LapReplayView>(this)?.BringIntoView();
@@ -701,25 +839,77 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     public IEnumerable<(string Name, Func<Task> Enter)> ScreenshotStates()
     {
         foreach (var state in LapStates()) yield return state;
+        yield return ("race-events", () => ScreenshotRunner.Folder is { } folder ? Views.RaceEvents.RaceEventsWindow.ShootAsync(_app, folder, "race-events") : Task.CompletedTask);
         foreach (var range in new[] { "week", "month", "all" })
         {
             var r = range;
             yield return ("range-" + r, () =>
             {
-                if (Stats is { } stats) { stats.Settings.Range = r; Refresh(); }
+                if (Stats is { } stats) { stats.Settings.Range = r; BuildTabBar(stats); Refresh(); }
                 return Task.Delay(400);
             });
         }
-        foreach (var state in new[] { "activity", "cars", "telemetry" })
+        foreach (var (id, _) in StatsTabs.All)
         {
-            string anchor = "stats." + state;
-            yield return (state, async () =>
+            string tab = id;
+            yield return ("tab-" + tab, async () =>
             {
-                await Task.Delay(300);
-                Ui.FindAnchor(this, anchor)?.BringIntoView();
-                await Task.Delay(300);
+                ((IStatsHost)this).ShowTab(tab);
+                await Task.Delay(900);
             });
         }
+        yield return ("tab-sessions-race", async () =>
+        {
+            if (Stats?.Store?.Sessions(0, long.MaxValue).FirstOrDefault(s => s.Type == "Race" && s.Laps > 18) is { } race) _tabState.Session = race.Id;
+            _tabState.SessionTab = "Overview";
+            ((IStatsHost)this).ShowTab("sessions");
+            Refresh();
+            await Task.Delay(900);
+        });
+        foreach (var sub in new[] { "Race events" })
+        {
+            string tab = sub;
+            yield return ("tab-sessions-" + tab.Replace(' ', '-').ToLowerInvariant(), async () =>
+            {
+                var all = Stats?.Store?.Sessions(0, long.MaxValue) ?? new();
+                var pick = tab != "Corners" ? all.FirstOrDefault(s => s.Type == "Race" && s.Laps > 18) : all.FirstOrDefault(s => Stats?.Traces?.LapsWithTrace(s.Id).Count > 1);
+                if (pick is not null) _tabState.Session = pick.Id;
+                _tabState.SessionTab = tab;
+                ((IStatsHost)this).ShowTab("sessions");
+                Refresh();
+                await Task.Delay(1500);
+            });
+        }
+        yield return ("tab-sessions-laps", async () =>
+        {
+            _tabState.SessionTab = "Lap by lap";
+            ((IStatsHost)this).ShowTab("sessions");
+            Refresh();
+            await Task.Delay(900);
+        });
+        yield return ("tab-cars-by-track", async () =>
+        {
+            _tabState.PairGroup = "track";
+            _tabState.PairSort = "az";
+            ((IStatsHost)this).ShowTab("cars");
+            Refresh();
+            await Task.Delay(900);
+        });
+        yield return ("telemetry", async () =>
+        {
+            _tabState.SessionTab = "Overview";
+            _tabState.PairGroup = "car";
+            _tabState.PairSort = "driven";
+            ((IStatsHost)this).ShowTab("sessions");
+            await Task.Delay(500);
+            if (Stats is { } stats) _ = OpenTelemetryAsync(stats);
+            await Task.Delay(900);
+        });
+        yield return ("telemetry-closed", () =>
+        {
+            _window.CloseModal(false);
+            return Task.Delay(300);
+        });
         yield return ("imperial", () =>
         {
             if (Stats is { } stats) { stats.Settings.Range = "season"; stats.Settings.Imperial = true; Refresh(); }
@@ -730,24 +920,16 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             if (Stats is { } stats) { stats.Settings.Imperial = false; Refresh(); }
             return Task.Delay(400);
         });
+        yield return ("race-events-keybinds", () => ScreenshotRunner.Folder is { } folder ? Views.RaceEvents.RaceEventsWindow.ShootKeybindsAsync(_app, folder) : Task.CompletedTask);
     }
 }
 
 internal static class StatsUi
 {
-    private static readonly string[] Ranges = { "Week", "Month", "Season", "All time" };
-
     public static string RangeName(StatRange range) => range switch
     {
         StatRange.Week => "this week", StatRange.Month => "this month", StatRange.Season => "this season", _ => "all time",
     };
-
-    public static FrameworkElement RangePicker(SessionStatsService stats, string group, Action changed) =>
-        Ui.Segmented(Ranges, (int)stats.Range, i =>
-        {
-            stats.Settings.Range = SessionStatsService.NameOf((StatRange)i);
-            changed();
-        }, "statsRange" + group, new[] { "Since Monday", "This calendar month", "This iRacing season (12 weeks + week 13)", "Everything" });
 
     internal static string? TipOf(StatDef def, StatResult result, bool full)
     {
@@ -796,92 +978,6 @@ internal static class StatsUi
 
 internal static class StatsSections
 {
-    public static FrameworkElement Page(List<(StatDef Def, StatResult Result)> results, StatsCharts.Data charts, SessionStatsService service, StatQuery q,
-        FrameworkElement? sessions = null, FrameworkElement? lastRace = null, Func<FrameworkElement>? telemetry = null, bool staged = false)
-    {
-        var settings = service.Settings;
-        var byId = results.ToDictionary(r => r.Def.Id, r => r);
-        (StatDef Def, StatResult Result)? Get(string id) => byId.TryGetValue(id, out var r) ? r : null;
-        IEnumerable<(StatDef, StatResult)> Many(params string[] ids) => ids.Select(Get).OfType<(StatDef, StatResult)>();
-
-        var page = new StackPanel();
-        void Add(FrameworkElement? element)
-        {
-            if (element is null) return;
-            element.Margin = new Thickness(0, page.Children.Count == 0 ? 0 : Ui.PanelSpacing, 0, 0);
-            page.Children.Add(element);
-        }
-        var later = new List<(Border Host, Func<FrameworkElement> Build)>();
-        void Later(string? anchor, Func<FrameworkElement> build)
-        {
-            if (!staged)
-            {
-                var built = build();
-                if (anchor is not null) Ui.Anchor(built, anchor);
-                Add(built);
-                return;
-            }
-            var host = new Border { Visibility = Visibility.Collapsed };
-            if (anchor is not null) Ui.Anchor(host, anchor);
-            Add(host);
-            later.Add((host, build));
-        }
-        void BuildLater(int next)
-        {
-            if (next >= later.Count) return;
-            if (!page.IsLoaded)
-            {
-                void Resume(object sender, RoutedEventArgs e)
-                {
-                    page.Loaded -= Resume;
-                    page.Dispatcher.BeginInvoke(() => BuildLater(next), System.Windows.Threading.DispatcherPriority.Background);
-                }
-                page.Loaded += Resume;
-                return;
-            }
-            var (host, build) = later[next];
-            host.Child = build();
-            host.Visibility = Visibility.Visible;
-            Motion.FadeIn(host);
-            page.Dispatcher.BeginInvoke(() => BuildLater(next + 1), System.Windows.Threading.DispatcherPriority.Background);
-        }
-
-        var known = new HashSet<string> { "pace.laps", "time.total", "pace.distance",
-            "time.week", "time.month", "time.weekly", "time.session", "time.stint", "time.garage", "time.practice", "time.qualify", "time.race",
-            "car.unique", "track.unique", "combo.top", "car.time", "car.laps", "track.time", "track.laps", "class.time",
-            "race.starts", "race.finishes", "race.wins", "race.podiums", "race.top5", "race.league", "race.avgstart", "race.avgfinish", "race.gained", "race.irating", "race.sr",
-            "inc.total", "inc.zero", "style.fuel", "style.pits", "cond.rain", "cond.night" };
-        var more = results.Where(r => !known.Contains(r.Def.Id)).ToList();
-        var racecraft = StatsRacecraft.Panel(charts.Races ?? Racecraft.Empty, Get, q, more.Count > 0 ? Metrics(more) : null);
-        if (settings.Shows("overview")) Add(Hero(charts, q, StatsUi.RangeName(service.Range), Many("pace.laps", "time.total", "pace.distance", "race.podiums").ToList(), racecraft, lastRace));
-        if (settings.Shows("sessions")) Add(sessions);
-
-        FrameworkElement Activity()
-        {
-            var types = charts.SessionTypes;
-            return Section("Driving activity", $"{SimRacing.Race.RaceFormat.Count(charts.Sessions, "session")}", null, Stack(
-                Chart("Session mix", null, StatsCharts.SessionMix(types)),
-                StatsLayout.Pair(
-                    Chart("When you drive", "Brighter squares are the hours you drive most", StatsCharts.Heatmap(charts.Heatmap, charts.HeatmapDays)),
-                    Chart(charts.Trend.Title, $"Each bar is your total driving time for that {charts.Trend.Unit}", StatsCharts.Trend(charts.Trend)), 1050, gap: 26),
-                Metrics(Many(service.Range == StatRange.Week ? new[] { "time.week", "time.month", "time.session", "time.stint", "time.garage" } : new[] { "time.week", "time.month", "time.weekly", "time.session", "time.stint", "time.garage" }))));
-        }
-        if (settings.Shows("activity")) Later("stats.activity", Activity);
-
-        FrameworkElement Cars()
-        {
-            string variety = string.Join(" · ", new[] { Count(Get("car.unique"), "car"), Count(Get("track.unique"), "track"), charts.Cars.Count > 0 ? "by driving time" : null }.OfType<string>());
-            var rankings = new StatGrid { MinTileWidth = 380, Gap = 40, Columns = 2 };
-            rankings.Children.Add(StatsSections.Column("Cars", StatsCharts.Ranked(charts.Cars, "No cars in this range", cars: true), StatsCharts.Totals(charts)));
-            rankings.Children.Add(StatsSections.Column("Tracks", StatsCharts.Ranked(charts.Tracks, "No tracks in this range")));
-            return Section("Cars and tracks", variety.Length > 0 ? variety : null, null, rankings);
-        }
-        if (settings.Shows("cars")) Later("stats.cars", Cars);
-        if (settings.Shows("telemetry") && telemetry is not null) Later(null, telemetry);
-        if (later.Count > 0) page.Dispatcher.BeginInvoke(() => BuildLater(0), System.Windows.Threading.DispatcherPriority.Background);
-        return page;
-    }
-
     internal static Tile Performance(StatsCharts.ComboCharts charts, SessionStatsService service, Action changed) =>
         Section("Performance", null, null, Stack(
             charts.Report is { } report ? StatsReport.Card(report, service, changed) : null,
@@ -1025,98 +1121,6 @@ internal static class StatsSections
         var cell = Hairline.Frame(new Border { Padding = new Thickness(11, 2, 10, 2), Child = stack, ToolTip = StatsUi.TipOf(def, result, full: name) }, Sides.Left);
         cell.SetResourceReference(Border.BorderBrushProperty, "Line");
         return cell;
-    }
-
-    private static FrameworkElement Hero(StatsCharts.Data charts, StatQuery q, string range, List<(StatDef Def, StatResult Result)> headline, FrameworkElement racecraft, FrameworkElement? lastRace)
-    {
-        var block = new Grid { MinHeight = 128, ClipToBounds = true };
-        block.Children.Add(new SoftPanels(PanelSpread.Best, "Place4", 0.35));
-        var best = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(23, 12, 23, 10), HorizontalAlignment = HorizontalAlignment.Left };
-        best.Children.Add(Scoped("Personal best", "all time, in the car and track you drove last"));
-        if (charts.Bests.FirstOrDefault() is { } pb)
-        {
-            var outline = new Border
-            {
-                Width = OutlineWidth, Height = OutlineHeight, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, OutlineInset, 0), IsHitTestVisible = false,
-                Child = new TrackSketch(pb.Track, pb.Config, "Place4Text", 4, lap: true) { PlayOnLoad = true, TrackId = pb.TrackId, TrackName = pb.TrackName },
-            };
-            block.Children.Add(outline);
-            var lap = RaceParts.BigFigure(StatFormat.LapTime(pb.Best), 54, "Place4Text");
-            lap.HorizontalAlignment = HorizontalAlignment.Left;
-            lap.VerticalAlignment = VerticalAlignment.Center;
-            var carName = new TextBlock { Text = pb.Car, Style = Ui.Res<Style>("H3"), TextWrapping = TextWrapping.Wrap };
-            var trackName = new TextBlock { Text = StatFormat.TrackAndConfig(pb.Track, pb.Config), Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap };
-            var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(22, 4, 0, 0), MaxWidth = 340, Children = { carName, trackName } };
-            var figures = new DockPanel { Margin = new Thickness(0, 1, 0, 0), Children = { lap, names } };
-            DockPanel.SetDock(lap, Dock.Left);
-            best.Children.Add(figures);
-            block.SizeChanged += (_, e) =>
-            {
-                double text = best.Margin.Left + new FrameworkElement[] { best.Children[0] as FrameworkElement ?? figures, figures }.Max(t => t.ActualWidth);
-                var map = e.NewSize.Width - text - OutlineInset >= OutlineWidth + 16 ? Visibility.Visible : Visibility.Collapsed;
-                if (outline.Visibility != map) outline.Visibility = map;
-            };
-            var facts = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
-            void Fact(FrameworkElement element) { element.Margin = new Thickness(0, 0, 8, 3); element.VerticalAlignment = VerticalAlignment.Center; facts.Children.Add(element); }
-            if (pb.InRange && q.From > 0)
-            {
-                Fact(Ui.Chip($"New {range}"));
-            }
-            Fact(new TextBlock { Text = $"Set {Dates.Day(pb.When.ToLocalTime())} · {SimRacing.Race.RaceFormat.Count(pb.Laps, "clean lap")} {range}", Style = Ui.Res<Style>("Caption") });
-            if (charts.HeroFirst is { } first && first.Lap - pb.Best > 0.0005)
-            {
-                var gain = new TextBlock { Text = $"{StatFormat.Value(StatKind.LapDelta, pb.Best - first.Lap, false)} since your first session here ({Dates.Day(first.When.ToLocalTime())})", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold };
-                gain.SetResourceReference(TextBlock.ForegroundProperty, StatsUi.Hue("Sage").Deep);
-                Fact(gain);
-            }
-            best.Children.Add(facts);
-            best.ToolTip = "The all-time best clean lap in the car and track you drove last in this range";
-        }
-        else best.Children.Add(Ui.EmptyState("I.Stats", "No clean laps yet", "None in this range."));
-        block.Children.Add(best);
-
-        var right = new Grid();
-        void Row(UIElement element, bool fill = false)
-        {
-            right.RowDefinitions.Add(new RowDefinition { Height = fill ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
-            Grid.SetRow(element, right.RowDefinitions.Count - 1);
-            right.Children.Add(element);
-        }
-        Row(block);
-        if (headline.Count > 0)
-            Row(RaceParts.Tiles(headline.Count, headline.Select(h => RaceParts.Tile(h.Result.NoData ? "No data" : h.Result.Value, h.Def.Label, "Place4",
-                h.Result.NoData ? "TextFaint" : StatsUi.ToneOf(h.Def, h.Result)?.Deep ?? "Heading", h.Result.NoData ? 16 : 30, StatsUi.TipOf(h.Def, h.Result, false), centred: true)).ToArray<FrameworkElement?>()));
-        var rule = Hairline.Rule(new Border());
-        rule.SetResourceReference(Border.BackgroundProperty, "Line");
-        Row(rule);
-        racecraft.VerticalAlignment = VerticalAlignment.Top;
-        Row(new Border { Padding = new Thickness(23, 18, 23, 21), Child = racecraft }, fill: true);
-        var hero = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = right, ClipToBounds = true };
-        if (lastRace is not Border card) return hero;
-        card.VerticalAlignment = VerticalAlignment.Stretch;
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(CardWidth) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(CardGap) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.Children.Add(card);
-        Grid.SetColumn(hero, 2);
-        grid.Children.Add(hero);
-        return grid;
-    }
-
-    internal const double CardWidth = 300, CardGap = 16;
-    private const double OutlineInset = 23;
-    private const double OutlineWidth = 170, OutlineHeight = 104;
-
-    private static TextBlock Scoped(string title, string scope)
-    {
-        var text = new TextBlock { Style = Ui.Res<Style>("Eyebrow"), TextWrapping = TextWrapping.Wrap };
-        text.Inlines.Add(new System.Windows.Documents.Run(title));
-        var rest = new System.Windows.Documents.Run(" · " + scope) { FontWeight = FontWeights.Normal };
-        rest.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "TextMuted");
-        text.Inlines.Add(rest);
-        return text;
     }
 }
 
@@ -1299,7 +1303,7 @@ internal static class StatsCharts
 
     internal sealed record ComboCharts(List<(DateTime When, double Lap)> Timeline, List<SessionSpread> Consistency, ComboReport? Report);
 
-    private static List<(DateTime When, double Lap)> SessionBests(SqliteDb db, string car, string track, string config) => db.Query("""
+    internal static List<(DateTime When, double Lap)> SessionBests(SqliteDb db, string car, string track, string config) => db.Query("""
         SELECT s.start_utc, MIN(l.time) FROM laps l JOIN sessions s ON s.id = l.session_id
         WHERE l.clean = 1 AND s.car = ?1 AND s.track = ?2 AND s.track_config = ?3 GROUP BY s.id ORDER BY s.start_utc, s.id
         """, car, track, config).Select(r => (StatsStore.FromUnix((long)r[0]!), Convert.ToDouble(r[1]))).ToList();

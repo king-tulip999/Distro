@@ -35,6 +35,7 @@ internal sealed class LiveryShopPage : UserControl, IPage
     private DispatcherTimer? _reload;
 
     private readonly bool _demo;
+    private WrittenPaints? _written;
     private readonly AppServices _app;
     private PaintGuard? _guard;
     private string? _tradingPaints;
@@ -562,7 +563,8 @@ internal sealed class LiveryShopPage : UserControl, IPage
         if (files.Count == 0) throw new InvalidOperationException("There was nothing to save.");
         _guard?.Saving();
         string folder;
-        try { folder = await Task.Run(() => IracingPaint.Save(kind, car, files)); }
+        var written = _written ??= new WrittenPaints(Path.Combine(Folder, "written.json"));
+        try { folder = await Task.Run(() => IracingPaint.Save(kind, car, files, written, Path.Combine(Folder, "replaced"))); }
         catch
         {
             _guard?.SaveFailed();

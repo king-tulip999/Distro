@@ -27,7 +27,6 @@ internal sealed class AppServices : IDisposable
     public bool IsAdmin { get; } = Environment.IsPrivilegedProcess;
 
     public HardwareService Hardware { get; }
-    public Fans.CoolingLearner? FanLearning { get; set; }
     public FrameRateService Frames { get; }
     public NetworkMonitor Network { get; }
     public OverlayController Overlay { get; }
@@ -121,7 +120,9 @@ internal sealed class AppServices : IDisposable
 
     public bool SimRunning { get; private set; }
 
-    public bool Light => SimRunning && Config.Performance.LightWhileRacing;
+    private readonly FullScreenWatch _fullScreen = new();
+
+    public bool Light => (SimRunning || _fullScreen.Active) && Config.Performance.LightWhileRacing;
 
     public event Action? LightChanged;
 
@@ -130,13 +131,20 @@ internal sealed class AppServices : IDisposable
         bool want = Config.Performance.LightWhileRacing && !Demo;
         Watcher.Started -= OnSimStarted;
         Watcher.Stopped -= OnSimStopped;
+        _fullScreen.Changed -= OnFullScreenChanged;
         if (want)
         {
+            _fullScreen.Changed += OnFullScreenChanged;
+            _fullScreen.Start();
             Watcher.Started += OnSimStarted;
             Watcher.Stopped += OnSimStopped;
             Watcher.Acquire(SimWatch, new[] { SimRacing.Telemetry.TelemetryService.SimProcess });
         }
-        else Watcher.Release(SimWatch);
+        else
+        {
+            _fullScreen.Stop();
+            Watcher.Release(SimWatch);
+        }
         SetSimRunning(want && Watcher.IsRunning(SimRacing.Telemetry.TelemetryService.SimProcess));
     }
 
@@ -150,11 +158,16 @@ internal sealed class AppServices : IDisposable
         if (string.Equals(name, SimRacing.Telemetry.TelemetryService.SimProcess, StringComparison.OrdinalIgnoreCase)) SetSimRunning(false);
     }
 
+    private bool _lightShown;
+
+    private void OnFullScreenChanged() => SetSimRunning(SimRunning);
+
     private void SetSimRunning(bool running)
     {
-        bool was = Light;
         SimRunning = running;
-        if (Light != was) LightChanged?.Invoke();
+        if (Light == _lightShown) return;
+        _lightShown = Light;
+        LightChanged?.Invoke();
     }
 
     public void Save()
@@ -390,6 +403,7 @@ internal sealed class AppServices : IDisposable
         Safely(Telemetry.Dispose);
         Safely(PitLoss.Flush);
         Safely(LapProfiles.Flush);
+        Safely(_fullScreen.Dispose);
         Safely(Watcher.Dispose);
         Safely(Network.Dispose);
         Safely(Overlay.Dispose);

@@ -17,7 +17,7 @@ internal sealed class HudPalette
 {
     public Color Bg, Surface, SurfaceAlt, Text, Heading, Muted, Faint, Line, LineStrong;
     public Color Accent, AccentText, AccentSoft, OnAccent;
-    public Color Good, GoodText, GoodSoft, Warn, WarnText, WarnSoft, Danger, DangerText, DangerSoft, Gold, Slate, Plum, Silver, Bronze;
+    public Color Good, GoodText, GoodSoft, Warn, WarnText, WarnSoft, Danger, DangerText, DangerSoft, Slate, Plum;
     public bool Dark;
     public Color Player, PlayerText;
     public Color? Highlight, HighlightEdge;
@@ -29,6 +29,7 @@ internal sealed class HudPalette
     public Color PickTint => Highlight ?? Accent;
     public Color Lapping = Color.FromArgb(0xF8, 0x71, 0x71), Lapped = Color.FromArgb(0x60, 0xA5, 0xFA);
     public Color Fastest = Color.FromArgb(0xB0, 0x6B, 0xFF);
+    public Color Attack = Hex(0x5AA9FF), Defend = Hex(0xFF8F3D);
     public Color ThrottleInput = Hex(0x3DDC84), BrakeInput = Hex(0xFF3B4E), ClutchInput = Hex(0x4C9AFF), SteerInput = Hex(0xC9D1DE), AbsInput = Hex(0xFFB020);
     public Color InputTrack = Hex(0x1A2130), TraceBack = Hex(0x111725), InputTicks = Hex(0x3A4456), RedZone = Hex(0x4A1622);
     public Color? MapTrack, MapEdge, MapPit, MapCars;
@@ -54,7 +55,7 @@ internal sealed class HudPalette
         Muted = Hex(0xB8B8B8), Faint = Hex(0x969696), Line = Hex(0x333333), LineStrong = Hex(0x3C3C3C),
         Accent = Hex(0xDB156B), AccentText = Hex(0xF5559A), AccentSoft = Hex(0x3A3A3A), OnAccent = Color.White,
         Good = Hex(0x7FC48E), GoodText = Hex(0x9ED4A8), GoodSoft = Hex(0x24352A), Warn = Hex(0xE8B04A), WarnText = Hex(0xF2CC80), WarnSoft = Hex(0x3A3020),
-        Danger = Hex(0xE5484D), DangerText = Hex(0xF07C7F), DangerSoft = Hex(0x42201F), Gold = Hex(0xFACC15), Slate = Hex(0x7A7A7A), Plum = Hex(0xA855F7), Silver = Hex(0xC9CED6), Bronze = Hex(0xD99A63),
+        Danger = Hex(0xE5484D), DangerText = Hex(0xF07C7F), DangerSoft = Hex(0x42201F), Slate = Hex(0x7A7A7A), Plum = Hex(0xA855F7),
         Player = Hex(0xDB156B), PlayerText = Hex(0xFFFFFF), Highlight = Hex(0x6A6A6A), HighlightEdge = Hex(0xDB156B), SoftBands = true,
         InputTrack = Hex(0x2A2A2A), TraceBack = Hex(0x171717), InputTicks = Hex(0x444444), RedZone = Hex(0x4A1E22),
     };
@@ -970,90 +971,6 @@ internal sealed class HudPainter : IDisposable
         G.FillPolygon(Brush(c), points);
     }
 
-    private readonly Dictionary<(int, int, int, int, int, int), LinearGradientBrush> _panelBrushes = new();
-    private readonly Dictionary<(int, int, int), LinearGradientBrush> _sweepBrushes = new();
-
-    private const float PanelFaintest = 0.02f, PanelBrightest = 0.16f, SweepAngle = 15, SweepWidth = 0.84f, SweepMoves = 0.55f;
-    private const double SweepSeconds = 10;
-
-    public void SoftPanels(RectangleF r, Color c, int count, float slope, float blur, double now)
-    {
-        if (r.Width <= 0 || r.Height <= 0 || count < 1) return;
-        int w = (int)MathF.Round(r.Width), h = (int)MathF.Round(r.Height);
-        var key = (w, h, c.ToArgb(), count, (int)MathF.Round(slope * 1000), (int)MathF.Round(blur * 10));
-        if (!_panelBrushes.TryGetValue(key, out var panels))
-        {
-            if (_panelBrushes.Count >= 32) { foreach (var x in _panelBrushes.Values) x.Dispose(); _panelBrushes.Clear(); }
-            panels = _panelBrushes[key] = PanelBrush(w, h, c, count, slope, blur);
-        }
-        Painted(r);
-        var shape = Look.Corner > 0.5f ? Shape(new SizeF(w - 1, h - 1), Look.Corner) : null;
-        void Cover(Brush brush)
-        {
-            if (shape is null) G.FillRectangle(brush, 0, 0, w, h);
-            else G.FillPath(brush, shape);
-        }
-        float ox = r.X + (shape is null ? 0 : 0.5f), oy = r.Y + (shape is null ? 0 : 0.5f);
-        G.TranslateTransform(ox, oy);
-        Cover(panels);
-        if (!ReducedMotion)
-        {
-            double cycle = now / SweepSeconds;
-            double t = Math.Min(1, (cycle - Math.Floor(cycle)) / SweepMoves);
-            float shift = (float)(-w + 2 * w * (1 - Math.Cos(Math.PI * t)) / 2);
-            var sweepKey = (w, h, c.ToArgb());
-            if (!_sweepBrushes.TryGetValue(sweepKey, out var sweep))
-            {
-                if (_sweepBrushes.Count >= 16) { foreach (var x in _sweepBrushes.Values) x.Dispose(); _sweepBrushes.Clear(); }
-                sweep = _sweepBrushes[sweepKey] = SweepBrush(w, h, c);
-            }
-            sweep.ResetTransform();
-            sweep.TranslateTransform(shift, 0);
-            Cover(sweep);
-        }
-        G.TranslateTransform(-ox, -oy);
-    }
-
-    private static LinearGradientBrush PanelBrush(int w, int h, Color c, int count, float slope, float blur)
-    {
-        float lean = slope * w, length = MathF.Sqrt(h * h + lean * lean);
-        var normal = new PointF(h / length, lean / length);
-        float far = (w * h + lean * h) / length;
-        float step = (1 + slope) / count * w * h / length, half = Math.Min(step * 0.45f, blur * 1.5f) / far;
-        Color Shade(int i) => Color.FromArgb((int)MathF.Round(255 * (PanelFaintest + (PanelBrightest - PanelFaintest) * (count == 1 ? 1 : (float)i / (count - 1)))), c);
-        var colors = new List<Color> { Shade(0) };
-        var at = new List<float> { 0 };
-        for (int i = 1; i < count; i++)
-        {
-            float edge = i * step / far;
-            colors.Add(Shade(i - 1)); at.Add(Math.Max(at[^1], edge - half));
-            colors.Add(Shade(i)); at.Add(Math.Min(1, edge + half));
-        }
-        colors.Add(Shade(count - 1));
-        at.Add(1);
-        var brush = new LinearGradientBrush(new PointF(-normal.X, -normal.Y), new PointF(normal.X * (far + 1), normal.Y * (far + 1)), Shade(0), Shade(count - 1));
-        brush.InterpolationColors = new ColorBlend { Colors = colors.ToArray(), Positions = at.ToArray() };
-        return brush;
-    }
-
-    private static LinearGradientBrush SweepBrush(int w, int h, Color c)
-    {
-        float angle = SweepAngle * MathF.PI / 180, span = 5f * w;
-        var along = new PointF(MathF.Cos(angle), MathF.Sin(angle));
-        var middle = new PointF(w / 2f, h / 2f);
-        var start = new PointF(middle.X - along.X * span / 2, middle.Y - along.Y * span / 2);
-        var end = new PointF(middle.X + along.X * span / 2, middle.Y + along.Y * span / 2);
-        float band = SweepWidth * w / span;
-        Color A(int alpha) => Color.FromArgb(alpha, c);
-        var brush = new LinearGradientBrush(start, end, A(0), A(0));
-        brush.InterpolationColors = new ColorBlend
-        {
-            Colors = new[] { A(0), A(0), A(15), A(33), A(15), A(0), A(0) },
-            Positions = new[] { 0, 0.5f - band / 2, 0.5f - band / 4, 0.5f, 0.5f + band / 4, 0.5f + band / 2, 1 },
-        };
-        return brush;
-    }
-
     public void Checker(RectangleF r, Color c, float cell)
     {
         r = Snap(r);
@@ -1131,8 +1048,6 @@ internal sealed class HudPainter : IDisposable
         foreach (var s in _shapes.Values) s.Dispose();
         foreach (var e in _ends.Values) e.Dispose();
         foreach (var g in _gradients.Values) g.Dispose();
-        foreach (var g in _panelBrushes.Values) g.Dispose();
-        foreach (var g in _sweepBrushes.Values) g.Dispose();
         _measure.Dispose();
         _measureBitmap.Dispose();
         _sharp.Dispose();

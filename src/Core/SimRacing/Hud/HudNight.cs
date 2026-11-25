@@ -66,7 +66,7 @@ internal static class HudNight
             Muted = Shade(0.75), Faint = Shade(0.58), Line = Shade(0.28), LineStrong = Shade(0.5),
             Accent = tint, AccentText = bright, AccentSoft = Shade(0.18), OnAccent = black,
             Good = d.Good, GoodText = d.GoodText, GoodSoft = d.GoodSoft, Warn = d.Warn, WarnText = d.WarnText, WarnSoft = d.WarnSoft,
-            Danger = d.Danger, DangerText = d.DangerText, DangerSoft = d.DangerSoft, Gold = d.Gold, Slate = Shade(0.58), Plum = d.Plum, Silver = d.Silver, Bronze = d.Bronze,
+            Danger = d.Danger, DangerText = d.DangerText, DangerSoft = d.DangerSoft, Slate = Shade(0.58), Plum = d.Plum,
             Player = tint, PlayerText = bright, Highlight = Shade(0.32), HighlightEdge = tint, BadgeInk = Shade(0.88), ClassRowDepth = 0.45f, SoftBands = true,
             InputTrack = Shade(0.12), TraceBack = black, InputTicks = Shade(0.4), RedZone = d.RedZone,
         };

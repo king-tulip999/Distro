@@ -31,16 +31,18 @@ internal sealed record Racecraft(IReadOnlyList<RaceLine> Races, int? Incidents, 
     public RaceLine? BiggestGain => Placed.Where(r => r.Gain > 0).OrderByDescending(r => r.Gain).ThenByDescending(r => r.StartUtc).FirstOrDefault();
     public double? AverageField => Races.Any(r => r.Field > 0) ? Races.Where(r => r.Field > 0).Average(r => r.Field!.Value) : null;
 
-    public int? IrChange => Races.Any(r => r.IrDelta is not null) ? Races.Sum(r => r.IrDelta ?? 0) : null;
-    public double? SrChange => Races.Any(r => r.SrDelta is not null) ? Races.Sum(r => r.SrDelta ?? 0) : null;
+    private IEnumerable<RaceLine> InRatedCategory => Rated is { } rated ? Races.Where(r => r.Category == rated.Category) : Array.Empty<RaceLine>();
+
+    public int? IrChange => InRatedCategory.Any(r => r.IrDelta is not null) ? InRatedCategory.Sum(r => r.IrDelta ?? 0) : null;
+    public double? SrChange => InRatedCategory.Any(r => r.SrDelta is not null) ? InRatedCategory.Sum(r => r.SrDelta ?? 0) : null;
 
     public RaceLine? Latest => Races.Count > 0 ? Races[^1] : null;
 
-    public int? IrNow => Latest is { } last && Races.LastOrDefault(r => r.Category == last.Category && r.IrStart > RaceResult.PlaceholderIRating) is { IrStart: { } ir } rated
-        ? ir + (rated.IrDelta ?? 0) : null;
+    public RaceLine? Rated => Races.LastOrDefault(r => RaceResult.KnownRating(r.IrStart));
 
-    public double? SrNow => Latest is { } last && Races.LastOrDefault(r => r.Category == last.Category && r.SrStart is not null) is { SrStart: { } sr } rated
-        ? sr + (rated.SrDelta ?? 0) : null;
+    public int? IrNow => Rated is { IrStart: { } ir } rated ? ir + (rated.IrDelta ?? 0) : null;
+
+    public double? SrNow => Rated is { SrStart: { } sr } rated ? sr + (rated.SrDelta ?? 0) : null;
 
     public int CleanRaces => Races.Count(r => r.Finished && r.Incidents == 0);
     public double? IncidentsPerRace => Races.Any(r => r.Incidents is not null) ? Races.Where(r => r.Incidents is not null).Average(r => r.Incidents!.Value) : null;

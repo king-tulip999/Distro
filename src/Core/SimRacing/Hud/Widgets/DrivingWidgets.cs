@@ -286,6 +286,14 @@ internal sealed class TimingWidget : HudWidget
     private static readonly string[] FullStackParts = { "top", "times", "bar", "sectors" };
     private static readonly string[] PillParts = { "delta", "pill" };
     private static readonly string[] ThinParts = { "split", "predicted" };
+    private static readonly string[] RibbonParts = { "delta", "split", "times" };
+    private static readonly string[] RibbonTimesParts = { "lap", "predicted", "best", "last" };
+    private static readonly string[] CompactParts = { "delta", "bar", "label" };
+    private static readonly string[] BoardParts = { "split", "delta" };
+    private static readonly string[] ColumnParts = { "head", "split", "delta" };
+
+    private static HAlign EdgeAlign(RectangleF cell, RectangleF row) =>
+        cell.X <= row.X + 0.5f ? HAlign.Left : cell.Right >= row.Right - 0.5f ? HAlign.Right : HAlign.Center;
 
     private void Trace(HudPainter p, HudView v, RectangleF area, double? d, Color color, string refLabel, double? refLap, string reference, bool full)
     {
@@ -444,10 +452,13 @@ internal sealed class TimingWidget : HudWidget
         float deltaW = p.Measure("+0.000", valueFont) + 4 * k;
         float textX = area.X + stripeW + 6 * k;
         float y = area.Y + Math.Max(0, (area.Height - rowH * rows) / 2);
-        p.Text(p.LabelText("Time"), p.Label, p.LabelColor, new RectangleF(textX + nameW, y, area.Width, rowH), HAlign.Left, VAlign.Center);
-        p.Text(p.LabelText(SectorReferenceLabel(reference)), p.Label, p.LabelColor, new RectangleF(area.X, y, area.Width, rowH), HAlign.Right, VAlign.Center);
-        y += rowH;
-        p.Region("split", new RectangleF(area.X, y, area.Width, rowH * n));
+        Span<RectangleF> parts = stackalloc RectangleF[3];
+        p.Arrange(v, "column", new RectangleF(area.X, y, area.Width, rowH * rows), false, 0, ColumnParts, stackalloc float[] { rowH, rowH * n, rowH }, parts);
+        float headY = parts[0].Y;
+        p.Text(p.LabelText("Time"), p.Label, p.LabelColor, new RectangleF(textX + nameW, headY, area.Width, rowH), HAlign.Left, VAlign.Center);
+        p.Text(p.LabelText(SectorReferenceLabel(reference)), p.Label, p.LabelColor, new RectangleF(area.X, headY, area.Width, rowH), HAlign.Right, VAlign.Center);
+        y = parts[1].Y;
+        p.Region("split", parts[1]);
         var rule = HudPalette.Alpha(p.P.Line, 220);
         for (int i = 0; i < n; i++, y += rowH)
         {
@@ -474,6 +485,7 @@ internal sealed class TimingWidget : HudWidget
             }
         }
         p.Line(area.X, y, area.Right, y, rule, 1);
+        y = parts[2].Y;
         var lapRow = new RectangleF(area.X, y, area.Width, rowH);
         p.Region("delta", lapRow);
         p.Text(p.LabelText("Lap"), p.Label, p.LabelColor, new RectangleF(textX, y, nameW, rowH), HAlign.Left, VAlign.Center, false);
@@ -493,11 +505,13 @@ internal sealed class TimingWidget : HudWidget
         var timeFont = cw >= p.Measure("00.000", p.Bold) + 8 * k ? p.Bold : p.SmallBold;
         int decimals = cw >= p.Measure("00.000", timeFont) + 6 * k ? 3 : cw >= p.Measure("00.00", timeFont) + 6 * k ? 2 : 1;
         int deltaDecimals = cw >= p.Measure("+0.000", p.SmallBold) + 6 * k ? 3 : cw >= p.Measure("+0.00", p.SmallBold) + 4 * k ? 2 : 1;
-        p.Region("split", new RectangleF(area.X, area.Y, (cw + gap) * n - gap, area.Height));
+        Span<RectangleF> parts = stackalloc RectangleF[2];
+        p.Arrange(v, "board", area, true, gap, BoardParts, stackalloc float[] { (cw + gap) * n - gap, 0 }, parts);
+        p.Region("split", parts[0]);
         for (int i = 0; i < n; i++)
         {
             ref var s = ref _sectors[i];
-            var cell = new RectangleF(area.X + i * (cw + gap), area.Y, cw, area.Height);
+            var cell = new RectangleF(parts[0].X + i * (cw + gap), area.Y, cw, area.Height);
             string name = PooledText.Number("S", i + 1);
             switch (s.State)
             {
@@ -512,7 +526,7 @@ internal sealed class TimingWidget : HudWidget
                     break;
             }
         }
-        var lapCell = new RectangleF(area.X + n * (cw + gap), area.Y, cw * lapSpan + gap * (lapSpan - 1), area.Height);
+        var lapCell = parts[1];
         p.Region("delta", lapCell);
         Cell(p, lapCell, p.LabelText("Lap"), p.LabelColor, RaceFormat.LapTime(Predicted(d, refLap)), lapSpan > 1 || decimals == 3 ? timeFont : p.SmallBold, p.P.Heading, RaceFormat.Delta(d), color, null);
     }
@@ -555,6 +569,12 @@ internal sealed class TimingWidget : HudWidget
         float block = thin ? Math.Max(badgeH + rise + trackH + 3 * k, p.ValueStatHeight(p.Bold)) : badgeH + rise + trackH + 6 * k + statsH;
         float top = area.Y + Math.Max(0, (area.Height - block) / 2);
         float trackY = thin ? top + block - trackH - 3 * k : top + badgeH + rise;
+        Span<RectangleF> stack = stackalloc RectangleF[3];
+        if (!thin)
+        {
+            p.Arrange(v, "ribbon", new RectangleF(area.X, top, area.Width, block), false, 0, RibbonParts, stackalloc float[] { badgeH + rise, trackH, 6 * k + statsH }, stack);
+            trackY = stack[1].Y;
+        }
         var track = new RectangleF(bar.X, trackY, bar.Width, trackH);
         p.Region("split", track);
         p.Fill(track, p.Solid(p.Raised(0.10), 130), p.CornerRadius(4));
@@ -596,7 +616,8 @@ internal sealed class TimingWidget : HudWidget
         string deltaText = RaceFormat.Delta(d);
         float bw = p.Measure(deltaText, badgeFont) + 12 * k;
         float bx = Math.Clamp(cx - bw / 2, bar.X, Math.Max(bar.X, bar.Right - bw));
-        var badge = new RectangleF(bx, track.Y - rise - badgeH, bw, badgeH);
+        float badgeY = thin || stack[0].Y < stack[1].Y ? track.Y - rise - badgeH : stack[0].Bottom - badgeH;
+        var badge = new RectangleF(bx, badgeY, bw, badgeH);
         p.Region("delta", badge);
         p.Fill(badge, d is null ? p.Raised(0.10) : d < 0 ? p.P.GoodSoft : p.P.DangerSoft, p.CornerRadius(4));
         p.Text(deltaText, badgeFont, color, badge, HAlign.Center, VAlign.Center, false);
@@ -606,12 +627,13 @@ internal sealed class TimingWidget : HudWidget
             p.ValueStat(new RectangleF(endBox.X, top + (block - vh) / 2, endBox.Width, vh), "Predicted", RaceFormat.LapTime(Predicted(d, refLap)), null, p.Bold, HAlign.Right);
             return;
         }
-        var stats = new RectangleF(area.X, track.Bottom + 6 * k, area.Width, statsH);
-        float cw = stats.Width / 4;
-        p.ValueStat(new RectangleF(stats.X, stats.Y, cw, statsH), "Lap", RaceFormat.LapTime(f.LapCurrent, 1), null, p.Bold);
-        p.ValueStat(new RectangleF(stats.X + cw, stats.Y, cw, statsH), "Predicted", RaceFormat.LapTime(Predicted(d, refLap)), null, p.Bold, HAlign.Center);
-        p.ValueStat(new RectangleF(stats.X + cw * 2, stats.Y, cw, statsH), "Best", RaceFormat.LapTime(f.LapBest), null, p.Bold, HAlign.Center);
-        p.ValueStat(new RectangleF(stats.X + cw * 3, stats.Y, cw, statsH), "Last", RaceFormat.LapTime(f.LapLast), LastColor(p, v), p.Bold, HAlign.Right);
+        var stats = new RectangleF(area.X, stack[2].Y < stack[1].Y ? stack[2].Y : stack[2].Y + 6 * k, area.Width, statsH);
+        Span<RectangleF> cells = stackalloc RectangleF[4];
+        p.Arrange(v, "ribbonTimes", stats, true, 0, RibbonTimesParts, stackalloc float[] { 0, 0, 0, 0 }, cells);
+        p.ValueStat(cells[0], "Lap", RaceFormat.LapTime(f.LapCurrent, 1), null, p.Bold, EdgeAlign(cells[0], stats));
+        p.ValueStat(cells[1], "Predicted", RaceFormat.LapTime(Predicted(d, refLap)), null, p.Bold, EdgeAlign(cells[1], stats));
+        p.ValueStat(cells[2], "Best", RaceFormat.LapTime(f.LapBest), null, p.Bold, EdgeAlign(cells[2], stats));
+        p.ValueStat(cells[3], "Last", RaceFormat.LapTime(f.LapLast), LastColor(p, v), p.Bold, EdgeAlign(cells[3], stats));
     }
 
     private void Pill(HudPainter p, HudView v, double? d, Color color, string refLabel, double? refLap, string reference)
@@ -690,29 +712,35 @@ internal sealed class TimingWidget : HudWidget
         float k = p.Density;
         var area = p.Bounds.Inflated(-10 * k, -6 * k);
         p.Region("delta", area);
+        bool showBar = v.Options.Bool("bar");
         float labelH = p.LineHeight(p.SmallBold), barH = 6 * k, gap = 5 * k;
+        float barRoom = showBar ? barH + gap : 0;
         float contentW = Math.Max(Math.Max(p.Measure("+00.000", p.Huge), 120 * k), p.Measure("SESSION OPTIMAL", p.SmallBold)) + 8 * k;
-        p.Need(contentW + 20 * k, p.LineHeight(p.Huge) + gap + barH + gap + labelH + 12 * k);
-        float numberH = Math.Max(0, area.Height - labelH - barH - gap * 2);
+        p.Need(contentW + 20 * k, p.LineHeight(p.Huge) + gap + barRoom + labelH + 12 * k);
+        float numberH = Math.Max(0, area.Height - labelH - barRoom - gap);
         var font = p.Fitting("+00.00", area.Width, numberH, p.Font(Math.Max(14, numberH * 0.95f), true), p.Huge, p.Big, p.Bold);
-        float block = p.LineHeight(font) + gap + barH + gap + labelH;
+        float numberLine = p.LineHeight(font);
+        float block = numberLine + gap + barRoom + labelH;
         float y = area.Y + Math.Max(0, (area.Height - block) / 2);
-        p.Text(d is null ? RaceFormat.Missing : RaceFormat.Delta(d), font, color, new RectangleF(area.X, y, area.Width, p.LineHeight(font)), HAlign.Center, VAlign.Center, false);
-        y += p.LineHeight(font) + gap;
-        float trackW = Math.Min(area.Width, 120 * k);
-        var track = new RectangleF(area.X + (area.Width - trackW) / 2, y, trackW, barH);
-        p.Region("bar", track);
-        p.Fill(track, p.Solid(p.Raised(0.10), 130), 3);
-        float mid = track.X + track.Width / 2;
-        if (d is { } dv)
+        Span<RectangleF> parts = stackalloc RectangleF[3];
+        p.Arrange(v, "compact", new RectangleF(area.X, y, area.Width, block), false, gap, CompactParts, stackalloc float[] { numberLine, showBar ? barH : -1, labelH }, parts);
+        p.Text(d is null ? RaceFormat.Missing : RaceFormat.Delta(d), font, color, parts[0], HAlign.Center, VAlign.Center, false);
+        if (showBar)
         {
-            float len = (float)(Math.Clamp(dv / v.Options.Number("range"), -1, 1) * track.Width / 2);
-            var fill = len < 0 ? new RectangleF(mid + len, track.Y, -len, track.Height) : new RectangleF(mid, track.Y, len, track.Height);
-            p.Fill(fill, d < 0 ? p.P.Good : p.P.Danger, 3);
+            float trackW = Math.Min(area.Width, 120 * k);
+            var track = new RectangleF(area.X + (area.Width - trackW) / 2, parts[1].Y, trackW, barH);
+            p.Region("bar", track);
+            p.Fill(track, p.Solid(p.Raised(0.10), 130), 3);
+            float mid = track.X + track.Width / 2;
+            if (d is { } dv)
+            {
+                float len = (float)(Math.Clamp(dv / v.Options.Number("range"), -1, 1) * track.Width / 2);
+                var fill = len < 0 ? new RectangleF(mid + len, track.Y, -len, track.Height) : new RectangleF(mid, track.Y, len, track.Height);
+                p.Fill(fill, d < 0 ? p.P.Good : p.P.Danger, 3);
+            }
+            p.Line(mid, track.Y - 2, mid, track.Bottom + 2, p.P.Heading, 1.5f);
         }
-        p.Line(mid, track.Y - 2, mid, track.Bottom + 2, p.P.Heading, 1.5f);
-        y += barH + gap;
-        p.Text(label, p.SmallBold, p.P.Heading, new RectangleF(area.X, y, area.Width, labelH), HAlign.Center, VAlign.Center);
+        p.Text(label, p.SmallBold, p.P.Heading, parts[2], HAlign.Center, VAlign.Center);
     }
 
     private static Color LastColor(HudPainter p, HudView v)

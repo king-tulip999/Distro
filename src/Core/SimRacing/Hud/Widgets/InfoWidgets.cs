@@ -22,7 +22,7 @@ internal sealed partial class WeatherWidget : HudWidget
     };
 
     private readonly (string Label, string Value)[] _cells = new (string, string)[3];
-    private static readonly string[] StripParts = { "values", "wind" }, StripColumnParts = { "sky", "body" };
+    private static readonly string[] StripParts = { "values", "wind" }, StripColumnParts = { "sky", "body" }, StripValueParts = { "air", "track", "humidity" };
 
     public override void Draw(HudPainter p, HudView v)
     {
@@ -66,15 +66,19 @@ internal sealed partial class WeatherWidget : HudWidget
         float cellPad = 8 * d;
         float need = 0;
         int shown = 0;
-        for (int i = 0; i < _cells.Length; i++)
+        var order = v.Options.Arranged("weather.strip.values", StripValueParts);
+        for (int n = 0; n < order.Count; n++)
         {
+            int i = order[n];
             float cell = Math.Max(p.Measure(_cells[i].Value, font), p.Measure(_cells[i].Label, p.Label)) + cellPad * 2;
             float wider = Math.Max(need, cell);
-            if (wider * (i + 1) > area.Width) break;
+            if (wider * (n + 1) > area.Width) break;
             need = wider;
-            shown = i + 1;
+            shown = n + 1;
         }
         if (shown == 0) return;
+        Span<float> cellSizes = stackalloc float[3];
+        for (int n = 0; n < order.Count; n++) cellSizes[order[n]] = n < shown ? 0 : -1;
         float valuesW = need * shown;
         if (v.Options.Bool("wind") && WindWidth(p, v, area.Height) is var windW && area.Width - valuesW >= windW)
         {
@@ -85,14 +89,17 @@ internal sealed partial class WeatherWidget : HudWidget
             Wind(p, v, boxes[1]);
             area = boxes[0];
         }
-        float cw = area.Width / shown;
+        Span<RectangleF> cellBoxes = stackalloc RectangleF[3];
+        p.Arrange(v, "weather.strip.values", area, true, 0, StripValueParts, cellSizes, cellBoxes);
         float vh = p.LineHeight(font), lh = p.LineHeight(p.Label);
         float top = area.Y + (area.Height - vh - lh) / 2;
-        for (int i = 0; i < shown; i++)
+        for (int i = 0; i < cellBoxes.Length; i++)
         {
-            float x = area.X + cw * i;
-            if (i > 0) p.Line(x, top - 2 * d, x, top + lh + vh + 2 * d, HudPalette.Alpha(p.P.Muted, 110), 1);
-            var cell = new RectangleF(x + cellPad / 2, top, cw - cellPad, lh + vh);
+            var box = cellBoxes[i];
+            if (cellSizes[i] < 0 || box.Width <= 0) continue;
+            float x = box.X;
+            if (x > area.X + 0.5f) p.Line(x, top - 2 * d, x, top + lh + vh + 2 * d, HudPalette.Alpha(p.P.Muted, 110), 1);
+            var cell = new RectangleF(x + cellPad / 2, top, box.Width - cellPad, lh + vh);
             p.Text(_cells[i].Label, p.Label, p.LabelColor, new RectangleF(cell.X, cell.Y, cell.Width, lh), HAlign.Center, VAlign.Top, false);
             p.Number(_cells[i].Value, font, p.P.Heading, new RectangleF(cell.X, cell.Y + lh, cell.Width, vh), HAlign.Center, VAlign.Center);
         }

@@ -26,6 +26,8 @@ internal static class FlatMapEditor
                 O("dotSize") with { ShowIf = Is(FlatMapWidget.Bar) },
                 O("myColor"),
                 O("carColor")),
+            new("track", "Track", HudTab.Layout, true, O("trackWidth"), O("edgeWidth"), O("trackLook"),
+                O("trackColor") with { ShowIf = MapTrackLook.Picking }, O("edgeColor") with { ShowIf = o => MapTrackLook.Picking(o) && o.Number("edgeWidth") > 0 }, O("startLine")),
             new("cars", "Classes shown", HudTab.Content, true, new ClassFilterSetting() { ShowIf = Is(FlatMapWidget.Lanes) }),
         },
     };

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using Core.Controls;
@@ -13,10 +14,11 @@ namespace Core.Views.Pages;
 
 internal sealed record AnalysisData(SessionSummary Session, List<(int Lap, double Time, LapTrace Trace)> Laps, (int Lap, LapTrace Trace)? SessionBest,
     (string Label, LapTrace Trace)? TrackBest, LapTrace? Optimal, IReadOnlyList<double> SectorStarts, string Driver,
-    IReadOnlyList<SharedLapInfo> Shared, (SharedLapInfo Info, LapTrace Trace)? SharedPicked, SimRacing.TrackMaps.TrackMap? Map);
+    IReadOnlyList<SharedLapInfo> Shared, (SharedLapInfo Info, LapTrace Trace)? SharedPicked, SimRacing.TrackMaps.TrackMap? Map,
+    List<(int Lap, double Time, bool Clean, LapTrace Trace)> All);
 
-internal sealed record AnalysisActions(Action<string> PickReference, Action<int> RemoveLap, Action<int> ExportLap, Action ImportLap,
-    Action<long> DeleteShared, Action Save);
+internal sealed record AnalysisActions(Action<string> PickReference, Action<int> PickLap, Action<int> ToggleExtra, Action<int> ExportLap, Action ImportLap,
+    Action<long> DeleteShared, Action Save, Action Back);
 
 internal enum MapColors { Laps, Speed, Delta }
 
@@ -93,57 +95,338 @@ internal static class LapAnalysisView
 
     public static readonly HashSet<string> SettingLanes = new() { "bias", "abs", "tc" };
 
+    public static readonly string[] Tabs = { "Coach", "Corners", "Consistency", "Whole lap", "Replay" };
+    public const int ReplayTab = 4, MaxExtras = 2;
+    private const double LapListWidth = 250;
+
     public static FrameworkElement Build(AnalysisData data, Config.SessionStatsSettings settings, string reference, AnalysisActions actions, ReplayMemory memory,
         out AnalysisState state)
     {
-        var s = state = Make(data, settings.Imperial, reference);
-        var page = new StackPanel();
-        Action<string> pickReference = actions.PickReference;
-        Action lanesChanged = () => { };
+        var mine = data.Laps[0];
+        var s = state = Make(data with { Laps = new() { mine } }, settings.Imperial, reference);
+        var replayState = data.Laps.Count > 1 ? Make(data, settings.Imperial, reference) : s;
+        var refTrace = s.Reference.Trace;
+        bool compared = !ReferenceEquals(refTrace, mine.Trace);
+        var coach = compared ? LapCoach.Build(mine.Trace, refTrace) : null;
+        var (phrase, column) = RefNames(reference, s);
+        memory.Tab = Math.Clamp(memory.Tab, 0, Tabs.Length - 1);
 
-        var chips = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
-        foreach (var line in s.Lines)
+        var host = new ContentControl();
+        var built = new FrameworkElement?[Tabs.Length];
+        var ticks = new List<FrameworkElement>();
+        LapReplayView? replay = null;
+        Border tabs = null!;
+        void Show(int tab)
         {
-            var chip = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 11, 2), VerticalAlignment = VerticalAlignment.Center };
-            var swatch = new Border { Width = 15, Height = 3, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
-            swatch.SetResourceReference(Border.BackgroundProperty, line.BrushKey);
-            if (line.Reference && !s.Single) swatch.Opacity = 0.6;
-            chip.Children.Add(swatch);
-            chip.Children.Add(new TextBlock { Text = line.Label, Style = Ui.Res<Style>("Body"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center });
-            if (line.Reference && !s.Single) chip.Children.Add(new TextBlock { Text = "Reference", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
-            int lapNumber = data.Laps.FirstOrDefault(l => ReferenceEquals(l.Trace, line.Trace)).Lap;
-            if (lapNumber > 0)
+            memory.Tab = tab;
+            foreach (var t in ticks) t.Visibility = tab == ReplayTab ? Visibility.Visible : Visibility.Collapsed;
+            built[tab] ??= BuildTab(tab);
+            host.Content = built[tab];
+            Motion.FadeIn(built[tab]!);
+        }
+        void Select(int tab)
+        {
+            if (memory.Tab == tab) Show(tab);
+            else Ui.SetSegment(tabs, tab);
+        }
+        CoachSetup? setup = null;
+        if (coach is not null)
+            setup = new CoachSetup
             {
-                var export = Ui.IconButton("I.Save", "Export this lap (to share or compare)", () => actions.ExportLap(lapNumber), "QuietIconButton");
-                export.Margin = new Thickness(2, 0, 0, 0);
-                chip.Children.Add(export);
-            }
-            if (lapNumber > 0 && data.Laps.Count > 1)
+                Data = data, Mine = mine.Trace, Lap = mine.Lap, Reference = refTrace, Phrase = phrase, Column = column, Coach = coach, Imperial = settings.Imperial, Memory = memory,
+                Names = CoachSetup.NamesOf(coach, refTrace, data),
+                OpenTurn = k => { memory.Turn = k; built[0] = built[1] = null; Select(0); },
+                ReplayTurn = k =>
+                {
+                    var (from, to) = setup!.Window(k);
+                    memory.Distance = from;
+                    Select(ReplayTab);
+                    var view = replay;
+                    view?.Dispatcher.InvokeAsync(() => view.PlayBetween(mine.Trace, from, to), System.Windows.Threading.DispatcherPriority.Loaded);
+                },
+            };
+        FrameworkElement BuildTab(int tab)
+        {
+            switch (tab)
             {
-                var remove = Ui.IconButton("I.X", "Take this lap out", () => actions.RemoveLap(lapNumber), "QuietIconButton");
-                remove.Margin = new Thickness(2, 0, 0, 0);
-                chip.Children.Add(remove);
+                case 3: return WholeLap(data, s, settings, actions, memory);
+                case ReplayTab: return replay = new LapReplayView(data, replayState, settings, memory, actions.Save);
             }
-            chips.Children.Add(chip);
+            if (setup is null)
+                return new Tile { Style = Ui.Res<Style>("Card"), Child = Ui.EmptyState("I.Activity", "Nothing to compare against",
+                    "This lap is the only one with a trace. Pick another lap under Against, or import a lap someone exported.") };
+            return tab switch { 0 => LapCoachView.Coach(setup), 1 => LapCoachView.Corners(setup), _ => LapCoachView.Consistency(setup) };
         }
 
         var refChoices = new List<Choice>();
-        if (data.SessionBest is { } sb) refChoices.Add(new Choice("session", $"Session best · {StatFormat.LapTime(sb.Trace.LapTime)}"));
+        if (data.SessionBest is { } sb && !Same(sb.Trace, mine.Trace)) refChoices.Add(new Choice("session", $"Session best · {StatFormat.LapTime(sb.Trace.LapTime)}"));
         if (data.TrackBest is { } tb) refChoices.Add(new Choice("track", $"Your best here · {tb.Label}"));
         if (data.Optimal is { } opt) refChoices.Add(new Choice("optimal", $"Optimal · {StatFormat.LapTime(opt.LapTime)}"));
-        foreach (var l in data.Laps) refChoices.Add(new Choice("lap:" + l.Lap, $"Lap {l.Lap} · {StatFormat.LapTime(l.Time)}"));
+        foreach (var l in data.All.Where(l => l.Lap != mine.Lap).OrderBy(l => l.Time)) refChoices.Add(new Choice("lap:" + l.Lap, $"Lap {l.Lap} · {StatFormat.LapTime(l.Time)}"));
         foreach (var shared in data.Shared) refChoices.Add(new Choice("shared:" + shared.Id, SharedLabel(shared, data.Session.Car)));
-        var refPick = Ui.Combo(refChoices, reference, c => { if (c.Id is { } id && id != reference) pickReference(id); }, 186);
-        refPick.ToolTip = "What the delta is measured against";
-        var import = Ui.LabeledButton("I.Folder", "Import lap", actions.ImportLap);
-        import.ToolTip = "Open a lap someone exported (same track) to compare against";
-        Button? deleteShared = null;
+        var refPick = Ui.Combo(refChoices, reference, c => { if (c.Id is { } id && id != reference) actions.PickReference(id); }, 210);
+        refPick.ToolTip = "What this lap is compared with";
+        var against = new TextBlock { Text = "Against", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+        against.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { against, refPick } };
+        void Tool(Button b) { b.Margin = new Thickness(8, 0, 0, 0); b.VerticalAlignment = VerticalAlignment.Center; tools.Children.Add(b); }
         if (data.SharedPicked is { } picked && reference == "shared:" + picked.Info.Id)
-        {
-            deleteShared = Ui.IconButton("I.Trash", "Remove this imported lap", () => actions.DeleteShared(picked.Info.Id), "QuietIconButton");
-            deleteShared.Margin = new Thickness(3, 0, 0, 0);
-        }
+            Tool(Ui.IconButton("I.Trash", "Remove this imported lap", () => actions.DeleteShared(picked.Info.Id)));
+        Tool(Ui.IconButton("I.Folder", "Import a lap someone exported (same track) to compare against", actions.ImportLap));
+        Tool(Ui.IconButton("I.Save", $"Export lap {mine.Lap} (to share or compare)", () => actions.ExportLap(mine.Lap)));
 
+        tabs = Ui.PageTabs(Tabs, memory.Tab, Show, "lapTabs");
+        tabs.HorizontalAlignment = HorizontalAlignment.Left;
+        var bar = new TabBarRow();
+        bar.Children.Add(tabs);
+        tools.Margin = new Thickness(19, 0, 0, 0);
+        bar.Children.Add(tools);
+        var tabRow = Ui.TabBar(tabs, bar);
+
+        var right = new StackPanel();
+        var summary = Summary(data, mine, s, compared, phrase, settings.Imperial);
+        summary.Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
+        right.Children.Add(summary);
+        right.Children.Add(tabRow);
+        right.Children.Add(host);
+
+        var list = LapList(data, mine, refTrace, coach, actions, ticks, settings.Imperial);
+        var root = new Grid();
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(LapListWidth) });
+        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Ui.PanelSpacing) });
+        root.ColumnDefinitions.Add(new ColumnDefinition());
+        Grid.SetColumn(right, 2);
+        root.Children.Add(list);
+        root.Children.Add(right);
+        Show(memory.Tab);
+        return root;
+    }
+
+    internal static bool Same(LapTrace a, LapTrace b) => ReferenceEquals(a, b) || (a.LapTime == b.LapTime && a.Points == b.Points && a.LengthM == b.LengthM);
+
+    internal static string Usable(AnalysisData data, string reference)
+    {
+        var mine = data.Laps[0].Trace;
+        LapTrace? Resolve(string r) =>
+            r == "track" ? data.TrackBest?.Trace
+            : r == "optimal" ? data.Optimal
+            : r.StartsWith("lap:") && int.TryParse(r[4..], out int n) ? data.All.FirstOrDefault(l => l.Lap == n).Trace
+            : r.StartsWith("shared:") ? data.SharedPicked?.Trace
+            : data.SessionBest?.Trace;
+        bool Fine(string r) => Resolve(r) is { } t && !Same(t, mine);
+        if (Fine(reference)) return reference;
+        foreach (var r in new[] { "session", "track" }) if (Fine(r)) return r;
+        var other = data.All.Where(l => !Same(l.Trace, mine)).OrderByDescending(l => l.Clean).ThenBy(l => l.Time).FirstOrDefault();
+        return other.Trace is null ? reference : "lap:" + other.Lap;
+    }
+
+    private static (string Phrase, string Column) RefNames(string reference, AnalysisState s) =>
+        reference == "track" ? ("your best here", "Best here")
+        : reference == "optimal" ? ("your optimal lap", "Optimal")
+        : reference.StartsWith("shared:") ? ("the imported lap", "Imported")
+        : reference.StartsWith("lap:") && s.Reference.Lap > 0 ? ($"lap {s.Reference.Lap}", $"Lap {s.Reference.Lap}")
+        : ("your session best", "Best");
+
+    internal static string SharedLabel(SharedLapInfo lap, string car) =>
+        $"{(lap.Driver.Length > 0 ? lap.Driver : "Imported")} · {StatFormat.LapTime(lap.LapTime)}{(string.Equals(lap.Car, car, StringComparison.OrdinalIgnoreCase) ? "" : " · " + lap.Car)}";
+
+    private static Tile Card(FrameworkElement content) => new()
+    {
+        Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 13, 16, 16), Child = content, Margin = new Thickness(0, 0, 0, Ui.PanelSpacing),
+    };
+
+    private static FrameworkElement LapList(AnalysisData data, (int Lap, double Time, LapTrace Trace) mine, LapTrace refTrace, LapCoach? coach, AnalysisActions actions,
+        List<FrameworkElement> ticks, bool imperial)
+    {
+        var stack = new StackPanel();
+        var back = Ui.LabeledButton("I.ChevronLeft", "Back", actions.Back);
+        back.ToolTip = "Back to the session (Esc)";
+        var title = new TextBlock { Text = "Laps", Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center };
+        var heading = Ui.SplitRow(title, back, 8);
+        heading.Margin = new Thickness(16, 0, 12, 0);
+        stack.Children.Add(heading);
+        var cols = new[] { GridLength.Auto, new GridLength(30), new GridLength(1, GridUnitType.Star), new GridLength(38), new GridLength(54) };
+        Grid Row()
+        {
+            var g = new Grid();
+            foreach (var w in cols) g.ColumnDefinitions.Add(new ColumnDefinition { Width = w });
+            return g;
+        }
+        var head = Row();
+        head.Margin = new Thickness(16, 10, 16, 4);
+        string[] names = { "", "Lap", "Time", "Top", "To best" };
+        for (int i = 1; i < names.Length; i++)
+        {
+            var h = new TextBlock { Text = names[i], Style = Ui.Res<Style>("Eyebrow"), HorizontalAlignment = i >= 3 ? HorizontalAlignment.Right : HorizontalAlignment.Left };
+            Grid.SetColumn(h, i);
+            head.Children.Add(h);
+        }
+        var headTick = new Border { Width = 22 };
+        ticks.Add(headTick);
+        head.Children.Add(headTick);
+        stack.Children.Add(head);
+
+        double best = data.SessionBest?.Trace.LapTime ?? data.All.Min(l => l.Time);
+        var extras = data.Laps.Skip(1).Select(l => l.Lap).ToHashSet();
+        var rows = new StackPanel();
+        foreach (var lap in data.All.OrderBy(l => l.Lap))
+        {
+            var number = lap.Lap;
+            bool me = lap.Lap == mine.Lap, isRef = Same(lap.Trace, refTrace);
+            var g = Row();
+            g.Height = 28;
+            var tick = new CheckBox { IsChecked = me || isRef || extras.Contains(lap.Lap), IsEnabled = !me && !isRef, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+            tick.ToolTip = me ? "The lap being analyzed" : isRef ? "The lap it's compared with" : "Add this lap to the replay";
+            tick.Click += (_, e) => { e.Handled = true; actions.ToggleExtra(number); };
+            ticks.Add(tick);
+            g.Children.Add(tick);
+            var no = new TextBlock { Text = lap.Lap.ToString(CultureInfo.CurrentCulture), Style = Ui.Res<Style>("Body"), FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center };
+            no.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
+            Grid.SetColumn(no, 1);
+            var time = new TextBlock { Text = StatFormat.LapTime(lap.Time), Style = Ui.Res<Style>("Body"), FontSize = 12.5, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+            bool fastest = data.SessionBest is { } sb && sb.Lap == lap.Lap;
+            time.SetResourceReference(TextBlock.ForegroundProperty, fastest ? "TimingBest" : lap.Clean ? "Heading" : "TextMuted");
+            Typography.SetNumeralAlignment(time, FontNumeralAlignment.Tabular);
+            var timeCell = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { time } };
+            timeCell.ToolTip = fastest ? "The session's fastest clean lap" : lap.Clean ? null : "Not a clean lap";
+            Grid.SetColumn(timeCell, 2);
+            var top = new TextBlock { Text = CoachText.SpeedValue(LapCoach.Top(lap.Trace), imperial).ToString("0", CultureInfo.CurrentCulture), Style = Ui.Res<Style>("Body"), FontSize = 12.5, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            top.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
+            Grid.SetColumn(top, 3);
+            double gap = lap.Time - best;
+            var toBest = new TextBlock { Text = Math.Abs(gap) < 0.0005 ? SimRacing.Race.RaceFormat.Missing : CoachText.Signed(gap), Style = Ui.Res<Style>("Body"), FontSize = 12.5, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            toBest.SetResourceReference(TextBlock.ForegroundProperty, CoachText.LossBrush(gap, 0.0005));
+            Typography.SetNumeralAlignment(toBest, FontNumeralAlignment.Tabular);
+            Grid.SetColumn(toBest, 4);
+            foreach (var e in new FrameworkElement[] { no, timeCell, top, toBest }) g.Children.Add(e);
+            g.Margin = new Thickness(13, 0, 16, 0);
+            var row = new Border { BorderThickness = new Thickness(3, 0, 0, 0), Child = g, Cursor = me ? null : Cursors.Hand };
+            row.SetResourceReference(Border.BorderBrushProperty, me ? "Accent" : "Transparent");
+            row.SetResourceReference(Border.BackgroundProperty, me ? "AccentSoft" : "Transparent");
+            if (!me)
+            {
+                row.MouseEnter += (_, _) => row.SetResourceReference(Border.BackgroundProperty, "Hover");
+                row.MouseLeave += (_, _) => row.SetResourceReference(Border.BackgroundProperty, "Transparent");
+                row.MouseLeftButtonUp += (_, _) => actions.PickLap(number);
+            }
+            rows.Children.Add(row);
+        }
+        stack.Children.Add(new ScrollViewer { Content = rows, MaxHeight = 560, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        var legendBest = new TextBlock { Text = "Purple = the session's fastest clean lap", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(16, 8, 16, 0) };
+        legendBest.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
+        if (data.SessionBest is not null) stack.Children.Add(legendBest);
+        var note = new TextBlock { Text = $"Tick up to {SimRacing.Race.RaceFormat.Count(MaxExtras, "more lap")} to add them to the replay", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(16, 8, 16, 0) };
+        ticks.Add(note);
+        stack.Children.Add(note);
+
+        var set = new Grid { Margin = new Thickness(16, 12, 16, 14) };
+        set.ColumnDefinitions.Add(new ColumnDefinition());
+        set.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var rule = Hairline.Rule(new Border { VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(-4, -12, -4, 0) }, Orientation.Horizontal);
+        rule.SetResourceReference(Border.BackgroundProperty, "Line");
+        Grid.SetColumnSpan(rule, 2);
+        set.Children.Add(rule);
+        int r = 0;
+        void Line(string label, string value)
+        {
+            set.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var l = new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 8, 2) };
+            var v = new TextBlock { Text = value, Style = Ui.Res<Style>("Body"), FontSize = 12, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 2, 0, 2) };
+            v.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
+            Typography.SetNumeralAlignment(v, FontNumeralAlignment.Tabular);
+            Grid.SetRow(l, r);
+            Grid.SetRow(v, r);
+            Grid.SetColumn(v, 1);
+            set.Children.Add(l);
+            set.Children.Add(v);
+            r++;
+        }
+        Line("Best lap", StatFormat.LapTime(best));
+        if (coach is not null)
+        {
+            var pool = data.All.Where(l => l.Clean).Select(l => l.Trace).ToList();
+            if (pool.Count < 2) pool = data.All.Select(l => l.Trace).ToList();
+            double theo = coach.Turns.Sum(t => pool.Min(l => LapCoach.Seconds(l, t)));
+            if (theo > 0) Line("Best of every turn added up", StatFormat.LapTime(Math.Min(theo, best)));
+        }
+        Line("Laps with a trace", data.All.Count.ToString(CultureInfo.CurrentCulture));
+        stack.Children.Add(set);
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0, 14, 0, 0), VerticalAlignment = VerticalAlignment.Top, Child = stack };
+    }
+
+    private static FrameworkElement Summary(AnalysisData data, (int Lap, double Time, LapTrace Trace) mine, AnalysisState s, bool compared, string phrase, bool imperial)
+    {
+        var grid = new Grid();
+        for (int i = 0; i < 5; i++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        var lead = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 18, 0) };
+        lead.Children.Add(new TextBlock { Text = $"Lap {mine.Lap}", Style = Ui.Res<Style>("Caption") });
+        var lapTime = RaceParts.BigFigure(StatFormat.LapTime(mine.Time), 38, "Heading");
+        lapTime.HorizontalAlignment = HorizontalAlignment.Left;
+        lead.Children.Add(lapTime);
+        grid.Children.Add(lead);
+        int col = 1;
+        FrameworkElement Cell(FrameworkElement body)
+        {
+            var cell = Hairline.Frame(new Border { Child = body, Padding = new Thickness(12, 2, 12, 2), VerticalAlignment = VerticalAlignment.Center }, Sides.Left);
+            cell.SetResourceReference(Border.BorderBrushProperty, "Line");
+            Grid.SetColumn(cell, col++);
+            grid.Children.Add(cell);
+            return cell;
+        }
+        void Stat(string value, string label, string brush = "Heading")
+        {
+            var v = RaceParts.LiveFigure(value, 20, brush);
+            v.HorizontalAlignment = HorizontalAlignment.Left;
+            Cell(new StackPanel { Children = { v, new TextBlock { Text = label, Style = Ui.Res<Style>("Caption") } } });
+        }
+        double gap = mine.Time - s.Reference.Trace.LapTime;
+        Stat(compared ? $"{CoachText.Signed(gap, "0.000")} {Units.S}" : SimRacing.Race.RaceFormat.Missing, compared ? $"Against {phrase}" : "Nothing to compare with", compared ? CoachText.LossBrush(gap, 0.0005) : "TextMuted");
+        var clean = data.All.Where(l => l.Clean).Select(l => l.Time).ToList();
+        if (clean.Count == 0) clean = data.All.Select(l => l.Time).ToList();
+        Stat($"{StatFormat.LapTime(clean.Min())} · {StatFormat.LapTime(clean.Average())}", "Best · average");
+        double top = LapCoach.Top(mine.Trace), topAll = data.All.Max(l => LapCoach.Top(l.Trace));
+        Stat(CoachText.Speed(top, imperial), $"Top speed · best {CoachText.SpeedValue(topAll, imperial).ToString("0", CultureInfo.CurrentCulture)}");
+        Stat($"{(clean.Max() - clean.Min()).ToString("0.00", CultureInfo.CurrentCulture)} {Units.S}", "Fastest to slowest lap");
+
+        var p = LapCoach.Pedals(mine.Trace);
+        var pedals = new StackPanel();
+        pedals.Children.Add(new TextBlock { Text = "Pedals, share of the lap", Style = Ui.Res<Style>("Caption") });
+        var barGrid = new Grid { Height = 8, Margin = new Thickness(0, 6, 0, 6) };
+        var share = new[] { (p.Throttle, StatsUi.Hue("Sage").Deep), (p.Brake, "Danger"), (p.Neither, "Warn") };
+        foreach (var (v, key) in share)
+        {
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(0.0001, v), GridUnitType.Star) });
+            var b = new Border();
+            b.SetResourceReference(Border.BackgroundProperty, key);
+            Grid.SetColumn(b, barGrid.ColumnDefinitions.Count - 1);
+            barGrid.Children.Add(b);
+        }
+        pedals.Children.Add(new Tile { CornerRadius = ThemeManager.Round(4), ClipChild = true, Child = barGrid });
+        var keys = new WrapPanel();
+        foreach (var (label, (v, key)) in new[] { "Throttle", "Brake", "Neither" }.Zip(share))
+        {
+            var sw = new Border { Width = 8, Height = 8, CornerRadius = ThemeManager.Round(2), Margin = new Thickness(0, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
+            sw.SetResourceReference(Border.BackgroundProperty, key);
+            var t = new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
+            t.Inlines.Add(new Run(label + " "));
+            t.Inlines.Add(new Run((v * 100).ToString("0", CultureInfo.CurrentCulture) + "%") { FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("Heading") });
+            keys.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 12, 0), Children = { sw, t } });
+        }
+        pedals.Children.Add(keys);
+        Cell(pedals);
+        var about = TextFit.TipWhenTrimmed(new TextBlock
+        {
+            Text = $"{data.Session.Car} · {data.Session.Place} · {Dates.Day(data.Session.StartUtc.ToLocalTime())}", Style = Ui.Res<Style>("Caption"),
+            TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 0, 8),
+        });
+        about.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(20, 12, 8, 14), Child = new StackPanel { Children = { about, grid } } };
+    }
+
+    private static FrameworkElement WholeLap(AnalysisData data, AnalysisState s, Config.SessionStatsSettings settings, AnalysisActions actions, ReplayMemory memory)
+    {
+        Action lanesChanged = () => { };
         var mapMode = s.Single
             ? Ui.Segmented(new[] { "Plain", "Speed" }, (int)s.MapColors, i => { s.MapColors = (MapColors)i; s.RaiseCursor(); }, "lapMapColors",
                 new[] { "The lap in its color", "The lap colored by speed: slow to fast" })
@@ -154,18 +437,7 @@ internal static class LapAnalysisView
         s.ZoomChanged += () => reset.IsEnabled = s.Zoomed;
         var lanesButton = Ui.LabeledButton("I.Sliders", "Lanes", () => { });
         lanesButton.Click += (_, _) => OpenLanes(lanesButton, settings, lanesChanged);
-
-        var refRow = Labeled("Reference", refPick);
-        if (deleteShared is not null) refRow.Children.Add(deleteShared);
-        var right = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
-        foreach (var e in new FrameworkElement[] { refRow, import, reset, lanesButton })
-        {
-            e.Margin = new Thickness(8, 2, 0, 2);
-            e.VerticalAlignment = VerticalAlignment.Center;
-            right.Children.Add(e);
-        }
-        var toolbar = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 10, 16, 10), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = Ui.SplitRow(chips, right, 13) };
-        page.Children.Add(toolbar);
+        lanesButton.Margin = new Thickness(8, 0, 0, 0);
 
         var map = new LapMap(s) { ToolTip = "The wheel zooms in on the spot under the pointer (the charts follow); double-click = the whole lap" };
         var mapCursor = new MapCursor(s, map) { IsHitTestVisible = false };
@@ -190,101 +462,51 @@ internal static class LapAnalysisView
         ShowLanes();
         lanesChanged = () => { ShowLanes(); actions.Save(); };
 
-        mapMode.VerticalAlignment = VerticalAlignment.Top;
         var mapTitle = StatsSections.Chart("Line", s.Lines.Any(l => l.Line is not null) ? (s.Single ? "Where the lap drove" : "Where each lap drove; the wide band is the reference's") : null, new Border());
         mapTitle.Children.RemoveAt(mapTitle.Children.Count - 1);
         mapMode.HorizontalAlignment = HorizontalAlignment.Left;
+        mapMode.VerticalAlignment = VerticalAlignment.Top;
         mapMode.Margin = new Thickness(0, 10, 0, 0);
         var mapBody = new StackPanel { Children = { mapTitle, mapMode } };
         mapHost.Margin = new Thickness(0, 10, 0, 0);
         mapBody.Children.Add(mapHost);
         var mapCard = Card(mapBody);
-        var chartCard = Card(StatsSections.Chart("Telemetry", "Drag across to zoom, double-click for the whole lap"
-            + (s.Lines.Any(l => l.PushToPass.Count > 0) ? "; shaded spans = push-to-pass in use" : "")
-            + (s.Single ? ". One lap only: tick more laps in the session's lap list to compare them" : ""), chartHost));
+        var chartTitle = StatsSections.Chart("Telemetry", "Drag across to zoom, double-click for the whole lap"
+            + (s.Lines.Any(l => l.PushToPass.Count > 0) ? "; shaded spans = push-to-pass in use" : ""), new Border());
+        chartTitle.Children.RemoveAt(chartTitle.Children.Count - 1);
+        foreach (var t in chartTitle.Children.OfType<TextBlock>()) t.TextWrapping = TextWrapping.Wrap;
+        var chartTools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top, Children = { reset, lanesButton } };
+        chartHost.Margin = new Thickness(0, 10, 0, 0);
+        var chartCard = Card(new StackPanel { Children = { Ui.SplitRow(chartTitle, chartTools, 10), chartHost } });
         mapCard.Margin = chartCard.Margin = new Thickness(0);
-        void MatchHeights()
+        double aspect = 1;
+        if (s.Reference.Line is { } line && line.X.Length > 1)
+            aspect = Math.Clamp((line.X.Max() - line.X.Min()) / Math.Max(10, line.Y.Max() - line.Y.Min()), 0.4, 2.5);
+        var pair = new Grid();
+        var mapColumn = new ColumnDefinition { Width = new GridLength(360) };
+        pair.ColumnDefinitions.Add(mapColumn);
+        pair.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Ui.PanelSpacing) });
+        pair.ColumnDefinitions.Add(new ColumnDefinition());
+        Grid.SetColumn(chartCard, 2);
+        pair.Children.Add(mapCard);
+        pair.Children.Add(chartCard);
+        void Fit()
         {
-            if (chart is null) return;
-            bool side = mapCard.IsLoaded && chartCard.IsLoaded && Math.Abs(mapCard.TranslatePoint(new Point(), chartCard).Y) < 1;
-            double want = side ? map.ActualHeight + chartCard.ActualHeight - mapCard.ActualHeight : chart.Height;
-            if (Math.Abs(want - map.Height) > 0.5) map.Height = Math.Max(120, want);
+            if (chart is null || !mapCard.IsLoaded || !chartCard.IsLoaded || pair.ActualWidth < 100) return;
+            double mapHeight = Math.Max(120, map.ActualHeight + chartCard.ActualHeight - mapCard.ActualHeight);
+            if (Math.Abs(mapHeight - map.Height) > 0.5) map.Height = mapHeight;
+            double chrome = mapCard.Padding.Left + mapCard.Padding.Right + mapCard.BorderThickness.Left + mapCard.BorderThickness.Right;
+            double width = Math.Clamp((mapHeight - 20) * aspect + 20 + chrome, 300, (pair.ActualWidth - Ui.PanelSpacing) * 0.55);
+            if (Math.Abs(mapColumn.Width.Value - width) > 0.5) mapColumn.Width = new GridLength(width);
         }
-        mapCard.SizeChanged += (_, _) => MatchHeights();
-        chartCard.SizeChanged += (_, _) => MatchHeights();
-        var telemetry = StatsLayout.Pair(mapCard, chartCard, 1100, 2, 3, Ui.PanelSpacing)!;
-        page.Children.Add(telemetry);
-        if (LossCard(data, s) is { } loss)
-        {
-            loss.Margin = new Thickness(0, Ui.PanelSpacing, 0, 0);
-            page.Children.Add(loss);
-        }
-        page.Children.Add(new DividerLine { Height = 2 * Ui.PanelSpacing });
-        page.Children.Add(new LapReplayView(data, s, settings, memory, actions.Save));
+        mapCard.SizeChanged += (_, _) => Fit();
+        chartCard.SizeChanged += (_, _) => Fit();
+        pair.SizeChanged += (_, _) => Fit();
+        pair.Loaded += (_, _) => pair.Dispatcher.InvokeAsync(Fit, System.Windows.Threading.DispatcherPriority.Loaded);
         s.ResetZoom();
-        return page;
+        pair.Loaded += (_, _) => { if (memory.Distance > 1) s.SetCursor(Math.Clamp(memory.Distance, 0, s.Length)); };
+        return pair;
     }
-
-    internal static string SharedLabel(SharedLapInfo lap, string car) =>
-        $"{(lap.Driver.Length > 0 ? lap.Driver : "Imported")} · {StatFormat.LapTime(lap.LapTime)}{(string.Equals(lap.Car, car, StringComparison.OrdinalIgnoreCase) ? "" : " · " + lap.Car)}";
-
-    private static StackPanel Labeled(string label, FrameworkElement control)
-    {
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
-        row.Children.Add(control);
-        return row;
-    }
-
-    private static Tile Card(FrameworkElement content) => new()
-    {
-        Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 13, 16, 16), Child = content, Margin = new Thickness(0, 0, 0, Ui.PanelSpacing),
-    };
-
-    private static Tile? LossCard(AnalysisData data, AnalysisState s)
-    {
-        if (s.Single || s.Lines.FirstOrDefault(l => !l.Reference) is not { } lap) return null;
-        var worst = CornerLoss.Worst(lap.Trace, s.Reference.Trace);
-        var names = data.Map is { } map ? SimRacing.TrackMaps.TurnNames.From(map, data.Session.TrackKm) : null;
-        string Where(double d) => names?.HasTurns == true ? names.Where(d / s.Reference.Trace.LengthM) : DistanceText(d, s.Imperial);
-        var rows = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
-        if (worst.Count == 0)
-            rows.Children.Add(new TextBlock { Text = $"No corner costs more than {CornerLoss.LeastLoss.ToString("0.00", CultureInfo.CurrentCulture)} {Units.S}.", Style = Ui.Res<Style>("Muted") });
-        foreach (var c in worst)
-        {
-            var corner = c;
-            var parts = new List<string>();
-            if (c.BrakeEarlier is { } b && Math.Abs(b) >= 3) parts.Add($"braked {Metres(Math.Abs(b), s.Imperial)} {(b > 0 ? "earlier" : "later")}");
-            if (c.ApexSpeed is { } v && Math.Abs(v) >= 0.55) parts.Add($"{SpeedText(Math.Abs(v), s.Imperial)} {(v < 0 ? "slower" : "faster")} at the slowest point");
-            if (c.ThrottleLater is { } t && Math.Abs(t) >= 5) parts.Add($"full throttle {Metres(Math.Abs(t), s.Imperial)} {(t > 0 ? "later" : "earlier")}");
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(74) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition());
-            var name = new TextBlock { Text = Where(c.Apex), Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center };
-            var lost = new TextBlock { Text = "+" + c.Lost.ToString("0.000", CultureInfo.CurrentCulture) + " " + Units.S, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
-            lost.SetResourceReference(TextBlock.ForegroundProperty, "DangerDeep");
-            System.Windows.Documents.Typography.SetNumeralAlignment(lost, FontNumeralAlignment.Tabular);
-            string said = parts.Count > 0 ? string.Join(", ", parts) : "lost through the corner";
-            var detail = new TextBlock { Text = char.ToUpper(said[0], CultureInfo.CurrentCulture) + said[1..] + ".", Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetColumn(lost, 1);
-            Grid.SetColumn(detail, 2);
-            grid.Children.Add(name);
-            grid.Children.Add(lost);
-            grid.Children.Add(detail);
-            var row = new Button { Style = Ui.Res<Style>("GhostButton"), Content = grid, HorizontalContentAlignment = HorizontalAlignment.Stretch, Height = double.NaN, MinHeight = 34,
-                Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 0, 4), ToolTip = "Zoom the charts and map to this corner" };
-            row.Click += (_, _) => s.Zoom(corner.From, corner.To);
-            rows.Children.Add(row);
-        }
-        return Card(StatsSections.Chart("Where the time goes", $"{lap.Short} against {s.Reference.Short}: the corners costing the most time, from the braking zone to the next corner", rows));
-    }
-
-    private static string Metres(double m, bool imperial) =>
-        imperial ? (m * 3.28084).ToString("0", CultureInfo.CurrentCulture) + " " + Units.Ft : m.ToString("0", CultureInfo.CurrentCulture) + " " + Units.M;
-
-    private static string SpeedText(double ms, bool imperial) =>
-        imperial ? (ms * 2.236936).ToString("0", CultureInfo.CurrentCulture) + " " + Units.Mph : (ms * 3.6).ToString("0", CultureInfo.CurrentCulture) + " " + Units.Kmh;
 
     private static FrameworkElement LaneTag(string id, Action? remove)
     {
@@ -367,6 +589,11 @@ internal static class LapAnalysisView
             });
         AnalysisLine? refLine = null;
         if (reference.StartsWith("lap:") && int.TryParse(reference[4..], out int n) && data.Laps.FindIndex(l => l.Lap == n) is var at and >= 0) refLine = s.Lines[at];
+        else if (reference.StartsWith("lap:") && int.TryParse(reference[4..], out int other) && data.All.FirstOrDefault(l => l.Lap == other) is { Trace: not null } found)
+        {
+            refLine = new AnalysisLine { Label = $"Lap {other} · {StatFormat.LapTime(found.Time)}", Trace = found.Trace, BrushKey = "TextMuted", Driver = data.Driver, Short = $"Lap {other}", Lap = other };
+            s.Lines.Add(refLine);
+        }
         else
         {
             var (label, shortName, driver, trace) = reference switch

@@ -18,13 +18,20 @@ internal static class StatsRacecraft
     private static string Sage => StatsUi.Hue("Sage").Deep;
     private static string Coral => StatsUi.Hue("Coral").Deep;
 
-    public static FrameworkElement Panel(Racecraft r, Func<string, (StatDef Def, StatResult Result)?> get, StatQuery q, FrameworkElement? more)
+    public static StatGrid Columns(Racecraft r, Func<string, (StatDef Def, StatResult Result)?> get, StatQuery q)
     {
         var columns = new StatGrid { MinTileWidth = 236, Gap = 32, RowGap = 19, Columns = 3 };
         columns.Children.Add(Column("Results", Results(r, get)));
         columns.Children.Add(Column("Positions and ratings", Positions(r, get)));
         columns.Children.Add(Column("Incidents, pit lane and weather", Incidents(r, get, q)));
-        var stack = new StackPanel { Children = { columns } };
+        return columns;
+    }
+
+    public static FrameworkElement Strip(Racecraft r) => new RaceStrip(r.Strip) { Height = RaceStrip.Tall };
+
+    public static FrameworkElement Panel(Racecraft r, Func<string, (StatDef Def, StatResult Result)?> get, StatQuery q, FrameworkElement? more)
+    {
+        var stack = new StackPanel { Children = { Columns(r, get, q) } };
         if (r.Starts > 0)
         {
             var head = new DockPanel { Margin = new Thickness(0, 24, 0, 0) };
@@ -74,7 +81,7 @@ internal static class StatsRacecraft
             : Row("Biggest gain", null);
         yield return Row("Average field", r.AverageField is { } field ? RaceFormat.Count((long)Math.Round(field), "car") : null, tip: "Cars in your class");
         var ir = get("race.irating")?.Def.Help;
-        string? category = r.Latest?.Category is { Length: > 0 } cat ? $"Latest {cat} rating" : null;
+        string? category = r.Rated?.Category is { Length: > 0 } cat ? $"Latest {cat} rating" : null;
         yield return Rating("iRating", r.IrNow?.ToString("N0", C), r.IrChange is { } irDelta ? StatFormat.Value(StatKind.Signed, irDelta, false) : null, r.IrChange ?? 0,
             string.Join("\n", new[] { category, ir }.OfType<string>()));
         yield return Rating("Safety rating", r.SrNow?.ToString("0.00", C), r.SrChange is { } srDelta ? StatFormat.Value(StatKind.Rating, srDelta, false) : null, r.SrChange ?? 0, category);

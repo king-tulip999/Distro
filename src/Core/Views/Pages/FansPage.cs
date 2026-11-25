@@ -366,10 +366,6 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         calibrateAll.Margin = new Thickness(0);
         ShowUncalibrated();
         tools.Children.Add(calibrateAll);
-        var coolingTest = Ui.LabeledButton("I.Thermometer", "Cooling test", () => _ = CoolingTestAsync(), "GhostButton");
-        coolingTest.ToolTip = "Measures how much each fan group actually lowers the temperatures and suggests curves";
-        coolingTest.Margin = new Thickness(6, 0, 0, 0);
-        tools.Children.Add(coolingTest);
         var resetAll = Ui.LabeledButton("I.Undo", "Reset all", () => _ = ResetAllFansAsync(), "GhostButton");
         resetAll.ToolTip = "Every fan back to its default name, limits and Auto in every preset (calibration is kept)";
         resetAll.Margin = new Thickness(6, 0, 0, 0);
@@ -578,7 +574,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         var graph = Driving(name, live, 0);
         if (graph is null || !live.TryGetValue(graph.Name, out var l) || l.Temp is not { } value) return null;
         string sensor = graph.SensorName ?? graph.Name;
-        string label = graph.SensorId is { } id && CoolingTest.IsGpu(id)
+        string label = graph.SensorId is { } id && (id == "gpu" || id.StartsWith("/gpu", StringComparison.OrdinalIgnoreCase))
             ? (sensor == "GPU Core" ? "GPU" : sensor)
             : sensor.StartsWith("Core", StringComparison.Ordinal) || sensor.StartsWith("CPU", StringComparison.Ordinal) ? "CPU" : sensor;
         return (label, sensor, value);
@@ -1201,23 +1197,6 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         BuildCurves();
     }
 
-    private CoolingTestDialog? _shotCooling;
-
-    private async Task CoolingTestAsync(bool showLast = true)
-    {
-        if (_app.Hardware.Catalog is null)
-        {
-            _app.Notify("Sensors aren't ready", "Wait a moment for the fans to be detected.", NoticeKind.Info);
-            return;
-        }
-        var dialog = new CoolingTestDialog(_app, _window, showLast);
-        await _window.ShowModal(dialog.Card);
-        dialog.Cancel();
-        _fanSignature = "";
-        Tick();
-        BuildCurves();
-    }
-
     private void BuildCurves()
     {
         _curveList.Children.Clear();
@@ -1304,7 +1283,6 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
             var row = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
             row.Children.Add(Labeled("Temperature from", sensor));
             stack.Children.Add(row);
-            if (LearnedNotice(curve) is { } learned) stack.Children.Add(learned);
 
             var editor = new CurveEditor { Height = 235, Margin = new Thickness(0, 10, 0, 0) };
             editor.SetPoints(curve.Points);
@@ -1377,41 +1355,6 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
 
         _curveEditorHost.Content = stack;
         Motion.FadeIn(stack);
-    }
-
-    private FrameworkElement? LearnedNotice(FanCurve curve)
-    {
-        var test = Fans.CoolingTest;
-        var group = test?.Groups.FirstOrDefault(g => string.Equals(g.CurveName, curve.Name, StringComparison.OrdinalIgnoreCase));
-        if (test is null || group is null || _app.FanLearning is not { } learning) return null;
-        var insight = learning.Insight(curve.Name);
-        if (insight is null)
-            return new TextBlock
-            {
-                Text = $"Learning from everyday use: {learning.Count(curve.Name)} of {CoolingLearner.MinSamples} steady readings under load",
-                Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 8, 0, 0),
-            };
-        if (Math.Abs(insight.Error) < CoolingLearner.MeaningfulErrorC) return null;
-        if (CoolingAnalysis.Suggest(test, group, curve, Fans.CoolingGoal, insight.Error) is not { } suggestion || CoolingApply.Same(curve.Points, suggestion.Points)) return null;
-        bool hotter = insight.Error > 0;
-        var notice = Ui.Notice(hotter ? "Apricot" : "Sage", "I.Thermometer",
-            $"The {insight.SensorName} runs {Math.Abs(insight.Error):0.0} °C {(hotter ? "hotter" : "cooler")} in everyday use than the cooling test predicted",
-            $"Measured over {RaceFormat.Count(insight.Count, "steady reading")} under load. Adjust moves this curve so the fans still settle near {suggestion.Knee}%.",
-            ("Adjust", () =>
-            {
-                var old = curve.Points;
-                curve.Points = suggestion.Points.Select(p => new CurvePoint { Temp = p.Temp, Percent = p.Percent }).ToList();
-                _app.FanSettingsChanged();
-                _app.Notify("Curve adjusted", $"“{curve.Name}”", NoticeKind.Success, action: new NoticeAction("Undo", () =>
-                {
-                    curve.Points = old;
-                    _app.FanSettingsChanged();
-                    BuildCurves();
-                }));
-                BuildCurves();
-            }));
-        notice.Margin = new Thickness(0, 10, 0, 0);
-        return notice;
     }
 
     private static readonly string[] MixNames = { "Max", "Min", "Average", "Sum", "Subtract" };
@@ -1582,36 +1525,6 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         yield return ("closed", () =>
         {
             _window.CloseModal(false);
-            return Task.CompletedTask;
-        });
-        yield return ("cooling-intro", () =>
-        {
-            _ = _window.ShowModal(new CoolingTestDialog(_app, _window, showLast: false).Card);
-            return Task.CompletedTask;
-        });
-        yield return ("cooling-running", async () =>
-        {
-            _window.CloseModal(false);
-            var dialog = new CoolingTestDialog(_app, _window, showLast: false);
-            _ = _window.ShowModal(dialog.Card);
-            dialog.Start();
-            _shotCooling = dialog;
-            await Task.Delay(9000);
-        });
-        yield return ("cooling-result", async () =>
-        {
-            _shotCooling?.Cancel();
-            await Task.Delay(800);
-            _window.CloseModal(false);
-            _ = _window.ShowModal(new CoolingTestDialog(_app, _window, showLast: true).Card);
-        });
-        yield return ("cooling-learned", () =>
-        {
-            _shotCooling?.Cancel();
-            _window.CloseModal(false);
-            ShowTab(1);
-            _selectedCurve = "CPU";
-            BuildCurves();
             return Task.CompletedTask;
         });
     }

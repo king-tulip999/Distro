@@ -92,7 +92,7 @@ internal static class HudThemes
             Good = Get("Sage", d.Good), GoodText = Get("SageDeep", d.GoodText), GoodSoft = Get("SageSoft", d.GoodSoft),
             Warn = Get("Warn", d.Warn), WarnText = Get("WarnDeep", d.WarnText), WarnSoft = Get("WarnSoft", d.WarnSoft),
             Danger = danger, DangerText = Get("DangerDeep", d.DangerText), DangerSoft = Get("DangerSoft", d.DangerSoft),
-            Gold = d.Gold, Slate = Get("TextFaint", d.Slate), Plum = d.Plum, Silver = d.Silver, Bronze = d.Bronze,
+            Slate = Get("TextFaint", d.Slate), Plum = d.Plum,
             Player = accent, PlayerText = Get("Heading", d.PlayerText),
             Highlight = HudPalette.Mix(surface, text, 0.3), HighlightEdge = accent, SoftBands = true,
             InputTrack = HudPalette.Mix(surface, text, 0.06), TraceBack = HudPalette.Mix(bg, surface, 0.5), InputTicks = lineStrong,

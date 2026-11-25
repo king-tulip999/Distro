@@ -15,6 +15,8 @@ internal sealed class ReplayMemory
 {
     public double Distance;
     public string? Follow;
+    public int Tab;
+    public int Turn = -1;
 }
 
 internal sealed class ReplayCar
@@ -29,7 +31,7 @@ internal sealed class ReplayCar
 
 internal sealed class LapReplayView : Grid
 {
-    private const double MinStage = 340, MaxStage = 616;
+    private const double MinStage = 440, MaxStage = 740;
     private const long ReadoutMs = 66;
     private readonly AnalysisState _s;
     private readonly Config.SessionStatsSettings _settings;
@@ -55,6 +57,7 @@ internal sealed class LapReplayView : Grid
     private ReplayCar _follow = null!;
     private double _time;
     private bool _playing, _hooked;
+    private double? _stopAt;
     private TimeSpan? _lastFrame;
     private long _lastReadout;
     private int _gapSign = 2, _sectorSign = 2, _sector = -1;
@@ -92,7 +95,7 @@ internal sealed class LapReplayView : Grid
         _stage.WentFree += () => { _save(); SyncCamera(); };
         var overlay = new Grid { Margin = new Thickness(11) };
 
-        var cards = new ReplayCardRow { VerticalAlignment = VerticalAlignment.Top };
+        var cards = new ReplayCardRow { Margin = new Thickness(11, 11, 11, 0) };
         foreach (var car in _cars.OrderBy(c => c.Line.Reference ? 1 : 0))
         {
             var card = new ReplayCard(car, settings.Imperial, () => Follow(car), _cars.Count == 1);
@@ -131,14 +134,8 @@ internal sealed class LapReplayView : Grid
         };
         overlay.Children.Add(miniCard);
 
-        var topLeft = new StackPanel { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 10, 0) };
-        var top = new Grid { VerticalAlignment = VerticalAlignment.Top };
-        top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        top.ColumnDefinitions.Add(new ColumnDefinition());
-        Grid.SetColumn(cards, 1);
-        top.Children.Add(topLeft);
-        top.Children.Add(cards);
-        overlay.Children.Add(top);
+        var topLeft = new StackPanel { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+        overlay.Children.Add(topLeft);
         if (_cars.Any(c => c.Line.Wind is not null))
         {
             _wind = new ReplayWind(_cars, settings.Imperial) { HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 8) };
@@ -215,8 +212,8 @@ internal sealed class LapReplayView : Grid
         topLeft.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(10, 6, 10, 6), HorizontalAlignment = HorizontalAlignment.Left, Child = legend });
 
         var stageHost = new Grid { ClipToBounds = true, Children = { _stage, overlay } };
-        IEnumerable<FrameworkElement> Parts() => overlay.Children.OfType<FrameworkElement>().Where(p => p != top)
-            .Concat(topLeft.Children.OfType<FrameworkElement>()).Concat(cards.Children.OfType<FrameworkElement>());
+        IEnumerable<FrameworkElement> Parts() => overlay.Children.OfType<FrameworkElement>().Where(p => p != topLeft)
+            .Concat(topLeft.Children.OfType<FrameworkElement>());
         void Avoid()
         {
             _stage.Avoid.Clear();
@@ -227,7 +224,6 @@ internal sealed class LapReplayView : Grid
                 at.Inflate(6, 6);
                 _stage.Avoid.Add(at);
             }
-            _stage.TopInset = cards.IsDescendantOf(stageHost) && cards.ActualHeight > 0 ? cards.TransformToAncestor(stageHost).Transform(new Point(0, cards.ActualHeight)).Y : 0;
             _stage.Update();
         }
         bool avoidQueued = false;
@@ -237,9 +233,9 @@ internal sealed class LapReplayView : Grid
             avoidQueued = true;
             Dispatcher.InvokeAsync(() => { avoidQueued = false; Avoid(); }, System.Windows.Threading.DispatcherPriority.Loaded);
         }
-        foreach (var part in Parts().Append(top)) part.SizeChanged += (_, _) => QueueAvoid();
+        foreach (var part in Parts().Append(topLeft)) part.SizeChanged += (_, _) => QueueAvoid();
         stageHost.SizeChanged += (_, _) => QueueAvoid();
-        _stageTile = Hairline.Frame(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Height = 454, ClipChild = true, Child = stageHost });
+        _stageTile = Hairline.Frame(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Height = 454, ClipChild = true, Child = StageWithCards(cards, stageHost) });
         _stageTile.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
 
         _stageTile.Margin = new Thickness(0, 0, 0, 10);
@@ -300,8 +296,9 @@ internal sealed class LapReplayView : Grid
         if (compared) showRow.Children.Add(refRow);
         gap.VerticalAlignment = VerticalAlignment.Center;
 
-        var groups = new WrapPanel { Orientation = Orientation.Horizontal };
-        void Group(FrameworkElement part)
+        var playGroups = new WrapPanel { Orientation = Orientation.Horizontal };
+        var viewGroups = new WrapPanel { Orientation = Orientation.Horizontal };
+        void Group(WrapPanel groups, FrameworkElement part)
         {
             if (groups.Children.Count > 0)
             {
@@ -312,18 +309,19 @@ internal sealed class LapReplayView : Grid
             part.Margin = new Thickness(0, 3, 0, 3);
             groups.Children.Add(part);
         }
-        Group(playRow);
-        Group(zoomRow);
-        if (showRow.Children.Count > 0) Group(showRow);
+        Group(playGroups, playRow);
         if (compared)
         {
             syncRow.Margin = new Thickness(14, 0, 0, 0);
-            Group(new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { gap, syncRow } });
+            Group(playGroups, new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { gap, syncRow } });
         }
+        Group(viewGroups, zoomRow);
+        if (showRow.Children.Count > 0) Group(viewGroups, showRow);
 
         var bar = new StackPanel();
         bar.Children.Add(_scrubber);
-        bar.Children.Add(groups);
+        bar.Children.Add(playGroups);
+        bar.Children.Add(viewGroups);
         _barTile = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 11, 16, 11), Child = bar };
         SetRow(_barTile, 1);
         Children.Add(_barTile);
@@ -349,6 +347,17 @@ internal sealed class LapReplayView : Grid
     }
 
     public TrackOutline? Outline { get; private set; }
+
+    private static FrameworkElement StageWithCards(FrameworkElement cards, FrameworkElement stage)
+    {
+        var grid = new Grid();
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition());
+        grid.Children.Add(cards);
+        Grid.SetRow(stage, 1);
+        grid.Children.Add(stage);
+        return grid;
+    }
 
     private async Task PlaceMapAsync(SimRacing.TrackMaps.TrackMap map, List<(double[] X, double[] Y, double Step, double Length)> lines)
     {
@@ -421,8 +430,20 @@ internal sealed class LapReplayView : Grid
         _lastFrame = null;
     }
 
+    public void PlayBetween(LapTrace lap, double from, double to)
+    {
+        if (_cars.Count == 0) return;
+        if (_cars.FirstOrDefault(c => ReferenceEquals(c.Trace, lap)) is { } car && car != _follow) Follow(car);
+        if (_settings.ReplayFree) SetFree(false);
+        _time = _follow.Trace.TimeAt(from);
+        Place(force: true);
+        Play();
+        _stopAt = to;
+    }
+
     public void Pause()
     {
+        _stopAt = null;
         if (_hooked) { CompositionTarget.Rendering -= OnFrame; _hooked = false; }
         if (!_playing) return;
         _playing = false;
@@ -448,7 +469,7 @@ internal sealed class LapReplayView : Grid
         var (t, ended) = LapReplay.Advance(_time, Math.Min(dt, 0.1), _settings.ReplaySpeed, _follow.Trace.LapTime);
         _time = t;
         Place();
-        if (ended) Pause();
+        if (ended || _stopAt is { } stop && _follow.Distance >= stop) Pause();
     }
 
     private void ShowReference(bool on)
@@ -707,8 +728,6 @@ internal sealed class ReplayStage : FrameworkElement
 
     public event Action? WentFree;
 
-    public double TopInset { get; set; }
-
     private const double TrailEaseSeconds = 0.4;
     private bool _moving, _easing;
     private double _trailShare;
@@ -745,10 +764,21 @@ internal sealed class ReplayStage : FrameworkElement
 
     private double TrailShare => 1 - Math.Pow(1 - _trailShare, 2);
 
+    private (double Left, double Right) SideInsets()
+    {
+        double left = 0, right = 0, edge = 40;
+        foreach (var r in Avoid)
+        {
+            if (r.Left < edge) left = Math.Max(left, r.Right);
+            else if (r.Right > ActualWidth - edge) right = Math.Max(right, ActualWidth - r.Left);
+        }
+        return left + right < ActualWidth * 0.6 ? (left, right) : (0, 0);
+    }
+
     private Point Anchor(double k)
     {
-        double top = Math.Clamp(TopInset, 0, ActualHeight * 0.6), h = ActualHeight - top;
-        return new Point(ActualWidth / 2, top + h * (0.5 + 0.08 * k));
+        var (left, right) = SideInsets();
+        return new Point(ActualWidth / 2 + (left - right) / 2 * (1 - k), ActualHeight * (0.5 + 0.08 * k));
     }
 
     private double _camX, _camY, _camScale = 1, _freeX, _freeY, _freeScale = 1;
@@ -929,7 +959,8 @@ internal sealed class ReplayStage : FrameworkElement
 
     private double Scale(double zoom)
     {
-        double fit = Math.Min((ActualWidth - 60) / _spanX, (ActualHeight - Math.Clamp(TopInset, 0, ActualHeight * 0.6) - 60) / _spanY);
+        var (left, right) = SideInsets();
+        double fit = Math.Min((ActualWidth - left - right - 60) / _spanX, (ActualHeight - 60) / _spanY);
         fit = Math.Max(0.01, fit);
         return fit * Math.Pow(Math.Max(1, MaxScale / fit), zoom);
     }

@@ -162,6 +162,8 @@ public sealed class SetupManagerSettings
 
     public string? SelectedCar { get; set; }
 
+    public string? ExportFolder { get; set; }
+
     public bool IntroSeen { get; set; }
 
     [System.Text.Json.Serialization.JsonIgnore]

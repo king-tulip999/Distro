@@ -113,6 +113,7 @@ internal static class ConfigTransfer
         var a = c.Hotkeys;
         return c.WindowProfiles.Profiles.Count(p => Set(p.Hotkey)) + c.WindowProfiles.Groups.Count(g => Set(g.Hotkey)) + c.Displays.Profiles.Count(p => Set(p.Hotkey))
             + c.Fans.Presets.Count(p => Set(p.Hotkey))
+            + (Set(c.SessionStats.RaceEvents.Hotkey) ? 1 : 0)
             + new[] { c.Overlay.Hotkey, c.Overlay.ResetFpsHotkey, a.ShowWindow,
                 a.NextDisplayProfile, a.PreviousDisplayProfile, a.FanControl, a.NextFanPreset, a.PreviousFanPreset, a.NextOverlayLayout }.Count(Set);
     }

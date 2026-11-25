@@ -17,13 +17,13 @@ internal sealed class TelemetryFilesCard : ContentControl
     private readonly StackPanel _body = new();
     private int _version;
 
-    public TelemetryFilesCard(AppServices app, MainWindow window, SessionStatsService stats)
+    public TelemetryFilesCard(AppServices app, MainWindow window, SessionStatsService stats, bool bare = false)
     {
         _app = app;
         _window = window;
         _stats = stats;
-        Content = StatsSections.Section("Telemetry files", null, null, _body);
-        Ui.Anchor(this, "stats.telemetry");
+        Content = bare ? _body : StatsSections.Section("Telemetry files", null, null, _body);
+        if (!bare) Ui.Anchor(this, "stats.telemetry");
         _body.Children.Add(Ui.Text("Reading your telemetry folder…", "Caption"));
         _ = LoadAsync();
     }

@@ -68,16 +68,16 @@ internal sealed class HudVr : IDisposable
         if (_installed != setting)
         {
             OpenXrLayer.Claim(setting);
-            if (setting) Problem = OpenXrLayer.Install();
-            else
-            {
-                if ((_installed == true || OpenXrLayer.Installed) && !OpenXrLayer.ClaimedElsewhere()) OpenXrLayer.Remove();
-                Problem = null;
-            }
+            if (!setting && (_installed == true || OpenXrLayer.Installed) && !OpenXrLayer.ClaimedElsewhere()) OpenXrLayer.Remove();
+            Problem = null;
             _installed = setting;
         }
         bool want = setting && active;
-        if (want == _on) return;
+        if (want == _on)
+        {
+            SyncLayer();
+            return;
+        }
         _on = want;
         if (want)
         {
@@ -101,7 +101,22 @@ internal sealed class HudVr : IDisposable
             _share.Dispose();
             IracingAsAdmin = false;
         }
+        SyncLayer();
         Changed?.Invoke();
+    }
+
+    private bool? _registered;
+
+    private void SyncLayer()
+    {
+        if (_app.Demo) return;
+        bool iracing = _app.Watcher.IsRunning(IracingFiles.IracingPaths.SimProcess);
+        bool want = OpenXrLayer.WantRegistered(_on, iracing);
+        if (want == _registered) return;
+        bool first = _registered is null;
+        _registered = want;
+        if (want) Problem = OpenXrLayer.Install();
+        else if (OpenXrLayer.MayUnregister(iracing, OpenXrLayer.ClaimedElsewhere())) OpenXrLayer.Unregister(leftover: first);
     }
 
     public bool IracingAsAdmin { get; private set; }
@@ -116,7 +131,11 @@ internal sealed class HudVr : IDisposable
 
     private void OnStarted(string name)
     {
-        if (_on && string.Equals(name, IracingFiles.IracingPaths.SimProcess, StringComparison.OrdinalIgnoreCase)) CheckIracingAdmin();
+        if (_on && string.Equals(name, IracingFiles.IracingPaths.SimProcess, StringComparison.OrdinalIgnoreCase))
+        {
+            SyncLayer();
+            CheckIracingAdmin();
+        }
         if (!_on || !string.Equals(name, SteamVrServer, StringComparison.OrdinalIgnoreCase)) return;
         _retry = 0;
         _steam.Connect();
@@ -125,6 +144,7 @@ internal sealed class HudVr : IDisposable
 
     private void OnStopped(string name)
     {
+        if (string.Equals(name, IracingFiles.IracingPaths.SimProcess, StringComparison.OrdinalIgnoreCase)) SyncLayer();
         if (string.Equals(name, IracingFiles.IracingPaths.SimProcess, StringComparison.OrdinalIgnoreCase) && IracingAsAdmin)
         {
             IracingAsAdmin = false;
@@ -301,6 +321,7 @@ internal sealed class HudVr : IDisposable
             _app.Watcher.Release(Consumer);
         }
         _on = false;
+        SyncLayer();
         Clear();
         _steam.Dispose();
         _share.Dispose();

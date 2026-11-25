@@ -26,6 +26,7 @@ internal static class StatsDemo
         var now = DateTime.UtcNow;
         int ir = 2140;
         double sr = 3.12;
+        int index = 0;
         var starts = Enumerable.Range(0, Services.DemoData.Stress ? 900 : 90).Select(_ => now.AddDays(-rnd.Next(0, 150)).Date.AddHours(rnd.Next(16, 23)).AddMinutes(rnd.Next(0, 60))).OrderBy(t => t).ToList();
         foreach (var start in starts)
         {
@@ -80,10 +81,77 @@ internal static class StatsDemo
                 Field = kind == "Race" ? field : null, LapsLed = kind == "Race" ? (finished && finish <= 2 ? more.Next(1, lapCount / 2) : 0) : null,
                 PitStops = kind == "Race" && lapCount > 18 ? 1 : 0, PitS = kind == "Race" && lapCount > 18 ? 38 + rnd.NextDouble() * 12 : 0,
             };
+            List<SavedRaceEvent>? events = null;
+            if (kind == "Race") events = RacePlaces(laps, grid, finish, field, pitLap, row.PitS, new Random(1000 + index));
+            index++;
             store.Save(row, laps);
+            if (events is not null && row.Id > 0) store.SaveRaceEvents(row.Id, events);
             if (row.Official) { ir += rnd.Next(-45, 70); sr = Math.Clamp(sr + (incidents < 4 ? 0.12 : -0.2), 1, 4.99); }
         }
         AddTraces(store, rnd);
+    }
+
+    private const double RaceStartAt = 140;
+
+    private static List<SavedRaceEvent> RacePlaces(List<LapRow> laps, int grid, int finish, int field, int pitLap, double pitSeconds, Random rnd)
+    {
+        int count = laps.Count;
+        var places = new int[count + 1];
+        places[0] = grid;
+        for (int n = 1; n <= count; n++)
+        {
+            int left = count - n;
+            int step = n == pitLap + 1 && pitLap > 0 ? 2 : rnd.NextDouble() < 0.45 ? 0 : rnd.Next(-2, 3);
+            int place = Math.Clamp(places[n - 1] + step, 1, field);
+            places[n] = n == count ? finish : Math.Clamp(place, Math.Max(1, finish - 2 * left), Math.Min(field, finish + 2 * left));
+        }
+        var numbers = Enumerable.Range(2, 96).Where(x => x != 42 && x != 7).OrderBy(_ => rnd.Next()).Take(field + 1).ToArray();
+        string Number(int place) => numbers[Math.Clamp(place, 0, numbers.Length - 1)].ToString(System.Globalization.CultureInfo.InvariantCulture);
+        string Name(int place) => $"{(char)('A' + numbers[Math.Clamp(place, 0, numbers.Length - 1)] % 26)}. Driver {Number(place)}";
+        var events = new List<SavedRaceEvent>();
+        double lapStart = RaceStartAt;
+        int fastest = -1;
+        if (rnd.NextDouble() < 0.4)
+        {
+            var clean = laps.Where(l => l.Clean && l.Lap > 1).ToList();
+            if (clean.Count > 0) fastest = clean.MinBy(l => l.Time)!.Lap;
+        }
+        void Add(int lap, string kind, double time, double? pct, int? position, int? before, int other, int? points, double? seconds) =>
+            events.Add(new SavedRaceEvent(0, lap, kind, time, pct, position, before, other > 0 ? Number(other) : "", other > 0 ? Name(other) : "", points, seconds));
+        for (int i = 0; i < count; i++)
+        {
+            var lap = laps[i] with { Position = places[i + 1] };
+            laps[i] = lap;
+            int from = places[i], to = places[i + 1];
+            double At(double pct) => lapStart + pct * lap.Time;
+            if (pitLap > 0 && lap.Lap == pitLap + 1)
+            {
+                Add(lap.Lap, SavedRaceEvents.Pit, At(0.02), 0.02, to, from, -1, null, pitSeconds > 0 ? pitSeconds : null);
+            }
+            else
+            {
+                int changes = Math.Abs(from - to);
+                for (int k = 0; k < changes; k++)
+                {
+                    double pct = (k + 0.2 + rnd.NextDouble() * 0.6) / changes;
+                    if (to < from) Add(lap.Lap, SavedRaceEvents.Pass, At(pct), pct, from - k - 1, from - k, from - k - 1, null, null);
+                    else Add(lap.Lap, SavedRaceEvents.Lost, At(pct), pct, from + k + 1, from + k, from + k + 1, null, null);
+                }
+            }
+            if (lap.Flags.HasFlag(LapFlags.OffTrack))
+            {
+                double pct = 0.1 + rnd.NextDouble() * 0.8;
+                Add(lap.Lap, SavedRaceEvents.Off, At(pct), pct, null, null, -1, null, null);
+            }
+            if (lap.Flags.HasFlag(LapFlags.Incident) && lap.Incidents is > 0 and var points)
+            {
+                double pct = 0.1 + rnd.NextDouble() * 0.8;
+                Add(lap.Lap, SavedRaceEvents.Incident, At(pct), pct, null, null, -1, points, null);
+            }
+            lapStart += lap.Time;
+            if (lap.Lap == fastest) Add(lap.Lap, SavedRaceEvents.Fastest, lapStart, null, null, null, -1, null, lap.Time);
+        }
+        return events.OrderBy(e => e.Time).Select((e, i) => e with { Seq = i + 1 }).ToList();
     }
 
     private static List<TyreReading>? DemoTyres(Random rnd, int laps, int pitLap)

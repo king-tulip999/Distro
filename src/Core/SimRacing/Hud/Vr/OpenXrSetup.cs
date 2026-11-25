@@ -107,6 +107,25 @@ internal static class OpenXrSetup
 
     internal static IEnumerable<string> LayerLogLines() => LayerLogLines(ReadLayerLog());
 
+    private const string OutsideMarker = "Loaded outside iRacing in ";
+
+    internal static List<string> OutsideLoads(string[]? lines)
+    {
+        var last = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (lines is null) return new List<string>();
+        foreach (string line in lines)
+        {
+            int at = line.IndexOf(OutsideMarker, StringComparison.Ordinal);
+            if (at < 0) continue;
+            int start = at + OutsideMarker.Length;
+            int end = line.IndexOf(':', start);
+            if (end <= start) continue;
+            string exe = line[start..end].Trim();
+            last[exe] = at >= 19 ? line[..19] : "";
+        }
+        return last.Select(p => p.Value.Length > 0 ? $"{p.Key} (last {p.Value})" : p.Key).ToList();
+    }
+
     internal static IEnumerable<string> LayerLogLines(string[]? lines)
     {
         if (lines is null)
@@ -145,7 +164,12 @@ internal static class OpenXrSetup
             yield return $"  - {layer.Name ?? "unreadable manifest"}: {(layer.MachineWide ? "machine-wide" : "per user")}{(layer.Enabled ? "" : ", turned off")} ({layer.Manifest})";
         yield return $"- Admin setup for iRacing: {(OpenXrLayer.MachineInstalled ? OpenXrLayer.MachineCurrent ? "set up" : "set up, out of date" : "not set up")}";
         yield return $"- iRacing running now: {(IracingRunning() ? "yes" : "no")}";
-        foreach (string line in LayerLogLines()) yield return line;
+        yield return $"- Per-user layer registered now: {(OpenXrLayer.Registered ? "yes" : "no")} (only while iRacing runs with VR widgets on)";
+        if (OpenXrLayer.LeftoverRemoved) yield return "- A leftover registration from an earlier run was removed at start";
+        string[]? log = ReadLayerLog();
+        var outside = OutsideLoads(log);
+        yield return outside.Count == 0 ? "- Loaded by other games: none logged" : "- Loaded by other games: " + string.Join(", ", outside);
+        foreach (string line in LayerLogLines(log)) yield return line;
         if (vr?.LayerReport is not { } r)
         {
             yield return "- Velocita's layer inside iRacing: not seen since Velocita started";

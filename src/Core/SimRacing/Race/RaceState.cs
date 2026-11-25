@@ -95,10 +95,15 @@ internal sealed class RaceState
     public double Now { get; private set; }
 
     public GapHistory Gaps { get; } = new();
+    public DuelLog Duels { get; } = new();
     public RadarModel Radar { get; } = new();
     public FuelModel FuelData { get; } = new();
     public LapTracker Laps { get; } = new();
     public DeltaHistory Deltas { get; } = new();
+    public GForceLog GForce { get; } = new();
+    public BurnZones Burn { get; } = new();
+    public ControlLog Controls { get; } = new();
+    public ErsLog Ers { get; } = new();
     public AlertEngine Alerts { get; }
 
     public int SelectedCar { get; set; } = -1;
@@ -362,6 +367,11 @@ internal sealed class RaceState
         if (!f.IsReplayPlaying)
         {
             Gaps.Sample(f, Now);
+            GForce.Update(f, Now);
+            Burn.Update(f, Now);
+            Controls.Update(f, Now);
+            Ers.Update(f, Now);
+            Duels.Update(f);
             SyncTurns(f);
             if (f.SessionTime is { } st)
             {
@@ -409,7 +419,12 @@ internal sealed class RaceState
     {
         Laps.Clear();
         Deltas.Clear();
+        GForce.Clear();
+        Burn.Clear();
+        Controls.Clear();
+        Ers.Clear();
         Gaps.Clear();
+        Duels.Clear();
         TrackLimits.Clear();
         Weather.Clear();
         _pitExit.Reset();

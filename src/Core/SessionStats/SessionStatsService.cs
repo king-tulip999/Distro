@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows.Threading;
 using Core.Services;
 using Core.SimRacing.IracingFiles;
+using Core.SimRacing.Race;
 using Core.SimRacing.Telemetry;
 
 namespace Core.SessionStats;
@@ -32,7 +33,12 @@ internal sealed class SessionStatsService : IDisposable
             var traces = _live.TakeTraces();
             var copy = row.Copy();
             if (Settings.TraceRecord) copy.Traces = traces;
-            Queue(store => store.SaveLive(copy, laps));
+            var events = RaceEventsOf(copy, ended: false);
+            Queue(store =>
+            {
+                store.SaveLive(copy, laps);
+                SaveRaceEvents(store, copy, events);
+            });
         };
     }
 
@@ -152,7 +158,7 @@ internal sealed class SessionStatsService : IDisposable
         RaceHistory.Use(null);
         if (!_app.Demo) _app.Telemetry.Release(Consumer);
         lock (_feedGate)
-            if (_live.Finish() is { } last) Queue(store => store.SaveLive(last.Row, last.Laps, ended: true));
+            if (_live.Finish() is { } last) SaveEnded(last.Row, last.Laps);
         _importCancel?.Cancel();
         bool stillImporting = _import is { } import && !import.Join(4000);
         if (stillImporting) _disposeAfterImport = true;
@@ -174,9 +180,43 @@ internal sealed class SessionStatsService : IDisposable
     {
         lock (_feedGate)
         {
-            if (_live.Feed(frame, DateTime.UtcNow) is { } ended)
-                Queue(store => store.SaveLive(ended.Row, ended.Laps, ended: true));
+            if (_live.Feed(frame, DateTime.UtcNow) is { } ended) SaveEnded(ended.Row, ended.Laps);
         }
+    }
+
+    public Func<RaceEventsSnapshot>? RaceEvents { get; set; }
+
+    private RaceEventsSnapshot? _lastRaceEvents;
+
+    private void SaveEnded(SessionRow row, List<LapRow> laps)
+    {
+        var events = RaceEventsOf(row, ended: true);
+        Queue(store =>
+        {
+            store.SaveLive(row, laps, ended: true);
+            SaveRaceEvents(store, row, events);
+        });
+    }
+
+    private RaceEventsSnapshot? RaceEventsOf(SessionRow row, bool ended)
+    {
+        if (_app.Demo || row.SessionType != nameof(SessionKind.Race) || RaceEvents is not { } source) return null;
+        RaceEventsSnapshot? found = null;
+        try
+        {
+            var now = source();
+            if (SavedRaceEvents.Matches(now, row)) found = _lastRaceEvents = now;
+            else if (_lastRaceEvents is { } last && SavedRaceEvents.Matches(last, row)) found = last;
+        }
+        catch (Exception ex) { App.LogError(ex); }
+        if (ended) _lastRaceEvents = null;
+        return found;
+    }
+
+    private static void SaveRaceEvents(StatsStore store, SessionRow row, RaceEventsSnapshot? events)
+    {
+        if (events is null || row.Id <= 0) return;
+        store.SaveRaceEvents(row.Id, SavedRaceEvents.Of(events));
     }
 
     private void OnProcessStopped(string name)
@@ -369,7 +409,7 @@ internal sealed class SessionStatsService : IDisposable
         }
     }
 
-    private const string RereadKey = "recorder_reread", RereadVersion = "official-lap-times-differs-grid-class-finish-car-settings-off-track-weather-ranges";
+    private const string RereadKey = "recorder_reread", RereadVersion = "official-lap-times-differs-grid-class-finish-car-settings-off-track-weather-ranges-lap-places";
 
     private void Reread(StatsStore store, string folder, bool traces, TraceRetention retention, CancellationToken cancel)
     {

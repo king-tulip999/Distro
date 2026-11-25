@@ -50,7 +50,7 @@ public partial class App : Application
         }
         if (ArgValue(e.Args, HudSheet.Arg) is { } sheetFolder)
         {
-            HudSheet.Run(this, sheetFolder);
+            HudSheet.Run(this, sheetFolder, only: ArgValue(e.Args, HudSheet.OnlyArg));
             return;
         }
         if (ArgValue(e.Args, HudSheet.FramesArg) is { } framesFolder)
@@ -60,12 +60,12 @@ public partial class App : Application
         }
         if (ArgValue(e.Args, HudSheet.SiteFramesArg) is { } siteFramesFolder)
         {
-            HudSheet.RunSite(this, siteFramesFolder, frames: true);
+            HudSheet.RunSite(this, siteFramesFolder, frames: true, only: ArgValue(e.Args, HudSheet.OnlyArg));
             return;
         }
         if (ArgValue(e.Args, HudSheet.SiteArg) is { } siteFolder)
         {
-            HudSheet.RunSite(this, siteFolder);
+            HudSheet.RunSite(this, siteFolder, only: ArgValue(e.Args, HudSheet.OnlyArg));
             return;
         }
         if (ArgValue(e.Args, FuelReplay.Arg) is { } replayFolder)
@@ -156,6 +156,7 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
             if (args.ExceptionObject is Exception ex) LogError(ex);
+            SimRacing.Hud.Vr.OpenXrLayer.UnregisterAfterCrash();
             AppServices.Current?.Hardware.EmergencyRestore();
         };
         System.Windows.Forms.Application.ThreadException += (_, args) => ReportError(args.Exception);
@@ -384,6 +385,7 @@ public partial class App : Application
         if (_starting && !ScreenshotRunner.Active && !MonkeyRunner.Active && !ControlSweep.Active && PerfProbe.File is null && !_trayWired && MainWindow is not { IsVisible: true })
         {
             LogError(e.Exception);
+            SimRacing.Hud.Vr.OpenXrLayer.UnregisterAfterCrash();
             try { AppServices.Current?.Hardware.EmergencyRestore(); } catch { }
             MessageBox.Show(
                 $"{AppIdentity.Name} couldn't start.\n\n" + e.Exception.Message +

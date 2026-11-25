@@ -49,6 +49,11 @@
     <Geometry x:Key="I.ChevronUp">M6 15l6-6 6 6</Geometry>
     <Geometry x:Key="I.ArrowRight">M5 12h14M13 6l6 6-6 6</Geometry>
     <Geometry x:Key="I.ArrowUp">M12 20V4M6 10l6-6 6 6</Geometry>
+    <Geometry x:Key="I.ArrowDown">M12 4v16M6 14l6 6 6-6</Geometry>
+    <Geometry x:Key="I.Wrench">M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z</Geometry>
+    <Geometry x:Key="I.OffTrack">M4 20c4-2 6-6 6-16M20 20c-3-2-4-5-4-8M16 12c2-3 4-4 5-4</Geometry>
+    <Geometry x:Key="I.Video">M3 7h12v10H3zM15 10l6-3v10l-6-3</Geometry>
+    <Geometry x:Key="I.Pin">M12 17v5M9 3h6l-1 6 4 4H6l4-4z</Geometry>
     <Geometry x:Key="I.Needle">M12 3l4 9h-8z</Geometry>
     <Geometry x:Key="I.TrendingUp">M3 17l6-6 4 4 8-8M14 7h7v7</Geometry>
     <Geometry x:Key="I.ChevronsUp">M7 11l5-5 5 5M7 18l5-5 5 5</Geometry>

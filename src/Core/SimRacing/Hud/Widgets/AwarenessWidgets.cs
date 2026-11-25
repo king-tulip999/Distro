@@ -137,11 +137,14 @@ internal sealed class TrafficWidget : HudWidget
             }
         }
         double pulse = p.ReducedMotion ? 0.5 : 0.5 + 0.5 * Math.Sin(v.Now * 4);
-        if (timeline) DrawTimeline(p, f, area, window, pulse);
-        else DrawLadder(p, f, area, window, pulse);
+        if (timeline) DrawTimeline(p, v, f, area, window, pulse);
+        else DrawLadder(p, v, f, area, window, pulse);
     }
 
-    private void DrawLadder(HudPainter p, TelemetryFrame f, RectangleF area, double window, double pulse)
+    private static readonly string[] LadderParts = { "rail", "class", "name", "status", "gap" };
+    private static readonly string[] TimelineParts = { "axis", "callout" };
+
+    private void DrawLadder(HudPainter p, HudView v, TelemetryFrame f, RectangleF area, double window, double pulse)
     {
         float d = p.Density, rowH = RowHeight(p), h = rowH - 2 * d;
         int fits = Math.Max(1, (int)((area.Height + 2 * d) / rowH));
@@ -154,23 +157,22 @@ internal sealed class TrafficWidget : HudWidget
         for (int i = 0; i < _order.Count; i++) _motion.Show(_order[i] < 0 ? TrafficMotion.You : _shown[_order[i]].Car, top + i * rowH);
         _motion.End();
 
-        float rx = area.X + 8 * d, railTop = area.Y + 3 * d, railBottom = area.Bottom - 4 * d, mid = (railTop + railBottom) / 2, half = (railBottom - railTop) / 2;
-        p.Fill(new RectangleF(rx - 1, railTop, 2, railBottom - railTop), p.P.SurfaceAlt, Round(p, 1));
-        p.Dot(rx, mid, 5 * d, p.P.Player);
-        for (int car = 0; car < TelemetryFrame.MaxCars; car++)
+        Span<RectangleF> cols = stackalloc RectangleF[5];
+        p.Arrange(v, "traffic.ladder", RectangleF.FromLTRB(area.X, area.Y, area.Right - 2 * d, area.Bottom), true, 0, LadderParts, stackalloc float[] { 24 * d, 56 * d, 0, 50 * d, 70 * d }, cols);
+        float statusLeft = Math.Abs(cols[2].Right - cols[3].X) < 0.5f ? cols[3].Right - 80 * d : cols[3].X;
+        float left = cols[1].X, right = cols[1].Right;
+        for (int i = 2; i < cols.Length; i++)
         {
-            if (!_motion.Visible(car, out _, out float a)) continue;
-            p.Dot(rx, mid - (float)Math.Clamp(_gap[car] / window, -1, 1) * half, 4.5f * d, Faded(ClassColor(p, f, car), a));
+            left = Math.Min(left, cols[i].X);
+            right = Math.Max(right, cols[i].Right);
         }
-
-        float left = area.X + 24 * d, right = area.Right - 2 * d;
         if (_motion.Live(TrafficMotion.You) && _motion.Visible(TrafficMotion.You, out float youY, out _))
         {
             p.Fill(new RectangleF(left, youY, right - left, h), p.P.SurfaceAlt, Round(p, 4));
             p.Fill(new RectangleF(left, youY, 3 * d, h), p.P.Player);
             var mine = f.Session.Player;
-            p.Pill(PillBox(left + 8 * d, youY, h, d), mine?.ClassLabel ?? "", p.ClassColor(f.Session, mine?.ClassId ?? 0), p.Font(11, true));
-            p.Text("You", p.Bold, p.P.Heading, RectangleF.FromLTRB(left + 56 * d, youY, right - 120 * d, youY + h));
+            p.Pill(PillBox(cols[1].X + 8 * d, youY, h, d), mine?.ClassLabel ?? "", p.ClassColor(f.Session, mine?.ClassId ?? 0), p.Font(11, true));
+            p.Text("You", p.Bold, p.P.Heading, RectangleF.FromLTRB(cols[2].X, youY, cols[2].Right, youY + h));
             if (_shown.Count == 0) p.Text(PooledText.Number("Clear for ", window, "0.#", Inv, Seconds), p.Small, p.P.Muted, RectangleF.FromLTRB(left, youY, right - 8 * d, youY + h), HAlign.Right);
         }
         for (int car = 0; car < TelemetryFrame.MaxCars; car++)
@@ -178,22 +180,34 @@ internal sealed class TrafficWidget : HudWidget
             if (!_motion.Visible(car, out float y, out float a)) continue;
             bool threat = _threat[car];
             if (threat) p.Fill(new RectangleF(left, y, right - left, h), Faded(HudPalette.Alpha(p.P.Warn, (int)Math.Round((0.1 + 0.12 * pulse) * 255)), a), Round(p, 4));
-            ClassPill(p, f, PillBox(left + 8 * d, y, h, d), car, a);
-            p.Text(NameOf(f, car), p.Body, Faded(p.P.Text, a), RectangleF.FromLTRB(left + 56 * d, y, right - 120 * d, y + h));
+            ClassPill(p, f, PillBox(cols[1].X + 8 * d, y, h, d), car, a);
+            p.Text(NameOf(f, car), p.Body, Faded(p.P.Text, a), RectangleF.FromLTRB(cols[2].X, y, cols[2].Right, y + h));
             string status = threat ? _meet[car] is { } t && t < MeetWithin ? PooledText.Number("in ", t, "0", Inv, Seconds) : "" : _closing[car] ? "catching" : "";
-            p.Text(status, p.Small, Faded(threat ? p.P.WarnText : p.P.Muted, a), RectangleF.FromLTRB(right - 150 * d, y, right - 70 * d, y + h), HAlign.Right);
-            p.Text(PooledText.Number(_gapText[car] > 0 ? "+" : "−", Math.Abs(_gapText[car]), "0.0", Inv), p.Bold, Faded(threat ? p.P.WarnText : p.P.Text, a), RectangleF.FromLTRB(right - 70 * d, y, right - 8 * d, y + h), HAlign.Right);
+            p.Text(status, p.Small, Faded(threat ? p.P.WarnText : p.P.Muted, a), RectangleF.FromLTRB(statusLeft, y, cols[3].Right, y + h), HAlign.Right);
+            p.Text(PooledText.Number(_gapText[car] > 0 ? "+" : "−", Math.Abs(_gapText[car]), "0.0", Inv), p.Bold, Faded(threat ? p.P.WarnText : p.P.Text, a), RectangleF.FromLTRB(cols[4].X, y, cols[4].Right - 8 * d, y + h), HAlign.Right);
+        }
+
+        float rx = cols[0].X + 8 * d, railTop = area.Y + 3 * d, railBottom = area.Bottom - 4 * d, mid = (railTop + railBottom) / 2, half = (railBottom - railTop) / 2;
+        p.Fill(new RectangleF(rx - 1, railTop, 2, railBottom - railTop), p.P.SurfaceAlt, Round(p, 1));
+        p.Dot(rx, mid, 5 * d, p.P.Player);
+        for (int car = 0; car < TelemetryFrame.MaxCars; car++)
+        {
+            if (!_motion.Visible(car, out _, out float a)) continue;
+            p.Dot(rx, mid - (float)Math.Clamp(_gap[car] / window, -1, 1) * half, 4.5f * d, Faded(ClassColor(p, f, car), a));
         }
     }
 
-    private void DrawTimeline(HudPainter p, TelemetryFrame f, RectangleF area, double window, double pulse)
+    private void DrawTimeline(HudPainter p, HudView v, TelemetryFrame f, RectangleF area, double window, double pulse)
     {
         float d = p.Density;
         foreach (var (car, _) in _shown) _motion.Show(car, 0);
         _motion.End();
 
         bool pills = area.Height >= 76 * d, scale = area.Height >= 97 * d, callout = area.Height >= 128 * d;
-        float ay = pills ? area.Y + 43 * d : area.Y + area.Height / 2, left = area.X + 18 * d, width = area.Width - 36 * d, labelY = ay + 48 * d;
+        Span<RectangleF> parts = stackalloc RectangleF[2];
+        p.Arrange(v, "traffic.timeline", area, false, 0, TimelineParts, stackalloc float[] { callout ? 101 * d : 0, callout ? 26 * d : -1 }, parts);
+        var axis = parts[0];
+        float ay = pills ? axis.Y + 43 * d : axis.Y + axis.Height / 2, left = area.X + 18 * d, width = area.Width - 36 * d, labelY = ay + 48 * d;
         var tiny = p.Tiny;
         float lh = p.LineHeight(tiny);
         p.Fill(new RectangleF(left, ay - 1, width, 2), p.P.SurfaceAlt, Round(p, 1));
@@ -225,7 +239,7 @@ internal sealed class TrafficWidget : HudWidget
 
         if (!callout) return;
         _urgent = PickUrgent(_urgent, _shown, _threats, _closings);
-        var box = new RectangleF(area.X + 4 * d, area.Y + 101 * d, area.Width - 8 * d, 26 * d);
+        var box = new RectangleF(area.X + 4 * d, parts[1].Y, area.Width - 8 * d, 26 * d);
         if (_shown.Count == 0)
         {
             p.Text(PooledText.Number("Clear for ", window, "0.#", Inv, BothWays), p.Small, p.P.Faint, box, HAlign.Center);

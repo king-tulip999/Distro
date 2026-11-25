@@ -350,24 +350,11 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private void BuildAppearance()
     {
-        var look = Section("Appearance", "settings.look", wide: !AppIdentity.IsTecnica);
-        if (!AppIdentity.IsTecnica)
-        {
-            var themeLabel = new TextBlock { Text = "Theme", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) };
-            Ui.Anchor(themeLabel, "settings.theme");
-            look.Children.Add(themeLabel);
-            look.Children.Add(new Border { Height = 8 });
-            var picker = new ThemePicker(U.Theme, _app.SetTheme, columns: 4, height: 46) { Margin = new Thickness(0, 0, -8, 3) };
-            var custom = new CustomThemeSection(_app);
-            Ui.Anchor(custom, "settings.customcolors");
-            look.Children.Add(ThemePreview.Beside(new StackPanel { Children = { picker, custom } }, Themes.For(U.Theme).Label));
-            look.Children.Add(Ui.Divider());
-        }
-        else
-        {
-            look.Children.Add(new CustomThemeSection(_app));
-            look.Children.Add(Ui.Divider());
-        }
+        var look = Section("Appearance", "settings.look");
+        var themeRow = Ui.SettingRow("Theme", null, AppThemeSource.Face(_app, Build));
+        Ui.Anchor(themeRow, "settings.theme");
+        look.Children.Add(themeRow);
+        look.Children.Add(Ui.Divider());
 
         string animationNote = SystemParameters.ClientAreaAnimation
             ? $"Page transitions, card entrances, spinning fan icons. Nothing animates while {AppIdentity.Name} is in the tray." + (PcClass.Weak ? " This PC gets a lighter version: 30 frames a second, no blur." : "")
@@ -382,10 +369,10 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         var section = Section("Performance", "settings.performance");
         var p = _app.Config.Performance;
         if (AppIdentity.IsTecnica) BuildSensorRate(section, p);
-        var lightRow = Ui.SettingRow("Lighter drawing while iRacing runs", null,
+        var lightRow = Ui.SettingRow("Lighter drawing while gaming", null,
             Ui.Switch(p.LightWhileRacing, v => { p.LightWhileRacing = v; _app.Save(); _app.WatchSim(); }),
             new Ui.SettingDefault(() => p.LightWhileRacing, () => { p.LightWhileRacing = true; _app.Save(); _app.WatchSim(); Build(); }, "On"),
-            $"{AppIdentity.Name}'s window draws without the graphics card the sim keeps busy, and its animations pause, so pages open quickly mid-race. Back to normal when iRacing closes.");
+            $"While a game fills the screen or iRacing is open, {AppIdentity.Name}'s window draws without the graphics card the game keeps busy, and its animations pause, so pages open quickly mid-game. Back to normal when you leave the game.");
         Ui.Anchor(lightRow, "settings.light");
         section.Children.Add(lightRow);
     }
@@ -932,7 +919,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         yield return ("accent-mint", () =>
         {
             _app.UseAccent(GlowAccent.Swatches.First(s => s.Name == "Mint").Hex);
-            _window.GoTo("settings", "settings.accent", flash: false);
+            _window.GoTo("settings", "settings.theme", flash: false);
             return Task.CompletedTask;
         });
         yield return ("accent-mint-main-page", () =>
@@ -946,11 +933,25 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             _window.Navigate("settings");
             return Task.CompletedTask;
         });
-        if (AppIdentity.IsTecnica) yield break;
+        yield return ("theme-window", () =>
+        {
+            var open = ThemeWindow.OpenOn(_window, new AppThemeSource(_app), Build);
+            return open.IsFaulted ? open : Task.CompletedTask;
+        });
+        yield return ("theme-window-search", () =>
+        {
+            ThemeWindow.Showing?.SearchFor("blue");
+            return Task.CompletedTask;
+        });
+        yield return ("theme-window-closed", () =>
+        {
+            _window.CloseModal(false);
+            return Task.CompletedTask;
+        });
         var theme = U.Theme;
         yield return ("custom-colors-grayed", () =>
         {
-            _window.GoTo("settings", "settings.customcolors", flash: false);
+            _window.GoTo("settings", "settings.theme", flash: false);
             return Task.CompletedTask;
         });
         yield return ("custom-colors-on", () =>
@@ -958,7 +959,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             U.OledCustom.Use(CustomPalette.Presets[0].Name);
             Themes.SetOledCustom(U.OledCustom);
             _app.SetTheme(AppTheme.Custom);
-            _window.GoTo("settings", "settings.customcolors", flash: false);
+            _window.GoTo("settings", "settings.theme", flash: false);
             return Task.CompletedTask;
         });
         yield return ("custom-colors-main-page", () =>
@@ -969,13 +970,13 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         yield return ("teams-on", () =>
         {
             _app.UsePick(ThemeSets.Teams, "Ferrari");
-            _window.GoTo("settings", "settings.customcolors", flash: false);
+            _window.GoTo("settings", "settings.theme", flash: false);
             return Task.CompletedTask;
         });
         yield return ("conditions-on", () =>
         {
             _app.UseOledColors("Night race");
-            _window.GoTo("settings", "settings.customcolors", flash: false);
+            _window.GoTo("settings", "settings.theme", flash: false);
             return Task.CompletedTask;
         });
         yield return ("custom-colors-back", () =>

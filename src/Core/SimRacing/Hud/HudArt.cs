@@ -8,7 +8,6 @@ internal static class HudArt
 {
     private const string Assets = "pack://application:,,,/Core;component/Assets/";
     private static readonly object Gate = new();
-    private static readonly Dictionary<string, Image?> Cars = new(StringComparer.OrdinalIgnoreCase);
 
     private static byte[]? Read(string path)
     {
@@ -21,38 +20,6 @@ internal static class HudArt
             return copy.ToArray();
         }
     }
-
-    public static Image? Car(string? car)
-    {
-        if (CarArt.KeyOf(car) is not { } key) return null;
-        lock (Gate)
-        {
-            if (_liveryVersion != LiveryPictures.Version)
-            {
-                foreach (var old in Cars.Values) old?.Dispose();
-                Cars.Clear();
-                _liveryVersion = LiveryPictures.Version;
-            }
-            if (Cars.TryGetValue(key, out var known)) return known;
-            Image? image = null;
-            try
-            {
-                if ((Painted(key) ?? Read($"Cars/{key}.png")) is { } bytes)
-                {
-                    using var stream = new MemoryStream(bytes);
-                    using var loaded = Image.FromStream(stream);
-                    image = new Bitmap(loaded);
-                }
-            }
-            catch (Exception ex) when (ex is IOException or ArgumentException or ExternalException or UriFormatException)
-            {
-                App.LogError(ex);
-            }
-            return Cars[key] = image;
-        }
-    }
-
-    private static int _liveryVersion;
 
     private static readonly Dictionary<string, Image?> Logos = new(StringComparer.OrdinalIgnoreCase);
 
@@ -78,12 +45,5 @@ internal static class HudArt
             }
             return Logos[brand] = image;
         }
-    }
-
-    private static byte[]? Painted(string key)
-    {
-        if (LiveryPictures.FileFor(key) is not { } file) return null;
-        try { return File.ReadAllBytes(file); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
     }
 }

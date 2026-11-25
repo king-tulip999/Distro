@@ -24,6 +24,12 @@ internal static class HudCatalog
             { MinW = 160, MinH = 50, DefaultHz = 10, Options = AlertsWidget.Options, Editor = Editors.AlertsEditor.Def, HideWhenEmpty = true },
         new("traffic", "Multiclass traffic", "Other classes within a few seconds, closing rates and when you'll meet.", 320, 160, () => new TrafficWidget())
             { MinW = 180, MinH = 70, DefaultHz = 30, Options = TrafficWidget.Options, Editor = Editors.TrafficEditor.Def, HideWhenEmpty = true },
+        new("headtohead", "Head to head", "The car right ahead and the car right behind once they're close: the gap, each sector and corner gained or lost, the trend and whether anyone catches before the flag. As duel rows, a ticker, corner bars, a track map, a battle line or a gap chart.", 520, 200, () => new HeadToHeadWidget())
+            { MinW = 240, MinH = 60, DefaultHz = 10, Options = HeadToHeadWidget.Options, Editor = Editors.HeadToHeadEditor.Def, HideWhenEmpty = true,
+              Limits = "iRacing doesn't send other cars' sector times, so Velocita times every car across iRacing's sector lines and 24 equal parts of the lap. A comparison shows once both cars have passed the same point, and laps through the pits are left out of the trend. In races the cars are the ones a place ahead and behind in your class; in other sessions, the nearest on track." },
+        new("coach", "Coach", "Coaching from your own laps: one call per turn on where your laps lose most against your best, with your pace and pedals; or a racing line map turning with the car, a side-by-side compare with your best at this spot, or a lap debrief. Optional brake beep.", 860, 200, () => new CoachWidget())
+            { MinW = 260, MinH = 110, DefaultHz = 20, Options = CoachWidget.Options, Editor = Editors.CoachEditor.Def, Natural = CoachWidget.Natural,
+              Limits = "Needs Session Stats and at least 3 clean recorded laps in this car and track; your best is your fastest time through each turn across your recent clean laps. Turns are counted from how sharply the track bends. Your own line while driving is worked out from your speed and direction, so it can drift a little over a lap. iRacing doesn't give track edges, so lines are only compared with your best lap's." },
         new("radar", "Car radar", "The cars around you from above: alongside in red from iRacing's spotter signal, ahead and behind in amber getting stronger as they close, with the distance to the nearest.", 140, 220, () => new RadarWidget())
             { FixedSize = true, MinW = 80, MinH = 110, DefaultHz = 30, Options = RadarWidget.Options, Editor = Editors.RadarEditor.Def, HideWhenEmpty = true,
               Limits = "iRacing doesn't publish where other cars are across the track, only which side is taken, so with a car on each side Velocita can't tell which is which. Car lengths are learned from your first few overlaps; until then ahead and behind show as lines." },
@@ -52,9 +58,6 @@ internal static class HudCatalog
         new("incidents", "Incident log", "Your incidents against the limit: as a budget bar with the latest ones, chips, a single line or a timeline of the race.", 400, 220, () => new IncidentsWidget())
             { MinW = 240, MinH = 90, DefaultHz = 10, Options = IncidentsWidget.Options, Editor = Editors.IncidentsEditor.Def,
               Limits = "Light contact gives no points, so iRacing doesn't report it. Incidents are named from their points; the log starts when the overlay first sees the session." },
-        new("result", "Race result", "Your finish once you take the checkered flag, as a card, a banner, a stamp or a lap chart: position and places gained, the car, iRating, incidents, awards, best and average lap, consistency and every lap's time.", 300, 448, () => new ResultWidget())
-            { MinW = 160, MinH = 120, DefaultHz = 30, Options = ResultWidget.Options, Editor = Editors.ResultEditor.Def, HideWhenEmpty = true, Natural = ResultWidget.Natural,
-              Limits = "The iRating change is an estimate from the field's ratings and your finish. Awards compare this race with the ones Session Stats has recorded, so they need Session Stats on." },
         new("inputs", "Inputs", "Throttle, brake, clutch and steering with gear, speed and RPM: a gear dial with pedal bars, a trace and an RPM bar, or the gear dial and trace alone, with extra fields to pick.", 436, 96, () => new InputsWidget())
             { MinW = 225, MinH = 50, DefaultHz = 30, Options = InputsWidget.Options, Editor = Editors.InputsEditor.Def, Natural = InputsWidget.Natural,
               Limits = "The shift point, limiter flash and RPM scale come from iRacing's figures for your car." },
@@ -63,6 +66,35 @@ internal static class HudCatalog
               Limits = "Shows up to three digits." },
         new("block", "Data block", "Any single value (live, session or calculated) as a number, bar or graph.", 170, 80, () => new BlockWidget())
             { FixedSize = true, MinW = 150, MinH = 72, DefaultHz = 10, Options = BlockWidget.Options, Editor = Editors.BlockEditor.Def },
+        new("pitbox", "Pit box helper", "Your pit stop from the lane to the exit: meters to your box against the speed limit, the lane with your box marked, or the stop counting down with each service and where you'll rejoin.", PitBoxWidget.W, PitBoxWidget.H, () => new PitBoxWidget())
+            { MinW = 220, MinH = 110, DefaultHz = 15, Options = PitBoxWidget.Options, Editor = Editors.PitBoxEditor.Def, HideWhenEmpty = true,
+              Limits = "Shows on pit road. iRacing doesn't publish how long a stop takes or how far along tire changes are, so the countdown follows the fuel going in at the rate it's measured, and repairs. The lane's ends are learned from where cars enter and leave pit road this session." },
+        new("cover", "Stream cover", "Covers the setup screen on stream while you're in the garage: a wordmark with session info, a hatched cover or a driver card.", StreamCoverWidget.W, StreamCoverWidget.H, () => new StreamCoverWidget())
+            { MinW = 200, MinH = 100, DefaultHz = 2, Options = StreamCoverWidget.Options, Editor = Editors.StreamCoverEditor.Def, HideWhenEmpty = true,
+              Limits = "Shows only while iRacing's garage screen is open." },
+        new("gforce", "G-force meter", "How hard you're cornering, braking and accelerating: a friction circle with a trail, bars with a trace, or this lap's peaks against your best lap.", GForceWidget.W, GForceWidget.H, () => new GForceWidget())
+            { MinW = 120, MinH = 100, DefaultHz = 30, Options = GForceWidget.Options, Editor = Editors.GForceEditor.Def },
+        new("spread", "Lap time spread", "Every car's recent pace on one chart: dots on a time axis with a row per class, a pace ranking, or how your class's lap times are spread.", LapSpreadWidget.W, LapSpreadWidget.H, () => new LapSpreadWidget())
+            { MinW = 260, MinH = 120, DefaultHz = 2, Options = LapSpreadWidget.Options, Editor = Editors.LapSpreadEditor.Def,
+              Limits = "Pace is the average of each car's recent clean laps as iRacing reports them; laps on pit road or under caution are left out, so a car shows after its first clean lap." },
+        new("hstandings", "Horizontal standings", "A thin position strip across the screen: the field as a ticker, the places around you, or one line per class.", TickerStandingsWidget.W, TickerStandingsWidget.H, () => new TickerStandingsWidget())
+            { MinW = 360, MinH = 28, DefaultHz = 5, Options = TickerStandingsWidget.Options, Editor = Editors.TickerStandingsEditor.Def,
+              Limits = "Closing and opening come from how the on-track gap changed over the last few seconds, shown per lap of yours." },
+        new("burn", "Fuel burn zones", "Where the fuel goes: the track colored by how much each stretch burns, the lap as a bar with a lift-and-coast tip, or fuel and time per gear.", BurnZonesWidget.W, BurnZonesWidget.H, () => new BurnZonesWidget())
+            { MinW = 180, MinH = 100, DefaultHz = 4, Options = BurnZonesWidget.Options, Editor = Editors.BurnZonesEditor.Def,
+              Limits = "Learned from your own clean laps in this session." },
+        new("ers", "Boost and ERS", "Hybrid battery, deploy and regen, push-to-pass and turbo boost, for the cars that have them: as a battery, a push-to-pass counter or a ring.", ErsWidget.W, ErsWidget.H, () => new ErsWidget())
+            { MinW = 140, MinH = 70, DefaultHz = 15, Options = ErsWidget.Options, Editor = Editors.ErsEditor.Def, HideWhenEmpty = true,
+              Limits = "Shows only what your car reports to iRacing." },
+        new("overtake", "Overtake alert", "A short, big warning when a car is about to pass you: a banner at the top, a glow down the screen edge, or a card with who's coming and when.", OvertakeWidget.W, OvertakeWidget.H, () => new OvertakeWidget())
+            { MinW = 60, MinH = 36, DefaultHz = 15, Options = OvertakeWidget.Options, Editor = Editors.OvertakeEditor.Def, HideWhenEmpty = true,
+              Limits = "Which side a car is on comes from iRacing's spotter signal, so it's known only once they're alongside. Gaps and closing speed come from iRacing's own time estimates; the corner they reach you in assumes they keep closing at the same rate." },
+        new("controls", "Car controls", "Your in-car adjustments (brake bias, traction control, ABS, maps and the rest): every control in a strip with the one you changed lit, the changed one alone in big digits, or a knob.", ControlsWidget.W, ControlsWidget.H, () => new ControlsWidget())
+            { MinW = 120, MinH = 50, DefaultHz = 10, Options = ControlsWidget.Options, Editor = Editors.ControlsEditor.Def, HideWhenEmpty = true,
+              Limits = "iRacing doesn't publish each control's range, so values show without their limits." },
+        new("rejoin", "Rejoin helper", "After a spin or going off: the cars coming, their time to you and when it's safe to go, as a countdown, a wait / go sign or a line of traffic.", RejoinWidget.W, RejoinWidget.H, () => new RejoinWidget())
+            { MinW = 200, MinH = 100, DefaultHz = 15, Options = RejoinWidget.Options, Editor = Editors.RejoinEditor.Def, HideWhenEmpty = true,
+              Limits = "Time to you comes from iRacing's own estimates. iRacing doesn't say which side of the track cars are on." },
     };
 
     private static readonly Dictionary<string, HudWidgetDef> ByKind = All.ToDictionary(d => d.Kind, StringComparer.OrdinalIgnoreCase);

@@ -772,8 +772,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, IHudEditor
             adminNote.Text = adminError
                 ?? (!installed ? "iRacing is running as administrator, so Windows keeps the VR layer out of it. Set it up once for iRacing as admin, then restart iRacing."
                     : !current ? "The VR layer for iRacing as admin is out of date. Update it, then restart iRacing."
-                    : "Set up for iRacing as admin.");
-            if (adminError is null && current) warn = false;
+                    : "Set up for iRacing as admin. Other VR games with anti-cheat may refuse to start until you remove it.");
             if (warn) adminNote.SetResourceReference(TextBlock.ForegroundProperty, "WarnDeep");
             else adminNote.ClearValue(TextBlock.ForegroundProperty);
             adminSetUp.Visibility = installed ? Visibility.Collapsed : Visibility.Visible;
@@ -808,7 +807,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, IHudEditor
         var headsets = Group("VR headsets", null,
             Ui.SettingRow("VR widgets", AppIdentity.SimHub
                 ? "Widgets set to show in VR appear in SteamVR and in iRacing through OpenXR, drawn by this plugin, not as SimHub overlays. Each widget's spot is on its page. Turn this on in only one of Velocita and Velocita for SimHub."
-                : "Widgets set to show in VR appear in SteamVR and in OpenXR games, iRacing included. Each widget's spot is on its page.", toggle),
+                : "Widgets set to show in VR appear in SteamVR and in iRacing through OpenXR. Each widget's spot is on its page.", toggle),
             Ui.SettingRow("Brightness", "Dims every VR widget, for night races. See-through parts stay the same.",
                 Ui.SliderWithValue(RaceHudSettings.MinVrBrightness, 100, S.VrBrightness, "{0:0}%", v => { S.VrBrightness = (int)v; changed(); Host()?.SettingsChanged(save: false); }, 190, 5)),
             status,
@@ -1063,64 +1062,12 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, IHudEditor
         };
     }
 
-    private const string PresetColors = "Preset";
-
     internal static IEnumerable<UIElement> LookRows(HudAppearance a, Action changed, Action rebuild, Func<string, string?, FrameworkElement, (Func<bool> Same, Action Reset, string Shown)?, UIElement> row)
     {
-        bool preset = HudThemes.Known(a.Colors) is not null;
-        string mode = preset ? PresetColors : a.Colors;
-        var modes = new[]
-        {
-            new Choice(HudAppearance.DefaultColors, "Default"),
-            new Choice(HudAppearance.AppColors, "Same as the app theme"),
-            new Choice(PresetColors, "Theme"),
-            new Choice(HudAppearance.CustomColors, "Custom"),
-        };
-        var pick = Ui.Combo(modes, mode, c =>
-        {
-            if (c.Id == PresetColors) a.Colors = HudThemes.Known(a.Colors) ?? HudThemes.Presets.First().Name;
-            else if (c.Id == HudAppearance.CustomColors)
-            {
-                if (a.Colors != HudAppearance.CustomColors) a.Custom = HudThemes.StartingColors(a);
-                a.Colors = HudAppearance.CustomColors;
-            }
-            else a.Colors = c.Id!;
-            changed();
-            rebuild();
-        }, 194);
-        yield return row("Colors", a.Colors == HudAppearance.AppColors ? "Applies to every widget. Follows the app theme." : "Applies to every widget.", pick,
+        if (AppServices.Current is not { } app) yield break;
+        var face = HudThemeSource.Face(app, a, () => { changed(); rebuild(); });
+        yield return row("Colors", a.Colors == HudAppearance.AppColors ? "Applies to every widget. Follows the app theme." : "Applies to every widget.", face,
             (() => a.Colors == HudAppearance.DefaultColors, () => a.Colors = HudAppearance.DefaultColors, "Default"));
-        if (preset)
-        {
-            var theme = new Button { Style = Ui.Res<Style>("MenuButton"), MinWidth = 194, HorizontalContentAlignment = HorizontalAlignment.Stretch };
-            void Face()
-            {
-                var name = TextFit.TipWhenTrimmed(new TextBlock { Text = a.Colors, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(6, 0, 0, 0) });
-                theme.Content = Ui.MenuFace(name, ThemeMenu.PresetSpec(a.Colors) is { } spec ? ThemeMenu.Dots(spec) : null);
-                System.Windows.Automation.AutomationProperties.SetName(theme, "Theme: " + a.Colors);
-            }
-            theme.Click += (_, _) => ThemeMenu.OpenPresetMenu(theme, a.Colors, name =>
-            {
-                a.Colors = name;
-                Face();
-                changed();
-            });
-            Face();
-            yield return row("Theme", null, theme, null);
-        }
-        if (a.Colors != HudAppearance.CustomColors) yield break;
-        var custom = a.Custom;
-        foreach (var (label, get, set) in new (string, Func<string>, Action<string>)[]
-        {
-            ("Panel", () => custom.Background, v => custom.Background = v),
-            ("Text", () => custom.Text, v => custom.Text = v),
-            ("Edges", () => custom.Edges, v => custom.Edges = v),
-            ("Accent", () => custom.Accent, v => custom.Accent = v),
-            ("Good", () => custom.Success, v => custom.Success = v),
-            ("Warning", () => custom.Warning, v => custom.Warning = v),
-            ("Danger", () => custom.Error, v => custom.Error = v),
-        })
-            yield return row(label, null, HexField(get, v => { set(v); changed(); }), null);
     }
 
     internal static StackPanel HexField(Func<string> get, Action<string> set)
@@ -1623,6 +1570,12 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, IHudEditor
         yield return ("hud-alerts", () => { SelectTab(AlertsTabIndex); return Task.CompletedTask; });
         yield return ("hud-fuel", () => { SelectTab(FuelTabIndex); return Task.CompletedTask; });
         yield return ("hud-settings", () => { SelectTab(SettingsTab); return Task.CompletedTask; });
+        yield return ("hud-theme-window", () =>
+        {
+            var open = ThemeWindow.OpenOn(_window, new HudThemeSource(_app, S.Appearance));
+            return open.IsFaulted ? open : Task.CompletedTask;
+        });
+        yield return ("hud-theme-window-closed", () => { _window.CloseModal(false); return Task.CompletedTask; });
         yield return ("hud-settings-back", () => { SelectTab(WidgetsTab); return Task.CompletedTask; });
         yield return ("hud-vr-settings", () => { ShowSettings(VrAnchor); return Task.CompletedTask; });
         yield return ("hud-vr-widget", async () => { SelectTab(WidgetsTab); await Task.Delay(300); _widgets?.ShowInVr("standings"); });

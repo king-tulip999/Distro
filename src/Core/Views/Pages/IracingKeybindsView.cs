@@ -82,6 +82,7 @@ internal sealed class KeybindsBoard : StackPanel, ISearchFilter
     private string? _find;
     private bool _quiet;
     private Clash? _clash;
+    private readonly string? _only;
 
     private sealed record Clash(HotkeyEntry Entry, HotkeyEntry Other, string Keys, string? Before);
 
@@ -92,10 +93,11 @@ internal sealed class KeybindsBoard : StackPanel, ISearchFilter
         if (_search.Text.Length > 0) _search.Text = "";
     }
 
-    public KeybindsBoard(AppServices app, Workspace ws)
+    public KeybindsBoard(AppServices app, Workspace ws, string? onlyGroup = null)
     {
         _app = app;
         _ws = ws;
+        _only = onlyGroup;
         _keys = app.IracingKeys;
         _search.TextChanged += (_, _) =>
         {
@@ -132,6 +134,14 @@ internal sealed class KeybindsBoard : StackPanel, ISearchFilter
         foreach (var part in new FrameworkElement[] { _summary, _filters, _rail, _pane, _search, _findBox }) Detach(part);
         _keys.Refresh();
         _entries = Load();
+        if (_only is not null)
+        {
+            Children.Add(CompactHeader());
+            if (_keys.File is null || _entries.Count == 0) return;
+            Children.Add(_pane);
+            Render();
+            return;
+        }
         Children.Add(Band());
         if (_keys.File is null || _entries.Count == 0) return;
         Children.Add(Toolbar());
@@ -186,9 +196,12 @@ internal sealed class KeybindsBoard : StackPanel, ISearchFilter
             Build();
             return;
         }
-        RenderSummary();
-        RenderFilters();
-        RenderRail();
+        if (_only is null)
+        {
+            RenderSummary();
+            RenderFilters();
+            RenderRail();
+        }
         RenderPane();
     }
 
@@ -244,6 +257,31 @@ internal sealed class KeybindsBoard : StackPanel, ISearchFilter
         edge.SetResourceReference(Border.BorderBrushProperty, "Line");
         edge.Margin = new Thickness(0, 9, 0, 9);
         return edge;
+    }
+
+    private FrameworkElement CompactHeader()
+    {
+        var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 4) };
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        var eyebrow = new TextBlock { Text = "Profile", Style = Ui.Res<Style>("Eyebrow"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+        Ui.AddInfo(eyebrow, IracingKeybindsView.ProfileExplained);
+        row.Children.Add(eyebrow);
+        row.Children.Add(ProfilePicker());
+        stack.Children.Add(row);
+        var state = new TextBlock
+        {
+            Text = _ws.SimRunning ? "iRacing is running: close it to change these keys. iRacing saves its own copy when it exits." : "Saved as you change them, the same keys as in the iRacing Controller",
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0),
+        };
+        if (_ws.SimRunning) state.SetResourceReference(TextBlock.ForegroundProperty, "ApricotDeep");
+        stack.Children.Add(state);
+        if (_keys.Error is { } error)
+        {
+            var note = new TextBlock { Text = error, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) };
+            note.SetResourceReference(TextBlock.ForegroundProperty, "ApricotDeep");
+            stack.Children.Add(note);
+        }
+        return stack;
     }
 
     private FrameworkElement ProfilePicker()
@@ -445,11 +483,11 @@ internal sealed class KeybindsBoard : StackPanel, ISearchFilter
         var stack = new StackPanel();
         if (!Filtering)
         {
-            string group = Current(Groups());
+            string group = _only ?? Current(Groups());
             var inside = _entries.Where(e => GroupOf(e) == group).ToList();
             var head = Head(stack);
             var title = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            title.Children.Add(new TextBlock { Text = group, Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
+            if (_only is null) title.Children.Add(new TextBlock { Text = group, Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
             title.Children.Add(new TextBlock { Text = $"{inside.Count(IsSet)} of {inside.Count} set", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center });
             var changed = inside.Where(Changed).ToList();
             if (changed.Count > 0)

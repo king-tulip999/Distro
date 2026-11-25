@@ -1345,7 +1345,9 @@ internal sealed class SetupManagerSection : StackPanel
     private void Export(SetupCar car, List<SetupNode> nodes)
     {
         bool pack = true;
-        string destination = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+        string destination = !string.IsNullOrWhiteSpace(S.ExportFolder) && Directory.Exists(S.ExportFolder)
+            ? S.ExportFolder
+            : Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
         var content = new StackPanel();
         var where = new TextBlock { Text = destination, Style = Ui.Res<Style>("Caption"), FontFamily = Ui.Res<FontFamily>("MonoFont"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
         var describe = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
@@ -1377,6 +1379,7 @@ internal sealed class SetupManagerSection : StackPanel
         {
             var (path, error) = _store.Export(nodes, destination, pack);
             if (error is not null) { _app.Notify("Nothing saved", error, NoticeKind.Warning); return false; }
+            if (!_store.Demo && !string.Equals(S.ExportFolder, destination, StringComparison.OrdinalIgnoreCase)) { S.ExportFolder = destination; Save(); }
             _app.Notify(pack ? "Share pack saved" : "Setups copied", path!, NoticeKind.Success);
             if (path is not null) OpenPath(pack ? $"/select,\"{path}\"" : $"\"{path}\"");
             return true;

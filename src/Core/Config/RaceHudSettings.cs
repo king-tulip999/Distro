@@ -172,7 +172,7 @@ public sealed class RaceHudSettings
 
     public static string SessionKind(string session) => string.Equals(session, "Warmup", StringComparison.OrdinalIgnoreCase) ? "Practice" : session;
 
-    public static readonly string[] RemovedKinds = { "blindspot", "spotter", "h2h", "pit", "flags", "dash", "trackmap", "radio", "spotterbox", "goals" };
+    public static readonly string[] RemovedKinds = { "blindspot", "spotter", "h2h", "pit", "flags", "dash", "trackmap", "radio", "spotterbox", "goals", "result" };
     public static readonly string[] RemovedAlerts = { "goal.done" };
 
     public string? ToggleHotkey { get; set; }

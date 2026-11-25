@@ -46,9 +46,14 @@ internal sealed class StatsStore : IDisposable
                 PRIMARY KEY(session_id, lap));
             CREATE TABLE IF NOT EXISTS imported(file TEXT PRIMARY KEY COLLATE NOCASE, hash TEXT NOT NULL, at INTEGER NOT NULL);
             CREATE INDEX IF NOT EXISTS imported_hash ON imported(hash);
+            CREATE TABLE IF NOT EXISTS race_events(
+                session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+                seq INTEGER NOT NULL, lap INTEGER NOT NULL, kind TEXT NOT NULL, time REAL NOT NULL, pct REAL, position INTEGER, position_before INTEGER,
+                other_number TEXT NOT NULL DEFAULT '', other_name TEXT NOT NULL DEFAULT '', points INTEGER, seconds REAL,
+                PRIMARY KEY(session_id, seq));
             """);
         _db.Run("INSERT OR IGNORE INTO meta(key, value) VALUES('version', ?1)", Version.ToString());
-        AddColumns("laps", "sectors TEXT", "flags INTEGER", "lap_incidents INTEGER", "run INTEGER", "setup TEXT");
+        AddColumns("laps", "sectors TEXT", "flags INTEGER", "lap_incidents INTEGER", "run INTEGER", "setup TEXT", "position INTEGER");
         AddColumns("sessions", "air_temp REAL", "wind_kph REAL", "wind_dir REAL", "humidity REAL", "pressure REAL", "air_density REAL", "skies INTEGER",
             "rain_max REAL", "wetness_max INTEGER", "rubber TEXT NOT NULL DEFAULT ''", "sim_start TEXT NOT NULL DEFAULT ''",
             "track_id INTEGER", "track_name TEXT NOT NULL DEFAULT ''", "tank_l REAL", "tyre_wear TEXT", "tier TEXT NOT NULL DEFAULT ''", "tier_pos INTEGER", "laps_led INTEGER", "field INTEGER",
@@ -387,9 +392,9 @@ internal sealed class StatsStore : IDisposable
     private void InsertLaps(long session, IReadOnlyList<LapRow> laps, int? offset, int? runOffset = null)
     {
         foreach (var l in laps)
-            _db.Run("INSERT OR REPLACE INTO laps(session_id, lap, time, clean, top_speed, fuel_used, full_throttle, brake, shifts, peak_lat_g, sectors, flags, lap_incidents, run, setup) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            _db.Run("INSERT OR REPLACE INTO laps(session_id, lap, time, clean, top_speed, fuel_used, full_throttle, brake, shifts, peak_lat_g, sectors, flags, lap_incidents, run, setup, position) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
                 session, l.Lap + (offset ?? 0), l.Time, l.Clean, l.TopSpeed, l.FuelUsed, l.FullThrottle, l.Brake, l.Shifts, l.PeakLatG, SectorText(l.Sectors),
-                (int)l.Flags, l.Incidents, l.Run is { } run ? run + (runOffset ?? 0) : null, l.Setup);
+                (int)l.Flags, l.Incidents, l.Run is { } run ? run + (runOffset ?? 0) : null, l.Setup, l.Position);
     }
 
     internal static string? SectorText(IReadOnlyList<double>? sectors) =>
@@ -557,9 +562,39 @@ internal sealed class StatsStore : IDisposable
     public SessionSummary? Session(long id) => _db.Query(SummarySql + " WHERE s.id = ?1", id) is { Count: > 0 } r ? Summary(r[0]) : null;
 
     public List<LapRow> Laps(long session) =>
-        _db.Query("SELECT lap, time, clean, top_speed, fuel_used, full_throttle, brake, shifts, peak_lat_g, sectors, flags, lap_incidents, run, setup FROM laps WHERE session_id = ?1 ORDER BY lap", session)
+        _db.Query("SELECT lap, time, clean, top_speed, fuel_used, full_throttle, brake, shifts, peak_lat_g, sectors, flags, lap_incidents, run, setup, position FROM laps WHERE session_id = ?1 ORDER BY lap", session)
             .Select(r => new LapRow(Convert.ToInt32(r[0]), Convert.ToDouble(r[1]), Convert.ToInt64(r[2]) != 0, D(r[3]), D(r[4]), D(r[5]), D(r[6]), Convert.ToInt32(r[7]), D(r[8]),
-                ParseSectors(r[9] as string), (LapFlags)(I(r[10]) ?? 0), I(r[11]), I(r[12]), r[13] as string)).ToList();
+                ParseSectors(r[9] as string), (LapFlags)(I(r[10]) ?? 0), I(r[11]), I(r[12]), r[13] as string, I(r[14]))).ToList();
+
+    public void SaveRaceEvents(long session, IReadOnlyList<SavedRaceEvent> events) =>
+        _db.Transaction(() =>
+        {
+            if (_db.Scalar("SELECT 1 FROM sessions WHERE id = ?1", session) is null) return;
+            _db.Run("DELETE FROM race_events WHERE session_id = ?1", session);
+            foreach (var e in events)
+                _db.Run("""
+                    INSERT OR REPLACE INTO race_events(session_id, seq, lap, kind, time, pct, position, position_before, other_number, other_name, points, seconds)
+                    VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                    """, session, e.Seq, e.Lap, e.Kind, e.Time, e.Pct, e.Position, e.PositionBefore, e.OtherNumber, e.OtherName, e.Points, e.Seconds);
+        });
+
+    public List<SavedRaceEvent> RaceEvents(long session) =>
+        _db.Query("SELECT seq, lap, kind, time, pct, position, position_before, other_number, other_name, points, seconds FROM race_events WHERE session_id = ?1 ORDER BY time, seq", session)
+            .Select(r => new SavedRaceEvent(Convert.ToInt32(r[0]), Convert.ToInt32(r[1]), r[2] as string ?? "", Convert.ToDouble(r[3]), D(r[4]), I(r[5]), I(r[6]),
+                r[7] as string ?? "", r[8] as string ?? "", I(r[9]), D(r[10]))).ToList();
+
+    public Dictionary<long, Dictionary<string, int>> RaceEventCounts(IEnumerable<long> sessions)
+    {
+        var result = new Dictionary<long, Dictionary<string, int>>();
+        foreach (var chunk in sessions.Distinct().Chunk(400))
+            foreach (var r in _db.Query($"SELECT session_id, kind, COUNT(*) FROM race_events WHERE session_id IN ({string.Join(",", chunk)}) GROUP BY session_id, kind"))
+            {
+                long id = (long)r[0]!;
+                if (!result.TryGetValue(id, out var kinds)) result[id] = kinds = new(StringComparer.Ordinal);
+                kinds[r[1] as string ?? ""] = Convert.ToInt32(r[2]);
+            }
+        return result;
+    }
 
     public SessionConditions? Conditions(long session)
     {

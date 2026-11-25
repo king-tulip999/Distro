@@ -489,17 +489,6 @@
     "kind": "action"
   },
   {
-    "title": "Cooling test",
-    "page": "fans",
-    "section": null,
-    "anchor": "fans.actions",
-    "tabs": [
-      "Fans"
-    ],
-    "where": "Fan Control \u203A Fans",
-    "kind": "action"
-  },
-  {
     "title": "Reset all",
     "page": "fans",
     "section": null,

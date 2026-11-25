@@ -217,6 +217,8 @@ internal sealed class IncidentsWidget : HudWidget
         p.G.Restore(clip);
     }
 
+    private static readonly string[] ChipsParts = { "newest", "older" };
+
     private void DrawChips(HudPainter p, HudView v)
     {
         float d = p.Density;
@@ -225,8 +227,12 @@ internal sealed class IncidentsWidget : HudWidget
         int count = v.Options.Int("count");
         float bigH = 40 * d, smallH = 28 * d, gap = 6 * d;
         p.NeedBelow(area, 6 * d + bigH + (count - 1) * (smallH + gap));
+        Span<RectangleF> boxes = stackalloc RectangleF[2];
+        p.Arrange(v, "incidents.chips", area, false, 0, ChipsParts, stackalloc float[] { 6 * d + bigH + gap, 0 }, boxes);
+        bool newestFirst = v.Options.Arranged("incidents.chips", ChipsParts)[0] == 0;
         float y = area.Y + 6 * d;
         if (list.Count == 0) { Empty(p, new RectangleF(area.X, y, area.Width, Math.Max(bigH, area.Bottom - y))); return; }
+        float olderBottom = newestFirst ? area.Bottom : boxes[1].Bottom;
         var nameBig = p.Font(14f, true);
         var whereFont = p.Font(13f, true);
         var clip = p.G.Save();
@@ -235,7 +241,9 @@ internal sealed class IncidentsWidget : HudWidget
         {
             bool first = n == 0;
             float h = first ? bigH : smallH;
-            if (y + h > area.Bottom + 1) break;
+            if (first) y = boxes[0].Y + 6 * d;
+            else if (n == 1) y = newestFirst ? boxes[0].Y + 6 * d + (bigH + gap) : boxes[1].Y;
+            if (y + h > (first ? area.Bottom : olderBottom) + 1) break;
             var e = list[i];
             var r = new RectangleF(area.X, y + Slide(p, v, e), area.Width, h);
             if (first) p.Fill(r, p.Solid(p.Raised(0.03)), p.Look.Corner > 0 ? 8 * d : 0);

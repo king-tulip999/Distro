@@ -26,6 +26,11 @@ internal static class Dates
 
     public static string ShortTime(DateTime t) => Short(t) + " · " + Time(t);
 
+    public static string DayTime(DateTime t) => Day(t) + " · " + Time(t);
+
+    public static string? SimTime(string text) =>
+        System.DateTime.TryParseExact(text, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var t) ? ShortTime(t) : null;
+
     public static string MonthYear(DateTime t) => t.ToString(C.DateTimeFormat.YearMonthPattern, C);
 
     public static bool TwelveHour => C.DateTimeFormat.ShortTimePattern.Contains('h');
@@ -33,6 +38,8 @@ internal static class Dates
     public static string Hour(int hour) => new DateTime(2000, 1, 1, hour % 24, 0, 0).ToString(TwelveHour ? "h tt" : "HH:mm", C);
 
     public static string HourLabel(int hour) => TwelveHour ? Hour(hour) : (hour % 24).ToString("00", C);
+
+    public static string Month(DateTime t) => t.ToString("MMM", C);
 
     public static string ShortMonthYear(DateTime t) => t.ToString(C.DateTimeFormat.YearMonthPattern.Replace("MMMM", "MMM"), C);
 }

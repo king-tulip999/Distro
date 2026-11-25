@@ -1,7 +1,10 @@
 using Core.Services;
 using Core.SessionStats;
+using Core.SimRacing.Race;
 using Core.Views;
 using Core.Views.Pages;
+using Core.Views.RaceEvents;
+using WinForms = System.Windows.Forms;
 
 namespace Core.Plugins.BuiltIn;
 
@@ -34,7 +37,32 @@ internal sealed class SessionStatsPlugin : Plugin
         new("Recent sessions", "Every session with its laps and sectors; open one to analyze laps: line, inputs, delta.", "Session Stats", PageKey, "stats.sessions", "sessions laps sectors lap analysis telemetry trace compare delta racing line optimal"),
         new("Lap traces", "How long lap telemetry is kept, the space it takes, delete all.", "Session Stats", PageKey, "stats.traces", "traces telemetry storage retention keep delete disk space ibt"),
         new("Telemetry files", "Record telemetry to disk (exact GPS lines), the .ibt folder's size, open it, clear files already read.", "Session Stats", PageKey, "stats.telemetry", "ibt telemetry folder record disk gps accurate line clear delete space size recycle"),
+        new("Race events", "Every pass, off track, incident and pit stop of the current session; click one to watch it in iRacing's replay. Can open when you leave the car.", "Session Stats", PageKey, "stats.raceevents", "race events replay passes overtakes off track incidents pit stops rivals standings lap times camera watch"),
     };
+
+    private const string RaceEventsConsumer = "Race events";
+    private RaceEventRecorder? _recorder;
+    private Action<SimRacing.Telemetry.TelemetryFrame>? _feed;
+    private DemoRaceEvents? _demoEvents;
+
+    public static IRaceEventsFeed? RaceEventsFeed(AppServices app)
+    {
+        if (app.Plugins.Find(PluginIds.SessionStats) is not SessionStatsPlugin { IsActive: true } plugin) return null;
+        if (app.Demo) return plugin._demoEvents ??= new DemoRaceEvents();
+        return plugin._recorder is { } recorder ? new LiveRaceEvents(recorder, External.Allowed) : null;
+    }
+
+    public override IEnumerable<PluginHotkey> Hotkeys(AppServices app)
+    {
+        var s = app.Config.SessionStats.RaceEvents;
+        yield return new PluginHotkey("stats.raceevents", "Open race events", () => s.Hotkey, hk => s.Hotkey = hk, () => RaceEventsWindow.Toggle(app), Page: PageKey);
+    }
+
+    public override void AddTrayItems(WinForms.ToolStripItemCollection items, AppServices app) =>
+        items.Add(new WinForms.ToolStripMenuItem("Race events", null, (_, _) => RaceEventsWindow.Open(app))
+        {
+            ShortcutKeyDisplayString = Core.Hotkeys.Hotkey.Display(app.Config.SessionStats.RaceEvents.Hotkey),
+        });
 
     public SessionStatsService? Service { get; private set; }
 
@@ -52,11 +80,31 @@ internal sealed class SessionStatsPlugin : Plugin
     {
         Service = new SessionStatsService(app);
         Service.Start();
+        if (app.Demo) return;
+        var recorder = _recorder = new RaceEventRecorder();
+        Service.RaceEvents = recorder.Snapshot;
+        var ui = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+        recorder.LeftCar += () => ui.BeginInvoke(() =>
+        {
+            if (app.Config.SessionStats.RaceEvents.OpenWhenLeavingCar && ReferenceEquals(_recorder, recorder)) RaceEventsWindow.Open(app, activate: false);
+        });
+        _feed = recorder.Feed;
+        app.Telemetry.AddObserver(_feed);
+        app.Telemetry.Acquire(RaceEventsConsumer);
     }
 
     protected override void OnStop(AppServices app)
     {
         Service?.Stop();
         Service = null;
+        RaceEventsWindow.Showing?.Close();
+        if (_feed is { } feed)
+        {
+            app.Telemetry.RemoveObserver(feed);
+            app.Telemetry.Release(RaceEventsConsumer);
+        }
+        _feed = null;
+        _recorder = null;
+        _demoEvents = null;
     }
 }

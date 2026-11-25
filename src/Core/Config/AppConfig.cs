@@ -259,10 +259,6 @@ public sealed class FanSettings
 
     public List<LegacyFanAssignment>? Fans { get; set; }
 
-    public CoolingTestResult? CoolingTest { get; set; }
-
-    public CoolingGoal CoolingGoal { get; set; } = CoolingGoal.Balanced;
-
     [System.Text.Json.Serialization.JsonIgnore]
     public FanPreset? Active => Presets.FirstOrDefault(p => p.Name == ActivePreset) ?? Presets.FirstOrDefault();
 

@@ -17,7 +17,8 @@ internal sealed class HudHost : IDisposable
     private const string Consumer = "iRacing Overlay";
 
     private readonly AppServices _app;
-    private readonly WinForms.Timer _timer = new();
+    private readonly HudPacer _timer = new();
+    private const int MaxHz = 60;
     private readonly Dictionary<string, Slot> _slots = new(StringComparer.OrdinalIgnoreCase);
     private sealed record Places(HudLayout? Layout, List<WidgetPlace> Items);
     private readonly List<Places> _undo = new(), _redo = new();
@@ -82,7 +83,7 @@ internal sealed class HudHost : IDisposable
         _webRenderer = AppIdentity.SimHub ? new HudWebRenderer { OnlyLayout = true, SampleWhenIdle = true, Shows = WebShows, SizeOf = SizeOf } : new HudWebRenderer { SizeOf = SizeOf };
         _vr = new HudVr(app);
         _vr.Changed += OnVrChanged;
-        _timer.Tick += (_, _) => SafeTick();
+        _timer.Tick += SafeTick;
         app.Telemetry.StatusChanged += OnStatusChanged;
         app.Telemetry.SimStarted += OnSimStarted;
         if (!app.Demo) app.Telemetry.AddObserver(LearnMap);
@@ -545,8 +546,7 @@ internal sealed class HudHost : IDisposable
             return;
         }
         fastest = Math.Max(fastest, PagePreviewHz);
-        int interval = fastest > 0 ? Math.Clamp(1000 / fastest, 16, 250) : 250;
-        if (_timer.Interval != interval) _timer.Interval = interval;
+        _timer.IntervalMs = fastest > 0 ? Math.Clamp(1000.0 / fastest, 1000.0 / MaxHz, 250) : 250;
         if (!_timer.Enabled) _timer.Start();
     }
 
@@ -670,7 +670,7 @@ internal sealed class HudHost : IDisposable
         else _vr.Hide(s.Config.Id);
         s.Dirty = false;
         s.LastSeq = frame.Sequence;
-        s.LastDraw = Stopwatch.GetTimestamp();
+        s.LastDraw = start;
         double ms = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
         s.DrawMs = s.DrawMs * 0.9 + ms * 0.1;
         s.Draws++;
@@ -1575,6 +1575,14 @@ internal sealed class HudHost : IDisposable
         copy.DrawImageUnscaled(_previewSurface.Bitmap!, 0, 0);
     }
 
+    public void RenderPreview(HudWidgetConfig config, RaceState race, HudPainter painter, float scale, ref Bitmap? bitmap, HudPalette palette)
+    {
+        var before = _tickPalette;
+        _tickPalette = palette;
+        try { RenderPreview(config, race, painter, scale, ref bitmap); }
+        finally { _tickPalette = before; }
+    }
+
     public void MeasurePreview(HudWidgetConfig config, RaceState race, HudPainter painter) => DrawAt(config, race, painter, 1f, new SizeF((float)config.W, (float)config.H));
 
     private void DrawAt(HudWidgetConfig config, RaceState race, HudPainter painter, float scale, SizeF layout)
@@ -1604,7 +1612,7 @@ internal sealed class HudHost : IDisposable
         painter.FinishPanels();
     }
 
-    private readonly record struct FitShape(bool Connected, SessionKind Kind, int Classes, int Cars, int Standings, int Player);
+    private readonly record struct FitShape(bool Connected, SessionKind Kind, int Classes, int Cars, int Standings, int Player, int Sectors);
 
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<RaceState, Dictionary<HudWidgetConfig, (int Hash, FitShape Shape, SizeF Size)>> _fits = new();
     private readonly HudPainter _fitPainter = new() { Overflow = new() };
@@ -1616,7 +1624,7 @@ internal sealed class HudHost : IDisposable
         var stored = new SizeF((float)Math.Max(1, config.W), (float)Math.Max(1, config.H));
         if (HudCatalog.Find(config.Kind) is not { } def || def.FixedSize) return stored;
         var f = race.Frame;
-        var shape = new FitShape(f.Status == SimStatus.Connected, f.SessionKind, f.Session.NumCarClasses, f.Session.ByCar.Count, race.LastStandingsCount, f.PlayerCarIdx);
+        var shape = new FitShape(f.Status == SimStatus.Connected, f.SessionKind, f.Session.NumCarClasses, f.Session.ByCar.Count, race.LastStandingsCount, f.PlayerCarIdx, f.Session.Sectors.Count);
         int hash = FitHash(config);
         var fits = _fits.GetOrCreateValue(race);
         bool known = fits.TryGetValue(config, out var had);

@@ -133,7 +133,13 @@ details.more>.adds,details.more>.f{margin-top:6px}
 .pv{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;flex:none}
 .pvh{display:flex;gap:6px;align-items:center;margin-bottom:8px}
 .pv>p{margin:0}.pv>.pvh+p{margin-top:-2px}.hn{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}.hn>p{margin:0 0 8px}.hn .pvh{margin:0}
-.pv img{width:100%;display:block;border-radius:8px;background:radial-gradient(circle at 50% 40%,#fff,#d9d5cf)}
+.pv img,#pvBig{width:100%;display:block;border-radius:8px;background:radial-gradient(circle at 50% 40%,#fff,#d9d5cf)}
+.pv img{cursor:zoom-in}
+#pv3d{width:100%;height:360px;display:block;border:none;border-radius:8px;background:radial-gradient(circle at 50% 42%,#f4f2ef,#c9c5bf)}
+.pvmode{display:flex;gap:4px;margin-bottom:8px}
+.pvmode button{flex:1;height:30px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-weight:600;cursor:pointer}
+.pvmode button.on{border-color:var(--accent);box-shadow:inset 2px 0 0 var(--accent);background:var(--sel)}
+#pvM{cursor:zoom-out}#pvBig{width:min(1016px,100%);max-height:calc(100dvh - 32px);object-fit:contain;border-radius:14px}
 .warn{grid-column:1/-1;background:var(--sel);border-radius:7px;padding:8px 10px;font-size:13px}
 .tl{list-style:none;padding:0;margin:8px 0 0;max-height:420px;overflow-y:auto;border:1px solid var(--line);border-radius:8px}
 .tl ul{list-style:none;padding:0;margin:0}
@@ -258,7 +264,10 @@ code{font-size:12.5px;overflow-wrap:anywhere;background:var(--bg);padding:1px 4p
  <div class="toast" id="toast" role="status"></div>
  <div class="pv hn hidden" id="repN" role="alert"><p>Your paint was replaced by another program, probably Trading Paints.</p><div class="pvh"><span style="flex:1"></span><button class="btn mini primary" id="repB">Put mine back</button></div></div>
  <div class="pv hidden" id="tpN"><div class="pvh"><b>Trading Paints is running</b><span style="flex:1"></span><button class="btn mini" id="tpX" aria-label="Hide">✕</button></div><p class="note">When you join a session it can replace this paint with your Trading Paints one. Turn off this paint on Trading Paints while you design here.</p></div>
- <div class="pv hidden" id="pv"><div class="pvh"><b>Car preview</b><span style="flex:1"></span><button class="btn mini" id="pvR">Refresh</button><button class="btn mini" id="pvX" aria-label="Close">✕</button></div><img id="pvImg" alt="Your car with this paint, drawn by iRacing" class="hidden"><p class="note" id="pvNote">Saving your paint…</p></div>
+ <div class="pv hidden" id="pv"><div class="pvh"><b>Car preview</b><span style="flex:1"></span><button class="btn mini hidden" id="pvE">Enlarge</button><button class="btn mini" id="pvR">Refresh</button><button class="btn mini" id="pvX" aria-label="Close">✕</button></div>
+<div class="pvmode hidden"><button data-pvmode="3d">3D</button><button data-pvmode="iracing" class="on">iRacing</button></div>
+<iframe id="pv3d" class="hidden" title="3D car preview"></iframe>
+<img id="pvImg" alt="Your car with this paint, drawn by iRacing" class="hidden"><p class="note hidden" id="pvNote">Saving your paint…</p></div>
  <div class="hud">
   <button class="btn" id="fitB" title="Fit the whole sheet on screen (0)">Fit</button>
   <button class="btn" id="rotB" title="Turn the sheet a quarter turn (R)">Rotate</button>
@@ -395,6 +404,7 @@ code{font-size:12.5px;overflow-wrap:anywhere;background:var(--bg);padding:1px 4p
  </div>
 </div>
 
+<div class="modal hidden" id="pvM" role="dialog" aria-modal="true" aria-label="Car preview"><img id="pvBig" alt="Your car with this paint, drawn by iRacing"></div>
 <div class="modal hidden" id="helpM" role="dialog" aria-modal="true" aria-labelledby="helpT">
  <div class="card">
   <h1 id="helpT">How it works</h1>
@@ -599,7 +609,11 @@ function loadPaint(id){
  return pcLoad[id];
 }
 function paintCan(L){if(L._live)return L._live;if(!L.src)return null;if(pcs[L.src])return pcs[L.src];if(assets[L.src])loadPaint(L.src);return null}
-async function ensurePaint(){await Promise.all([...doc.layers.filter(l=>l.type==='paint'&&l.src&&assets[l.src]).map(l=>loadPaint(l.src)),...doc.layers.filter(l=>l.mask&&assets[l.mask]).map(l=>loadPaint(l.mask))])}
+async function ensurePaint(){
+ const pics=doc.layers.filter(l=>l.type==='image'&&l.src).map(l=>{if(!imgs[l.src]&&assets[l.src])loadImg(l.src);return imgs[l.src]}).filter(Boolean);
+ await Promise.all([...doc.layers.filter(l=>l.type==='paint'&&l.src&&assets[l.src]).map(l=>loadPaint(l.src)),...doc.layers.filter(l=>l.mask&&assets[l.mask]).map(l=>loadPaint(l.mask)),...pics.map(im=>im.complete?null:im.decode().catch(()=>{}))]);
+ return doc.layers.every(l=>l.type==='image'?!!imgs[l.src]?.naturalWidth:l.type!=='paint'||!l.src||!!pcs[l.src])
+}
 let thumbing=false;
 function drawLayer(c,L,spec){
  if(L.type==='paint'){if(L.specOnly&&!spec&&!thumbing)return;const pc=paintCan(L);if(!pc)return;c.save();c.globalAlpha=L.opacity;c.drawImage(spec&&!L.specOnly?tinted(pc,specColor(L),L._live?null:'p'+L.src):pc,0,0,S,S);c.restore();return}
@@ -823,7 +837,7 @@ function drawNow(){
 let hist=[],hi=-1,storeT=null;
 const docData=()=>({S,base:doc.base,layers:doc.layers,fin:doc.fin,fonts:doc.fonts,clearBase:doc.clearBase,team:doc.team});
 const snap=()=>JSON.stringify(docData(),(k,v)=>k[0]==='_'?undefined:v);
-function commit(){hist=hist.slice(0,hi+1);hist.push(snap());if(hist.length>200)hist.shift();hi=hist.length-1;prune();store();ui();scheduleSync()}
+function commit(sync=true){hist=hist.slice(0,hi+1);hist.push(snap());if(hist.length>200)hist.shift();hi=hist.length-1;prune();store();ui();if(sync)scheduleSync()}
 function restore(s){
  const o=JSON.parse(s),ids=sels.map(l=>l.id);S=o.S;doc.base=o.base;doc.layers=o.layers;doc.fin=o.fin;doc.fonts=o.fonts||[];doc.clearBase=!!o.clearBase;if(o.team)doc.team=[...o.team];teamUI();
  nid=Math.max(nid,...doc.layers.map(l=>l.id+1),1);setSels(doc.layers.filter(l=>ids.includes(l.id)));
@@ -838,13 +852,13 @@ function prune(){
 function usedAssets(){const o={};for(const l of doc.layers){if((l.type==='image'||l.type==='paint')&&assets[l.src])o[l.src]=assets[l.src];if(l.mask&&assets[l.mask])o[l.mask]=assets[l.mask]}for(const f of doc.fonts)if(assets['font:'+f])o['font:'+f]=assets['font:'+f];return o}
 function store(){clearTimeout(storeT);storeT=setTimeout(()=>{const d={...JSON.parse(snap()),assets:usedAssets()};kv('project',d).catch(()=>{try{localStorage.setItem('liveryshop',JSON.stringify({...d,assets:{}}))}catch(e){}})},700)}
 function loadImg(id){const im=new Image();im.onload=()=>{draw();ui()};im.src=assets[id];imgs[id]=im}
-function loadProject(o){
+function loadProject(o,sync=true){
  if(!o||!Array.isArray(o.layers))throw new Error('Not a Livery Shop project');
  Object.assign(assets,o.assets||{});
  S=o.S||2048;doc.base=o.base||'#f2f2f2';doc.layers=o.layers.map(l=>Object.assign(base(l.type),l));doc.fin=o.fin||{fin:'gloss',fm:0,fr:40,fc:0};doc.fonts=[];doc.clearBase=!!o.clearBase;if(o.team)doc.team=[...o.team];teamUI();
  for(const id in o.assets||{}){if(id.startsWith('font:'))addFont(id.slice(5),o.assets[id]);else if(doc.layers.some(l=>l.type==='image'&&l.src===id))loadImg(id)}
  nid=Math.max(1,...doc.layers.map(l=>l.id+1));setSels([]);
- $('#baseC').value=C(doc.base);$('#sizeS').textContent=S+' × '+S;carUI();hist=[];hi=-1;commit();fit();
+ $('#baseC').value=C(doc.base);$('#sizeS').textContent=S+' × '+S;carUI();hist=[];hi=-1;commit(sync);fit();
 }
 
 /* ---------- UI ---------- */
@@ -977,7 +991,7 @@ document.addEventListener('click',e=>{
 
 /* team colors */
 function teamUI(){document.querySelectorAll('[data-t]').forEach(el=>{el.value=doc.team[+el.dataset.t]})}
-document.addEventListener('input',e=>{const t=e.target.dataset&&e.target.dataset.t;if(t==null||e.target.type!=='color')return;doc.team[+t]=e.target.value;teamUI();$('#baseC').value=C(doc.base);draw();thumbsSoon();if(!$('#wizard').classList.contains('hidden'))startersSoon()});
+document.addEventListener('input',e=>{const t=e.target.dataset&&e.target.dataset.t;if(t==null||e.target.type!=='color')return;doc.team[+t]=e.target.value;teamUI();$('#baseC').value=C(doc.base);draw();sync3d();thumbsSoon();if(!$('#wizard').classList.contains('hidden'))startersSoon()});
 document.addEventListener('change',e=>{const t=e.target.dataset&&e.target.dataset.t;if(t==null||e.target.type!=='color')return;commit()});
 let thT=null;function thumbsSoon(){clearTimeout(thT);thT=setTimeout(()=>{document.querySelectorAll('#layers li[data-id]').forEach(li=>{const L=doc.layers.find(l=>l.id==li.dataset.id);if(L)thumb(L,li.querySelector('canvas'))});colourChips();qbarUI()},150)}
 
@@ -1469,6 +1483,7 @@ async function useTemplate(f){
  try{
   const ext=f.name.split('.').pop().toLowerCase();
   const t=ext==='psd'?await readPSD(await f.arrayBuffer()):ext==='tga'?readTGA(await f.arrayBuffer()):await readImage(f);
+  if(ext!=='psd'&&t.layers.length===1)t.layers[0].name=f.name;
   tpl.layers=t.layers;tpl.fileName=f.name;$('#tplName').textContent='Loaded: '+f.name;tpl.show=true;tplOpen.clear();wzTplNote();$('#tplB').setAttribute('aria-pressed','true');
   if(t.w&&t.w!==S){setSize(t.w);commit()}
   fillSrc=null;tpl.spots=findSpots(t.layers);spotUI();toolNotes();
@@ -1484,7 +1499,7 @@ function tplGroups(){
 }
 function niceGroup(p){if(/turn off/i.test(p))return'Guides';const last=p.split(' / ').pop();if(/pattern/i.test(last))return'iRacing patterns';if(/spec/i.test(p)){const m=last.match(/metallic|roughness|clearcoat/i);return'Spec map: '+(m?m[0].toLowerCase():last)}return last.replace(/^Paintable Area$/i,'Paintable area')}
 function renderTplList(){
- const ul=$('#tplList');ul.classList.toggle('hidden',tpl.layers.length<2);
+ const ul=$('#tplList');ul.classList.toggle('hidden',!tpl.layers.length);
  $('#tplNote').textContent=tpl.layers.length?'Tick a layer to see it as a guide over your paint. Guides are never exported. "Add" copies a template layer into your paint so it does get exported. Press T to hide the overlay.':$('#tplNote').textContent;
  if(!tplOpen.size)tplOpen.add('__init__'),tplGroups().forEach(([p])=>{if(/turn off/i.test(p)||tplGroups().length===1)tplOpen.add(p)});
  ul.innerHTML=tplGroups().map(([p,items])=>{const on=items.filter(x=>x.l.on).length;return`<li class="grp"><details data-g="${esc(p)}" ${tplOpen.has(p)?'open':''}><summary><span>${esc(niceGroup(p))}</span><span class="cnt">${on?on+' shown · ':''}${items.length}</span></summary><ul>${items.map(({l,i,leaf})=>`<li><label><input type="checkbox" data-i="${i}" ${l.on?'checked':''}><span>${esc(leaf)}</span></label><button class="btn mini" data-use="${i}" title="Copy this layer into your paint so it gets exported">Add</button></li>`).join('')}</ul></details></li>`}).join('');
@@ -1494,7 +1509,7 @@ $('#tplList').addEventListener('click',e=>{const i=e.target.dataset&&e.target.da
 $('#tplList').addEventListener('change',e=>{const i=e.target.dataset.i;if(i==null)return;tpl.layers[i].on=e.target.checked;draw();renderTplList();toolNotes()});
 
 /* ---------- car settings ---------- */
-$('#baseC').addEventListener('input',e=>{doc.base=e.target.value;draw();colourChips()});
+$('#baseC').addEventListener('input',e=>{doc.base=e.target.value;draw();sync3d();colourChips()});
 $('#baseC').addEventListener('change',commit);
 function carUI(){
  const B=$('#baseFin');B.innerHTML=finUI(doc.fin,false).replace('>Finish<','>Base finish<');
@@ -1579,7 +1594,7 @@ const HOST=(window.chrome&&window.chrome.webview)||null;let hostInfo=null,hostSe
 function hostCall(msg,wait=60000){return new Promise(res=>{const id=++hostSeq;hostWait.set(id,res);HOST.postMessage({...msg,id});setTimeout(()=>{if(hostWait.has(id)){hostWait.delete(id);res({error:'Velocita didn\'t answer.'})}},wait)})}
 function b64(bytes){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]||'');r.readAsDataURL(new Blob([bytes]))})}
 function applyHost(m){
- hostInfo=m;document.querySelectorAll('.hostOnly').forEach(e=>e.classList.remove('hidden'));if($('#kind').value==='car'){$('#pv').classList.remove('hidden');requestPreview()}document.querySelectorAll('.webOnly').forEach(e=>e.classList.add('hidden'));
+ hostInfo=m;document.querySelectorAll('.hostOnly').forEach(e=>e.classList.remove('hidden'));if($('#kind').value==='car'){$('#pv').classList.remove('hidden');setPvMode(pvMode)}document.querySelectorAll('.webOnly').forEach(e=>e.classList.add('hidden'));
  let want='';try{want=JSON.parse(localStorage.getItem('liveryshop-opts')||'{}').carDir||''}catch(e){}
  const sel=$('#carDir'),cars=[...(m.cars||[])].sort((a,b)=>a.name.localeCompare(b.name));sel.innerHTML=cars.map(c=>`<option value="${esc(c.dir)}">${esc(c.name)}</option>`).join('');
  sel.value=cars.some(c=>c.dir===want)?want:(m.car||cars[0]?.dir||'');
@@ -1600,7 +1615,7 @@ async function hostSave(manual){
  if(!/^\d+$/.test(id)){syncUI(`<strong>Enter your iRacing ${$('#owner').value==='team'?'team':'customer'} ID in the Export tab to start saving.</strong>`);if(manual){showTab('export');$('#cust').focus()}return false}
  if(hostBusy){hostAgain=true;return false}hostBusy=true;
  try{
-  await document.fonts.ready;await ensurePaint();const f=fileNames(),bpp=$('#alpha32').checked||doc.clearBase?32:24;
+  await document.fonts.ready;if(!await ensurePaint()&&!manual)return false;const f=fileNames(),bpp=$('#alpha32').checked||doc.clearBase?32:24;
   const files=[{name:f.paint,data:await b64(tga(render('export'),bpp))}];if(f.spec)files.push({name:f.spec,data:await b64(tga(render('spec'),32))});
   const r=await hostCall({type:'save',kind:$('#kind').value,car:$('#carDir').value,files});
   if(r.error){syncUI('Couldn\'t save: '+esc(r.error));if(manual)toast('Couldn\'t save: '+r.error);return false}
@@ -1615,10 +1630,31 @@ async function requestPreview(){
  const f=fileNames();if($('#pvImg').classList.contains('hidden'))$('#pvNote').textContent='Asking iRacing to draw your car…';
  const r=await hostCall({type:'preview',car:$('#carDir').value,file:f.paint});
  if(r.error){$('#pvNote').textContent=r.error;return}
- const img=$('#pvImg');img.src=r.png;img.classList.remove('hidden');$('#pvNote').textContent='Drawn by iRacing from your saved paint. It updates each time your paint saves.';
+ const img=$('#pvImg');img.src=r.png;img.classList.remove('hidden');$('#pvE').classList.remove('hidden');if(!$('#pvM').classList.contains('hidden'))$('#pvBig').src=r.png;$('#pvNote').textContent='Drawn by iRacing from your saved paint. It updates each time your paint saves.';
 }
-async function openPreview(){if($('#kind').value!=='car'){toast('The preview works for car paints.');return}$('#pv').classList.remove('hidden');$('#pvNote').textContent='Saving your paint…';if(await hostSave(false))await requestPreview();else if(!/^\d+$/.test($('#cust').value.trim()))$('#pvNote').textContent='Enter your iRacing customer ID in the Export tab first.'}
+let pvMode='iracing';
+function pvColors(){const t=(doc&&doc.team)||[];return{base:C((doc&&doc.base)||'#f2f2f2'),accent:t[0]||'#c8371e',sec:t[1]||'#141210'}}
+function threeUrl(){const c=pvColors();return 'viewer.html?'+new URLSearchParams({car:$('#carDir').value||'Car',base:c.base,accent:c.accent,sec:c.sec})}
+let _3dt=0;function sync3d(){const f=$('#pv3d');if(f.style.display==='none'||!f.src)return;const n=Date.now();if(n-_3dt<400)return;_3dt=n;try{f.contentWindow.postMessage({type:'liveryColors',...pvColors()},'*')}catch(e){}}
+function setPvMode(mode){
+ pvMode=mode;
+document.querySelectorAll('[data-pvmode]').forEach(b=>b.classList.toggle('on',b.dataset.pvmode===mode));
+ const three=$('#pv3d'),img=$('#pvImg'),note=$('#pvNote');
+ if(mode==='3d'){
+  img.classList.add('hidden');$('#pvE').classList.add('hidden');note.classList.add('hidden');
+  three.style.display='block';if(!three.src)three.src=threeUrl();else sync3d();
+ }else{
+  three.style.display='none';note.classList.remove('hidden');
+  if($('#kind').value!=='car'){$('#pvNote').textContent='The preview works for car paints.';return}
+  $('#pvNote').textContent='Saving your paint…';
+  (async()=>{if(await hostSave(false))await requestPreview();else if(!/^\d+$/.test($('#cust').value.trim()))$('#pvNote').textContent='Enter your iRacing customer ID in the Export tab first.'})();
+ }
+}
+function openPreview(){if($('#kind').value!=='car'){toast('The preview works for car paints.');return}$('#pv').classList.remove('hidden');setPvMode(pvMode)}
+document.querySelectorAll('[data-pvmode]').forEach(b=>b.addEventListener('click',()=>setPvMode(b.dataset.pvmode)));
 $('#pvB').addEventListener('click',openPreview);$('#pvR').addEventListener('click',openPreview);$('#pvX').addEventListener('click',()=>$('#pv').classList.add('hidden'));
+function enlargePreview(){if($('#pvImg').classList.contains('hidden'))return;$('#pvBig').src=$('#pvImg').src;openModal('pvM')}
+$('#pvE').addEventListener('click',enlargePreview);$('#pvImg').addEventListener('click',enlargePreview);$('#pvM').addEventListener('click',()=>closeModal('pvM'));
 
 {const r=document.querySelector('aside.r'),col=document.createElement('div');col.className='rcol';r.replaceWith(col);col.append($('#repN'),$('#tpN'),$('#pv'),r)}
 /* ---------- live sync ---------- */
@@ -1652,7 +1688,7 @@ async function syncNow(manual){
  if(syncing){again=true;return}syncing=true;
  try{
   if(await dir.queryPermission({mode:'readwrite'})!=='granted'){$('#connB').textContent='Reconnect folder';syncUI('Press Reconnect folder to let Livery Shop save to iRacing again.');return}
-  await document.fonts.ready;await ensurePaint();const f=fileNames(),bpp=$('#alpha32').checked||doc.clearBase?32:24;
+  await document.fonts.ready;if(!await ensurePaint()&&!manual)return;const f=fileNames(),bpp=$('#alpha32').checked||doc.clearBase?32:24;
   await writeFile(f.paint,tga(render('export'),bpp));if(f.spec)await writeFile(f.spec,tga(render('spec'),32));
   const t=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});
   syncUI(folderMsg()+` <br>Last saved ${t}: <code>${esc(f.paint)}</code>${f.spec?` and <code>${esc(f.spec)}</code>`:''}.`);if(manual)toast('Saved to iRacing.');
@@ -1689,7 +1725,7 @@ function openModal(id){$('#'+id).classList.remove('hidden')}
 function closeModal(id){$('#'+id).classList.add('hidden')}
 document.querySelectorAll('.modal [data-close]').forEach(b=>b.addEventListener('click',()=>closeModal(b.closest('.modal').id)));
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m&&m.id!=='wizard')closeModal(m.id)}));
-addEventListener('keydown',e=>{if(e.key==='Escape')for(const id of['verM','helpM'])closeModal(id)},true);
+addEventListener('keydown',e=>{if(e.key==='Escape')for(const id of['verM','helpM','pvM'])closeModal(id)},true);
 $('#helpB').addEventListener('click',()=>openModal('helpM'));
 $('#tplPick').addEventListener('click',()=>$('#tplFile').click());
 $('#exportB2').addEventListener('click',()=>$('#exportB').click());
@@ -1824,8 +1860,8 @@ carUI();teamUI();setTool('select');showTab('layer');ui();
  let saved=null;try{saved=await kv('project')}catch(e){}
  if(!saved){try{saved=JSON.parse(localStorage.getItem('liveryshop')||'null')}catch(e){}}
  started=true;
- if(saved&&saved.layers&&saved.layers.length){try{loadProject(saved);return}catch(e){}}
- commit();draw();
+ if(saved&&saved.layers&&saved.layers.length){try{loadProject(saved,false);return}catch(e){}}
+ commit(false);draw();
  if(hostInfo?.sample){sampleDesign();return}
  let done=false;try{done=localStorage.getItem('liveryshop-setup')==='1'}catch(e){}
  if(!done)openWizard();

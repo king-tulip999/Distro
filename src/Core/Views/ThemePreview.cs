@@ -10,29 +10,21 @@ namespace Core.Views;
 
 internal static class ThemePreview
 {
-    private const double PreviewWidth = 290, SideBySideFrom = 640, Gap = 14;
+    internal sealed record SampleText(string Label, string Value, string Change, string Warning, string Setting, string[] Choices, (string Name, string Detail)[] Rows);
 
-    public static Grid Beside(FrameworkElement picker, string themeName)
+    internal static SampleText Sample => AppIdentity.IsTecnica
+        ? new("CPU temperature", "64 °C", "−3 °C", "High load", "Background usage", new[] { "Standard", "Reduced" }, new[] { ("Desk", "2560 × 1440"), ("TV", "3840 × 2160") })
+        : new("Last lap", "1:47.382", "−0.214", "Pit window", "Units", new[] { "Metric", "Imperial" }, new[] { ("Spa-Francorchamps", "2:17.884"), ("Monza", "1:47.382") });
+
+    public static FrameworkElement For(ThemeSpec spec, double width)
     {
-        var preview = Build(themeName);
-        var grid = new Grid
-        {
-            ColumnDefinitions = { new ColumnDefinition(), new ColumnDefinition { Width = new GridLength(0) } },
-            RowDefinitions = { new RowDefinition { Height = GridLength.Auto }, new RowDefinition { Height = GridLength.Auto } },
-        };
-        grid.Children.Add(picker);
-        grid.Children.Add(preview);
-        void Place(double width)
-        {
-            bool side = width >= SideBySideFrom;
-            grid.ColumnDefinitions[1].Width = side ? new GridLength(PreviewWidth + Gap) : new GridLength(0);
-            Grid.SetColumn(preview, side ? 1 : 0);
-            Grid.SetRow(preview, side ? 0 : 1);
-            preview.Margin = side ? new Thickness(Gap, 0, 0, 0) : new Thickness(0, 10, 0, 0);
-        }
-        Place(0);
-        grid.SizeChanged += (_, e) => { if (e.WidthChanged) Place(e.NewSize.Width); };
-        return grid;
+        var resources = ThemeManager.Build(spec);
+        using var scope = Ui.Scope(resources);
+        var tile = Build(spec.Label);
+        tile.Resources = resources;
+        tile.Width = width;
+        tile.Background = Ui.Res<Brush>("WindowBg");
+        return tile;
     }
 
     private static Tile Build(string themeName)
@@ -44,9 +36,9 @@ internal static class ThemePreview
         stack.Children.Add(top);
 
         var lap = new Grid { ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition(), new ColumnDefinition { Width = GridLength.Auto } } };
-        var lapLabel = new TextBlock { Text = "Last lap", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
-        var lapTime = new TextBlock { Text = "1:47.382", Style = Ui.Res<Style>("H2"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        var lapDelta = new TextBlock { Text = "−0.214", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("SageDeep"), VerticalAlignment = VerticalAlignment.Center };
+        var lapLabel = new TextBlock { Text = Sample.Label, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
+        var lapTime = new TextBlock { Text = Sample.Value, Style = Ui.Res<Style>("H2"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var lapDelta = new TextBlock { Text = Sample.Change, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("SageDeep"), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(lapTime, 1);
         Grid.SetColumn(lapDelta, 2);
         lap.Children.Add(lapLabel);
@@ -60,7 +52,7 @@ internal static class ThemePreview
         stack.Children.Add(buttons);
 
         var chips = new WrapPanel { Margin = new Thickness(0, 9, 0, 0) };
-        foreach (var (text, soft, deep) in new[] { ("Auto", "AccentSoft", "AccentText"), ("Connected", "SageSoft", "SageDeep"), ("Pit window", "WarnSoft", "WarnDeep"), ("Fan stopped", "DangerSoft", "DangerDeep") })
+        foreach (var (text, soft, deep) in new[] { ("Auto", "AccentSoft", "AccentText"), ("Connected", "SageSoft", "SageDeep"), (Sample.Warning, "WarnSoft", "WarnDeep"), ("Fan stopped", "DangerSoft", "DangerDeep") })
             chips.Children.Add(Ui.Chip(text, soft, deep));
         stack.Children.Add(chips);
 

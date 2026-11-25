@@ -252,10 +252,12 @@ internal sealed class IracingKeybinds
         ("Focus", "Replay cars"), ("CustSect", "Custom sector"), ("SplitsDelta", "Splits"),
     };
 
+    public const string ReplayGroup = "Replay and TV cameras";
+
     public static string GroupOf(string n) => n switch
     {
         _ when n.StartsWith("BlackBox") || n.StartsWith("DashBox") => "Black boxes",
-        _ when n.StartsWith("Rpy") || n.StartsWith("NextRpyCam") || n.StartsWith("PrevRpyCam") || n is "FocusNextCar" or "FocusPrevCar" or "FocusPlayerCar" => "Replay and TV cameras",
+        _ when n.StartsWith("Rpy") || n.StartsWith("NextRpyCam") || n.StartsWith("PrevRpyCam") || n is "FocusNextCar" or "FocusPrevCar" or "FocusPlayerCar" => ReplayGroup,
         _ when n.StartsWith("Cam") || n is "GroupCopy" or "GroupPaste" => "Camera tool",
         _ when n.StartsWith("DCam") || n.StartsWith("Look") || n is "NextDrivingCam" or "PrevDrivingCam" or "RecenterTiltAxis" or "RecenterHeadMountedDisplay" or "ToggleVirtualMirror" => "View",
         _ when n.StartsWith("TChat") || n.StartsWith("AutoChat") || n.StartsWith("VChat") => "Chat",

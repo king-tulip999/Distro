@@ -12,6 +12,7 @@ internal sealed record DriverEntry
     public long UserId { get; init; }
     public long TeamId { get; init; }
     public string CarNumber { get; init; } = "";
+    public int? CarNumberRaw { get; init; }
     public string CarName { get; init; } = "";
     public string CarShortName { get; init; } = "";
     public string CarPath { get; init; } = "";
@@ -188,6 +189,7 @@ internal sealed class SessionInfo
             UserId = (long)(SessionYaml.Num(d, "UserID") ?? 0),
             TeamId = (long)(SessionYaml.Num(d, "TeamID") ?? 0),
             CarNumber = SessionYaml.Str(d, "CarNumber") ?? "",
+            CarNumberRaw = SessionYaml.Int(d, "CarNumberRaw"),
             CarName = SessionYaml.Str(d, "CarScreenName") ?? "",
             CarShortName = SessionYaml.Str(d, "CarScreenNameShort") ?? SessionYaml.Str(d, "CarScreenName") ?? "",
             CarPath = SessionYaml.Str(d, "CarPath") ?? "",

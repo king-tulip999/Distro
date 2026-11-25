@@ -9,6 +9,8 @@ internal sealed class DemoTelemetry
     private const int Player = 12, Cars = 28, FirstLmp2 = 23;
     private const int TowedCar = 14;
     private const double TrainCycle = 600, TrainBehind = 0.065, TrainAhead = 0.02, TrainHeldShare = 0.4, DiceLaps = 0.006, DiceEvery = 27;
+    private const double PaceWave = 0.0015;
+    private const int PaceCorners = 3, MaxDemoLaps = 400;
     private const double GlueFrom = 0.15, GlueTo = 0.85, GlueBehind = 0.024, GlueClose = 0.01;
     private static readonly int[] Train = { 8, 27, 7, 26, 6, 25, 5, 24, 4, 23, 3, 2, 1 };
     private const double WarmUpSeconds = 6 * 110, WarmUpStep = 0.5, LineNear = 0.996, LineStep = 0.01;
@@ -132,12 +134,35 @@ internal sealed class DemoTelemetry
             double dice = DiceLaps * DiceShape(phase) * Math.Sin(2 * Math.PI * t / DiceEvery + inTrain * 1.9);
             return Math.Max(0, Dist(Player, t) + (car <= 8 ? 1 : 0) + Math.Floor(u) + TrainOffset(phase) + dice);
         }
-        double lap = LapTime(car);
-        double grid = -(car >= FirstLmp2 ? car - FirstLmp2 + 3 : car - 1) * 0.006;
-        double swing = 0.03 * Math.Sin(t / 40 + car * 1.7) + 0.008 * Math.Sin(t / 14 + car * 2.9);
+        var (laps, into, lap) = Place(car, Driven(car, t));
+        return laps + Shape(car, into / lap);
+    }
+
+    private static double Driven(int car, double t)
+    {
+        double grid = -(car >= FirstLmp2 ? car - FirstLmp2 + 3 : car - 1) * 0.006 * LapTime(car);
         double cycle = t + car * 97;
         double stopped = Math.Floor(cycle / PitEvery) * 40 + Math.Clamp(cycle % PitEvery, 0, 40) - Math.Clamp(car * 97 % PitEvery, 0, 40);
-        return Math.Max(0, (t - stopped) / lap + grid + swing);
+        return Math.Max(0, t - stopped + grid);
+    }
+
+    private static (int Laps, double Into, double Lap) Place(int car, double driven)
+    {
+        int laps = 0;
+        double into = driven;
+        while (true)
+        {
+            double lap = LapOf(car, laps + 1);
+            if (into < lap || laps >= MaxDemoLaps) return (laps, Math.Min(into, lap), lap);
+            into -= lap;
+            laps++;
+        }
+    }
+
+    private static double Shape(int car, double u)
+    {
+        double phase = car * 1.3, wave = PaceWave * (1 + 0.5 * Noise(car, 0));
+        return u + wave * (Math.Sin(2 * Math.PI * PaceCorners * u + phase) - Math.Sin(phase));
     }
 
     private double BestLap(int car, int laps)
@@ -293,7 +318,7 @@ internal sealed class DemoTelemetry
         f.LapCompleted = f.CarLapCompleted[Player];
         f.LapDistPct = ppct;
         f.LapDist = ppct * TrackKm * 1000;
-        f.LapCurrent = ppct * LapOf(Player, f.CarLapCompleted[Player] + 1);
+        f.LapCurrent = Place(Player, Driven(Player, raceT)).Into;
         f.LapLast = f.CarLastLap[Player] > 0 ? f.CarLastLap[Player] : null;
         f.LapBest = f.CarBestLap[Player] > 0 ? f.CarBestLap[Player] : null;
         f.DeltaBest = 0.35 * Math.Sin(ppct * 9) + 0.12;
@@ -320,12 +345,15 @@ internal sealed class DemoTelemetry
         f.Abs = 6;
         f.EngineMap = 1;
         f.LatAccel = 14 * Math.Sin(ppct * 2 * Math.PI * 7) * (1 - v / 90);
-        f.LongAccel = accel * 4;
+        f.LongAccel = Math.Clamp(accel * 4, -18, 9);
         f.YawRate = 0.3 * Math.Sin(ppct * 40);
         f.YawNorth = ppct * 2 * Math.PI;
         f.AbsActive = f.Brake > 0.85;
-        f.PushToPassCount = 150;
+        f.PushToPassCount = Math.Max(20, 150 - 3 * Math.Floor(Math.Max(0, t + 1500) / 60));
         f.PushToPassActive = (int)(t / 15) % 4 == 0 && f.Throttle > 0.95;
+        f.BatteryPct = Math.Clamp(0.6 + 0.12 * Math.Sin(ppct * 2 * Math.PI) - 0.03 * ((int)pd % 6), 0, 1);
+        f.MguKPower = f.OnPitRoad ? 0 : f.Brake > 0 ? -150000 * f.Brake : accel > 0 ? 120000 * f.Throttle : 0;
+        f.DeployMode = 3;
         f.Warnings = (f.OnPitRoad ? EngineWarnings.PitLimiter : EngineWarnings.None) | (oilHot ? EngineWarnings.OilTemp : EngineWarnings.None);
         f.PitFlags = PitServices.Fuel | PitServices.LeftFront | PitServices.RightFront | PitServices.LeftRear | PitServices.RightRear;
         f.PitFuel = 60;

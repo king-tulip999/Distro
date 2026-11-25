@@ -66,7 +66,11 @@ internal static class SimHubEngine
             App.LogError(e.Exception);
             e.SetObserved();
         };
-        AppDomain.CurrentDomain.UnhandledException += (_, e) => { if (e.ExceptionObject is Exception ex) App.LogError(ex); };
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            if (e.ExceptionObject is Exception ex) App.LogError(ex);
+            SimRacing.Hud.Vr.OpenXrLayer.UnregisterAfterCrash();
+        };
 
         PluginManager.DiscoverEarly();
         Controls.ClickGuard.Install();

@@ -115,6 +115,8 @@ internal static class SettingRows
             case HudOptionKind.Number:
                 double.TryParse(current, NumberStyles.Float, CultureInfo.InvariantCulture, out var num);
                 bool whole = o.Kind == HudOptionKind.Int;
+                if (o.Slider)
+                    return Row(label, o.Help, true, Ui.SliderWithValue(o.Min, o.Max, num, "{0:0}" + (o.Unit ?? ""), x => c.SetOne(s.Key, x.ToString(whole ? "0" : "0.###", CultureInfo.InvariantCulture)), 190, whole ? 1 : o.Step));
                 var box = new NumberBox(num, o.Unit ?? "", 52) { Minimum = o.Min, Maximum = o.Max, Step = whole ? 1 : o.Step, Decimals = whole ? 0 : o.Step < 0.1 ? 2 : o.Step < 1 ? 1 : 0 };
                 box.ValueChanged += x => c.SetOne(s.Key, x.ToString(whole ? "0" : "0.###", CultureInfo.InvariantCulture));
                 System.Windows.Automation.AutomationProperties.SetName(box, label);

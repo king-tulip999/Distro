@@ -92,6 +92,8 @@ internal static class OpenXrLayer
                 key.DeleteValue(ManifestPath, false);
                 key.SetValue(ManifestPath, 0, RegistryValueKind.DWord);
             }
+            RegisteredHere = true;
+            SetSignInCleanup(true);
             return null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
@@ -103,14 +105,92 @@ internal static class OpenXrLayer
     internal static bool IsLast(IReadOnlyList<string> names, string manifest) =>
         names.Count > 0 && string.Equals(names[^1], manifest, StringComparison.OrdinalIgnoreCase);
 
-    public static void Remove()
+    internal static bool WantRegistered(bool vrOn, bool iracingRunning) => vrOn && iracingRunning;
+
+    internal static bool MayUnregister(bool iracingRunning, bool claimedElsewhere) => !(iracingRunning && claimedElsewhere);
+
+    public static bool RegisteredHere { get; private set; }
+
+    public static bool LeftoverRemoved { get; private set; }
+
+    public static void Unregister(bool leftover = false)
     {
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(ImplicitKey, true);
-            if (key?.GetValue(ManifestPath) is not null) key.DeleteValue(ManifestPath, false);
+            if (key?.GetValue(ManifestPath) is not null)
+            {
+                key.DeleteValue(ManifestPath, false);
+                if (leftover) LeftoverRemoved = true;
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { }
+        SetSignInCleanup(false);
+        RegisteredHere = false;
+    }
+
+    public static void UnregisterAfterCrash()
+    {
+        try
+        {
+            if (RegisteredHere && !ClaimedElsewhere()) Unregister();
+        }
+        catch { }
+    }
+
+    public const string CleanupArg = "--openxr-cleanup";
+    private const string RunOnceKey = @"Software\Microsoft\Windows\CurrentVersion\RunOnce", RunOnceValue = "Velocita VR layer cleanup";
+    internal const int RunOnceMaxChars = 260;
+
+    internal static string? CleanupCommand(string? exe)
+    {
+        if (string.IsNullOrWhiteSpace(exe) || exe.Contains('"')) return null;
+        string command = $"\"{exe}\" {CleanupArg}";
+        return command.Length <= RunOnceMaxChars ? command : null;
+    }
+
+    private static void SetSignInCleanup(bool on)
+    {
+        try
+        {
+            if (on)
+            {
+                if (CleanupCommand(Environment.ProcessPath) is not { } command) return;
+                using var key = Registry.CurrentUser.CreateSubKey(RunOnceKey, true);
+                key.SetValue(RunOnceValue, command, RegistryValueKind.String);
+            }
+            else
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(RunOnceKey, true);
+                if (key?.GetValue(RunOnceValue) is not null) key.DeleteValue(RunOnceValue, false);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { }
+    }
+
+    public static bool RunCleanupStep(string[] args)
+    {
+        if (!args.Contains(CleanupArg, StringComparer.OrdinalIgnoreCase)) return false;
+        Unregister();
+        return true;
+    }
+
+    public static bool Registered
+    {
+        get
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(ImplicitKey);
+                return key?.GetValue(ManifestPath) is not null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { return false; }
+        }
+    }
+
+    public static void Remove()
+    {
+        Unregister();
         foreach (var file in new[] { Path.Combine(Folder, DllFile), ManifestPath })
         {
             try { if (File.Exists(file)) File.Delete(file); }

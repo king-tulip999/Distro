@@ -11,6 +11,8 @@
 #include <mutex>
 #include <vector>
 
+#pragma comment(lib, "advapi32.lib")
+
 typedef int32_t XrResult;
 typedef uint64_t XrVersion;
 typedef uint64_t XrSystemId;
@@ -388,6 +390,57 @@ namespace
         const wchar_t* name = wcsrchr(path, L'\\');
         name = name ? name + 1 : path;
         return _wcsnicmp(name, L"iRacingSim", 10) == 0;
+    }
+
+    const wchar_t* const ImplicitLayersKey = L"Software\\Khronos\\OpenXR\\1\\ApiLayers\\Implicit";
+
+    bool SameFile(const wchar_t* a, const wchar_t* b)
+    {
+        wchar_t fullA[MAX_PATH] = {}, fullB[MAX_PATH] = {};
+        DWORD lengthA = GetFullPathNameW(a, MAX_PATH, fullA, nullptr), lengthB = GetFullPathNameW(b, MAX_PATH, fullB, nullptr);
+        return lengthA > 0 && lengthA < MAX_PATH && lengthB > 0 && lengthB < MAX_PATH && _wcsicmp(fullA, fullB) == 0;
+    }
+
+    int RemoveOwnRegistration()
+    {
+        HMODULE self = nullptr;
+        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(&RemoveOwnRegistration), &self)) return -1;
+        wchar_t manifest[MAX_PATH] = {};
+        DWORD length = GetModuleFileNameW(self, manifest, MAX_PATH);
+        wchar_t* slash = length > 0 && length < MAX_PATH ? wcsrchr(manifest, L'\\') : nullptr;
+        if (!slash || size_t(slash - manifest) + 20 >= MAX_PATH) return -1;
+        wcscpy_s(slash + 1, MAX_PATH - size_t(slash + 1 - manifest), L"VelocitaXr.json");
+        HKEY key = nullptr;
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, ImplicitLayersKey, 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &key) != ERROR_SUCCESS) return 0;
+        int removed = 0;
+        for (DWORD index = 0;;)
+        {
+            wchar_t name[MAX_PATH + 1] = {};
+            DWORD nameLength = MAX_PATH;
+            LSTATUS status = RegEnumValueW(key, index, name, &nameLength, nullptr, nullptr, nullptr, nullptr);
+            if (status == ERROR_NO_MORE_ITEMS) break;
+            if (status == ERROR_SUCCESS && SameFile(name, manifest) && RegDeleteValueW(key, name) == ERROR_SUCCESS)
+            {
+                removed++;
+                continue;
+            }
+            index++;
+        }
+        RegCloseKey(key);
+        return removed;
+    }
+
+    void LeaveOtherProcess()
+    {
+        wchar_t path[MAX_PATH] = {};
+        GetModuleFileNameW(nullptr, path, MAX_PATH);
+        const wchar_t* name = wcsrchr(path, L'\\');
+        name = name ? name + 1 : path;
+        int removed = RemoveOwnRegistration();
+        Log("Loaded outside iRacing in %ls: %s", name,
+            removed > 0 ? "removed the layer's per-user registration so other games stop loading it"
+            : removed == 0 ? "no per-user registration to remove (the admin setup, if any, stays)"
+            : "couldn't find the layer's own file to remove its registration");
     }
 
     template <typename T>
@@ -941,6 +994,7 @@ extern "C" __declspec(dllexport) XrResult xrNegotiateLoaderApiLayerInterface(con
         || loaderInfo->minInterfaceVersion > XR_CURRENT_LOADER_API_LAYER_VERSION || loaderInfo->maxInterfaceVersion < XR_CURRENT_LOADER_API_LAYER_VERSION)
         return XR_ERROR_INITIALIZATION_FAILED;
     if (IsTargetProcess()) Log("Layer loaded by the OpenXR loader in iRacing");
+    else LeaveOtherProcess();
     request->layerInterfaceVersion = XR_CURRENT_LOADER_API_LAYER_VERSION;
     request->layerApiVersion = loaderInfo->maxApiVersion < ((uint64_t(1) << 48) | (uint64_t(1) << 32)) ? loaderInfo->maxApiVersion : ((uint64_t(1) << 48) | (uint64_t(1) << 32));
     request->getInstanceProcAddr = &Layer_xrGetInstanceProcAddr;

@@ -61,13 +61,13 @@ Two separate apps: take one or both. Neither needs the other.
 
 ### iRacing Overlay
 
-20 widgets: relative, standings, fuel and strategy, delta, radar, track map, inputs, tires, weather and more. Drag them around in the car with `Ctrl+Alt+E`, save layouts per car or track, add any widget to OBS as a browser source, or show them in your VR headset.
+32 widgets: relative, standings, head to head, fuel and strategy, delta, radar, track map, inputs, tires, weather, pit box and rejoin helpers, a G-force meter, a stream cover and more. Drag them around in the car with `Ctrl+Alt+E`, save layouts per car or track, add any widget to OBS as a browser source, or show them in your VR headset.
 
 | Feature | What it does |
 | --- | --- |
 | **Pit exit** | Where a stop right now would put you, learned per track and car |
 | **Strategy** | Fuel saving to skip a stop |
-| **Track notes** | Notes per corner, track limits and a race result card |
+| **Track notes** | Notes per corner and track limits |
 | **VR** | Any widget in your headset through SteamVR or OpenXR, fixed in the cockpit or following your head, placed per widget or matched to the monitor |
 | **Widget editor** | Click any part of a widget to change it, drag its parts and columns into your own order, and pick when it shows |
 | **Night mode** | Black widgets in one color for night racing, switched on at sunset in iRacing or by keybind |
@@ -142,7 +142,6 @@ Measured with all six apps running side by side in the same live iRacing session
 | **Placement settings** | Size, position, borders, a start delay and a keybind, with a picture of where the window lands |
 | **Performance Overlay** | FPS, 1% lows, temperatures and usage over your game, in whatever order you like |
 | **Fan Control** | Curves, per-fan limits, presets and a failsafe that hands the fans back to the BIOS if anything goes wrong |
-| **Cooling test** | Measures how much each fan group actually lowers your temperatures and suggests quiet, balanced or cool curves |
 
 <br>
 

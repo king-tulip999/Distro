@@ -16,6 +16,13 @@ internal sealed class MapWidget : HudWidget
         HudOption.Number("zoom", "Zoom", 1, 1, 8, 0.5, null, "1 shows the whole track; above that the map closes in on your car"),
         HudOption.Bool("rotate", "Turn with my car", false, "Your direction of travel points up"),
         HudOption.Bool("turns", "Turn numbers", true, "Numbers that would overlap are left out"),
+        HudOption.Number("trackWidth", "Track width", 100, 40, 400, 10, "%", "100 is the track's real width, drawn to scale"),
+        HudOption.Number("edgeWidth", "Border width", 1, 0, 10, 0.5, "px", "0 for no border"),
+        MapTrackLook.Look,
+        MapTrackLook.TrackColor,
+        MapTrackLook.EdgeColor,
+        HudOption.Bool("pitLane", "Pit lane", true, "Draw the pit lane next to the track"),
+        HudOption.Bool("startLine", "Start / finish line", true),
         HudOption.Choice("dotStyle", "Style", "dot", new HudChoice("dot", "Dot"), new HudChoice("pill", "Pill"), new HudChoice("circle", "Circle")),
         HudOption.Number("dotSize", "Dot size", 100, 50, 300, 10, "%"),
         HudOption.Number("myDotSize", "My dot size", 100, 50, 300, 10, "%", "Compared with the other dots"),
@@ -103,9 +110,11 @@ internal sealed class MapWidget : HudWidget
         if (v.Options.Bool("positions") && v.Options.Value("dotStyle") is not ("pill" or "circle")) dot = Math.Max(dot, LabelDot(p, v));
         Build(map);
         float mine = (dot + 2 * d) * (float)(v.Options.Number("myDotSize") / 100);
-        _view = View(p, v, map, area, Math.Max(dot, mine) + 2 * d);
-        var track = p.P.MapTrack ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.3);
-        var edge = p.P.MapEdge ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.55);
+        float widthScale = (float)(v.Options.Number("trackWidth") / 100);
+        float edgePx = (float)v.Options.Number("edgeWidth") * d;
+        float grow = Math.Max(0, widthScale - 1) * map.Width / 2;
+        _view = View(p, v, map, area, Math.Max(dot, mine) + 2 * d, edgePx, grow);
+        var (track, edge) = MapTrackLook.Colors(p, v.Options);
         var pitColor = p.P.MapPit ?? HudPalette.Mix(p.P.Surface, p.P.Text, 0.18);
         var g = p.G;
         g.SetClip(area);
@@ -114,11 +123,12 @@ internal sealed class MapWidget : HudWidget
         _toScreen.Rotate(_view.Angle * 180 / MathF.PI);
         _toScreen.Scale(_view.Scale, _view.Scale);
         _toScreen.Translate(-_view.Centre.X, -_view.Centre.Y);
-        DrawTrackDirect(p, map, track, edge, pitColor);
-        if (map.StartLine is { } sf)
+        DrawTrackDirect(p, map, new TrackLook(track, edge, pitColor, widthScale, edgePx, v.Options.Bool("pitLane")));
+        if (v.Options.Bool("startLine") && map.StartLine is { } sf)
         {
-            var a = _view.ToScreen(sf.A);
-            var b = _view.ToScreen(sf.B);
+            var (a, b) = StartLine(sf.A, sf.B, widthScale, edgePx / _view.Scale);
+            a = _view.ToScreen(a);
+            b = _view.ToScreen(b);
             p.Line(a.X, a.Y, b.X, b.Y, p.P.Heading, Math.Max(2, 3 * d));
         }
         if (v.Options.Bool("turns")) Turns(p, map, area);
@@ -127,28 +137,51 @@ internal sealed class MapWidget : HudWidget
         g.ResetClip();
     }
 
-    private void DrawTrackDirect(HudPainter p, TrackMap map, Color track, Color edge, Color pitColor)
+    private readonly record struct TrackLook(Color Track, Color Edge, Color Pit, float Width, float EdgePx, bool PitLane);
+
+    private void DrawTrackDirect(HudPainter p, TrackMap map, TrackLook look)
     {
         var g = p.G;
         _back.Reset();
         _back.Multiply(_toScreen);
         _back.Invert();
         g.MultiplyTransform(_toScreen);
-        DrawTrack(g, p, map, track, edge, pitColor);
+        DrawTrack(g, p, map, look);
         g.MultiplyTransform(_back);
     }
 
-    private void DrawTrack(Graphics g, HudPainter p, TrackMap map, Color track, Color edge, Color pitColor)
+    private void DrawTrack(Graphics g, HudPainter p, TrackMap map, TrackLook look)
     {
         float k = _view.Scale;
-        if (_pit is not null) g.FillPath(p.Brush(pitColor), _pit);
-        if (_pitLines is not null) g.DrawPath(p.Pen(pitColor, Math.Max(1, _pitWidth * k) / k), _pitLines);
-        if (_surface is not null)
+        float edge = look.EdgePx / k;
+        if (look.PitLane)
         {
-            g.FillPath(p.Brush(track), _surface);
-            g.DrawPath(p.Pen(edge, 1 / k), _surface);
+            if (_pit is not null) g.FillPath(p.Brush(look.Pit), _pit);
+            if (_pitLines is not null) g.DrawPath(p.Pen(look.Pit, Math.Max(1, _pitWidth * k) / k), _pitLines);
         }
-        else if (_centre is not null) g.DrawPath(p.Pen(track, Math.Max(2, map.Width * k) / k), _centre);
+        if (_surface is not null && look.Width >= 1)
+        {
+            float grow = (look.Width - 1) * map.Width;
+            if (edge > 0) g.DrawPath(p.Pen(look.Edge, grow + 2 * edge), _surface);
+            g.FillPath(p.Brush(look.Track), _surface);
+            if (grow > 0) g.DrawPath(p.Pen(look.Track, grow), _surface);
+        }
+        else if (_centre is not null)
+        {
+            float w = Math.Max(2 / k, map.Width * look.Width);
+            if (edge > 0) g.DrawPath(p.Pen(look.Edge, w + 2 * edge), _centre);
+            g.DrawPath(p.Pen(look.Track, w), _centre);
+        }
+    }
+
+    internal static (PointF A, PointF B) StartLine(PointF a, PointF b, float widthScale, float edge)
+    {
+        float dx = b.X - a.X, dy = b.Y - a.Y;
+        float len = MathF.Sqrt(dx * dx + dy * dy);
+        if (len <= 0) return (a, b);
+        float half = len * widthScale / 2 + edge;
+        float mx = (a.X + b.X) / 2, my = (a.Y + b.Y) / 2, ux = dx / len, uy = dy / len;
+        return (new PointF(mx - ux * half, my - uy * half), new PointF(mx + ux * half, my + uy * half));
     }
 
     public override void Dispose()
@@ -160,14 +193,16 @@ internal sealed class MapWidget : HudWidget
         _back.Dispose();
     }
 
-    private MapView View(HudPainter p, HudView v, TrackMap map, RectangleF area, float margin)
+    private MapView View(HudPainter p, HudView v, TrackMap map, RectangleF area, float margin, float edgePx, float grow)
     {
+        var extent = RectangleF.Inflate(_extent, grow, grow);
+        margin += edgePx;
         var f = v.Frame;
         bool turning = v.Options.Bool("rotate");
         float zoom = (float)v.Options.Number("zoom");
         var room = new SizeF(Math.Max(1, area.Width - margin * 2), Math.Max(1, area.Height - margin * 2));
-        float k = MapView.FitScale(_extent, room, turning) * zoom;
-        var middle = new PointF(_extent.X + _extent.Width / 2, _extent.Y + _extent.Height / 2);
+        float k = MapView.FitScale(extent, room, turning) * zoom;
+        var middle = new PointF(extent.X + extent.Width / 2, extent.Y + extent.Height / 2);
         int me = f.PlayerCarIdx;
         double pct = me >= 0 && me < TelemetryFrame.MaxCars ? f.CarLapDistPct[me] : -1;
         var centre = middle;

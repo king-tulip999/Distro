@@ -13,14 +13,17 @@ internal static class HudSheet
     public const string FramesArg = "--hud-frames";
     public const string SiteArg = "--hud-site";
     public const string SiteFramesArg = "--hud-site-frames";
+    public const string OnlyArg = "--hud-sheet-only";
 
-    public static void RunSite(App app, string folder, bool frames = false)
+    public static readonly string[] StyledKinds = { "pitbox", "cover", "gforce", "spread", "hstandings", "burn", "ers", "overtake", "controls", "rejoin" };
+
+    public static void RunSite(App app, string folder, bool frames = false, string? only = null)
     {
         Running = true;
         try
         {
             Directory.CreateDirectory(folder);
-            RenderSite(folder, frames);
+            RenderSite(folder, frames, only?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
         }
         catch (Exception ex)
         {
@@ -81,7 +84,7 @@ internal static class HudSheet
     private static readonly HashSet<string> Searched = new(StringComparer.OrdinalIgnoreCase) { "tyres", "incidents", "alerts", "laps", "notes", "events" };
     private static readonly Dictionary<string, double> SiteSpeeds = new(StringComparer.OrdinalIgnoreCase) { ["block"] = 1, ["incidents"] = 60, ["notes"] = 10, ["laps"] = 80 };
 
-    private static void RenderSite(string folder, bool frames)
+    private static void RenderSite(string folder, bool frames, string[]? only = null)
     {
         static (string, string)[] O(params (string, string)[] o) => o;
         const double Ahead = 0, Cross = Math.PI / 2, Behind = Math.PI;
@@ -155,10 +158,16 @@ internal static class HudSheet
             new("alerts", "Headline", O(), At: 1500, Fit: true),
             new("alerts", "Stripe stack", O(("style", "stripes")), At: 1500, Fit: true),
             new("alerts", "Race log", O(("style", "log")), At: 1500, Fit: true),
-            new("result", "Card", O()),
-            new("result", "Banner", O(("look", "banner")), Fit: true),
-            new("result", "Stamp", O(("look", "stamp")), Fit: true),
-            new("result", "Lap story", O(("look", "story")), Fit: true),
+            new("headtohead", "Duel rows", O(("style", "rows")), Fit: true),
+            new("headtohead", "Ticker", O(("style", "ticker")), Fit: true),
+            new("headtohead", "Corner bars", O(("style", "corners")), Fit: true),
+            new("headtohead", "Track map", O(("style", "map")), Fit: true),
+            new("headtohead", "Battle line", O(("style", "battle")), Fit: true),
+            new("headtohead", "Gap chart", O(("style", "trend")), Fit: true),
+            new("coach", "Turn calls", O(("style", "strip"))),
+            new("coach", "Racing line", O(("style", "line"))),
+            new("coach", "Compare with my best", O(("style", "compare"))),
+            new("coach", "Lap debrief", O(("style", "debrief"))),
             new("inputs", "Gear dial", O()),
             new("inputs", "Gear dial with extra fields", O(("extras", "position,lapNumber,fuelPct,last,best,air")), Fit: true),
             new("inputs", "Trace only", O(("style", "bare"))),
@@ -204,6 +213,9 @@ internal static class HudSheet
         shots.Add(new SiteShot("relative", "Class-colored rows and outlines", O(("classRows", "true"), ("classBorder", "true"))));
         shots.Add(new SiteShot("standings", "Car logos and class outlines", O(("columns", "cpos,logo,badge,num,name,pit,change,last,int,gap"), ("classBorder", "true")), W: 540, H: 520));
         shots.Add(new SiteShot("standings", "Class-colored rows, one list", O(("group", "false"), ("classRows", "true"), ("classBorder", "true")), H: 330));
+        foreach (var kind in StyledKinds)
+            foreach (var choice in HudCatalog.Find(kind)!.Option("style")!.Choices)
+                shots.Add(new SiteShot(kind, choice.Label, O(("style", choice.Id)), Fit: true));
 
         var json = new System.Text.StringBuilder("[");
         var races = new Dictionary<double, SiteRace>();
@@ -211,6 +223,7 @@ internal static class HudSheet
         int n = 0;
         foreach (var shot in shots)
         {
+            if (only is not null && !only.Contains(shot.Kind, StringComparer.OrdinalIgnoreCase)) { n++; continue; }
             if (!races.TryGetValue(shot.At, out var site))
             {
                 site = new SiteRace();
@@ -290,7 +303,7 @@ internal static class HudSheet
             var pixels = new Size((int)Math.Ceiling(size.Width * SiteScale), (int)Math.Ceiling(size.Height * SiteScale));
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             var saved = new List<string>();
-            double seconds = def.Kind == "result" ? 4 : SiteClipSeconds;
+            double seconds = SiteClipSeconds;
             for (int i = 0; i < seconds * fps; i++)
             {
                 site.Run(start + i * speed / fps);
@@ -438,13 +451,14 @@ internal static class HudSheet
 
     public static bool Running { get; private set; }
 
-    public static void Run(App app, string folder, bool frames = false)
+    public static void Run(App app, string folder, bool frames = false, string? only = null)
     {
         Running = true;
         try
         {
             Directory.CreateDirectory(folder);
             if (frames) RenderFrames(folder);
+            else if (only is not null) Render(folder, only.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
             else
             {
                 Render(folder);
@@ -458,7 +472,7 @@ internal static class HudSheet
         app.Shutdown();
     }
 
-    private static void Render(string folder)
+    private static void Render(string folder, string[]? only = null)
     {
         var settings = new RaceHudSettings();
         double simNow = -1500;
@@ -478,10 +492,52 @@ internal static class HudSheet
         demo.Fill(frame, 0.25);
         frame.Sequence = ++seq;
         race.Update(frame);
+        using var painter = new HudPainter();
+        void SaveStyles(HudWidgetDef def, string dir, HudPalette palette)
+        {
+            if (def.Option("style") is not { } style) return;
+            foreach (var choice in style.Choices)
+            {
+                var config = new HudWidgetConfig { Id = "styles-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H, Options = { ["style"] = choice.Id } };
+                var size = new SizeF((float)def.W, (float)def.H);
+                using (var fit = new HudPainter { Overflow = new() })
+                using (var probe = new Core.Overlay.DibSurface())
+                {
+                    var pg = probe.Ensure(new Size((int)Math.Ceiling(def.W), 2400));
+                    fit.Simulated = true;
+                    fit.IsPreview = true;
+                    fit.Begin(pg, 1, new SizeF((float)def.W, 2400), palette, settings.Appearance);
+                    def.Create().Paint(fit, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = new HudOptions(def, config), Def = def });
+                    fit.FinishPanels();
+                    if (fit.Needed is { } need) size = new SizeF(Math.Max(need.Width, fit.MinWidth), need.Height);
+                }
+                foreach (var (suffix, w, h) in new[] { ("", size.Width, size.Height), ("-min", (float)def.MinW, (float)def.MinH) })
+                {
+                    using var surface = new Core.Overlay.DibSurface();
+                    var g = surface.Ensure(new Size((int)Math.Round(w * 2), (int)Math.Round(h * 2)));
+                    painter.Simulated = true;
+                    painter.IsPreview = true;
+                    painter.Begin(g, 2, new SizeF(w, h), palette, settings.Appearance);
+                    def.Create().Paint(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = new HudOptions(def, config), Def = def });
+                    painter.FinishPanels();
+                    painter.End(surface.Dc, surface.Size);
+                    surface.Bitmap!.Save(Path.Combine(dir, def.Kind + "-" + choice.Id + suffix + ".png"));
+                }
+            }
+        }
+
         if (race.Incidents.Count < 4)
             foreach (var (at, lap, sector, points) in new[] { (380.2, 3, 1, 1), (742.6, 6, 2, 2), (1105.9, 9, 0, 4), (1310.4, 11, 2, 1) })
                 race.AddIncident(new IncidentRecord(at, lap, sector, points, 0));
-        using var painter = new HudPainter();
+        if (only is not null)
+        {
+            var palette = HudPalette.Of(settings.Appearance);
+            string dir = Path.Combine(folder, "Default");
+            Directory.CreateDirectory(dir);
+            foreach (var kind in only)
+                if (HudCatalog.Find(kind) is { } def) SaveStyles(def, dir, palette);
+            return;
+        }
         foreach (var tint in Enum.GetValues<HudNightColor>())
         {
             string dir = Path.Combine(folder, "Night-" + tint);
@@ -539,9 +595,6 @@ internal static class HudSheet
 
             foreach (var (kind, file, options) in new[]
             {
-                ("result", "result-banner", new[] { ("look", "banner") }),
-                ("result", "result-stamp", new[] { ("look", "stamp") }),
-                ("result", "result-story", new[] { ("look", "story") }),
                 ("tyres", "tyres-bars", new[] { ("look", "bars") }),
                 ("tyres", "tyres-strip", new[] { ("look", "strip") }),
                 ("laps", "laps-trend", new[] { ("look", "trend") }),
@@ -566,6 +619,14 @@ internal static class HudSheet
             Save(map, map.W, map.H, Path.Combine(dir, "map-dots.png"), 1, ("dotSize", "200"), ("myDotSize", "150"), ("dotText", "number"), ("lapColors", "true"));
             Save(map, map.W, map.H, Path.Combine(dir, "map-pill.png"), 1, ("dotStyle", "pill"), ("dotSize", "150"), ("dotText", "number"));
             Save(map, map.W, map.H, Path.Combine(dir, "map-circle.png"), 1, ("dotStyle", "circle"), ("dotSize", "150"), ("dotText", "number"));
+            Save(map, map.W, map.H, Path.Combine(dir, "map-track-black.png"), 1, ("trackWidth", "250"), ("edgeWidth", "3"), ("trackLook", "blackWhite"));
+            Save(map, map.W, map.H, Path.Combine(dir, "map-track-thin.png"), 1, ("trackWidth", "50"), ("edgeWidth", "2"), ("pitLane", "false"));
+            Save(map, map.W, map.H, Path.Combine(dir, "map-track-zoom.png"), 1, ("zoom", "3"), ("trackWidth", "200"), ("edgeWidth", "4"), ("trackLook", "blackWhite"), ("startLine", "false"));
+            Save(map, map.W, map.H, Path.Combine(dir, "map-track-white.png"), 1, ("trackWidth", "200"), ("edgeWidth", "2"), ("trackLook", "whiteBlack"));
+            var flatLook = HudCatalog.Find("flatmap")!;
+            foreach (var style in new[] { "strip", "around", "lanes", "profile", "bar" })
+                Save(flatLook, flatLook.W, flatLook.H, Path.Combine(dir, "flatmap-track-" + style + ".png"), 1, ("style", style), ("trackWidth", "200"), ("edgeWidth", "2"), ("trackLook", "blackWhite"));
+            Save(flatLook, flatLook.W, flatLook.H, Path.Combine(dir, "flatmap-track-upright.png"), 1, ("style", "bar"), ("upright", "true"), ("trackWidth", "250"), ("edgeWidth", "2"), ("trackLook", "blackWhite"));
             var flat = HudCatalog.Find("flatmap")!;
             foreach (var (file, options) in new[]
             {
@@ -583,6 +644,32 @@ internal static class HudSheet
                 Save(flat, size.Width, size.Height, Path.Combine(dir, file + ".png"), 1, options);
             }
             Save(flat, 64, 250, Path.Combine(dir, "flatmap-upright.png"), 1, ("style", "bar"), ("upright", "true"));
+            var duel = HudCatalog.Find("headtohead")!;
+            foreach (var style in new[] { "rows", "ticker", "corners", "map", "battle", "trend" })
+                foreach (var (suffix, cars) in new[] { ("", "both"), ("-ahead", "ahead"), ("-behind", "behind") })
+                {
+                    var options = new[] { ("style", style), ("cars", cars) };
+                    var size = Asked(duel, options);
+                    Save(duel, size.Width, size.Height, Path.Combine(dir, "headtohead-" + style + suffix + ".png"), 1, options);
+                }
+            var coach = HudCatalog.Find("coach")!;
+            foreach (var (file, options) in new (string, (string, string)[])[]
+            {
+                ("coach-strip", new[] { ("style", "strip") }),
+                ("coach-strip-lean", new[] { ("style", "strip"), ("pace", "false"), ("pedals", "false"), ("result", "false") }),
+                ("coach-line", new[] { ("style", "line") }),
+                ("coach-line-north", new[] { ("style", "line"), ("direction", "north"), ("legend", "false") }),
+                ("coach-compare", new[] { ("style", "compare") }),
+                ("coach-compare-three", new[] { ("style", "compare"), ("rows", "brake,line,slowest") }),
+                ("coach-debrief", new[] { ("style", "debrief") }),
+                ("coach-debrief-list", new[] { ("style", "debrief"), ("map", "false") }),
+            })
+            {
+                var config = new HudWidgetConfig { Id = file, Kind = "coach" };
+                foreach (var (k, value) in options) config.Options[k] = value;
+                var size = coach.Natural!(new HudOptions(coach, config));
+                Save(coach, size.Width, size.Height, Path.Combine(dir, file + ".png"), 1, options);
+            }
             var traffic = HudCatalog.Find("traffic")!;
             foreach (var style in new[] { "ladder", "timeline" })
             {
@@ -690,6 +777,8 @@ internal static class HudSheet
                 }
                 return new SizeF(width, MathF.Ceiling(hi));
             }
+
+            foreach (var kind in StyledKinds) SaveStyles(HudCatalog.Find(kind)!, dir, palette);
 
             foreach (var kind in new[] { "relative", "standings", "fuel" })
                 Save(HudCatalog.Find(kind)!, HudCatalog.Find(kind)!.W, HudCatalog.Find(kind)!.H, Path.Combine(dir, kind + "@150.png"), 1.5f);

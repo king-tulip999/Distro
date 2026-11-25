@@ -59,7 +59,7 @@ internal static partial class IracingPaint
         return (null, null);
     }
 
-    public static string Save(string kind, string? car, IReadOnlyList<(string Name, byte[] Bytes)> files)
+    public static string Save(string kind, string? car, IReadOnlyList<(string Name, byte[] Bytes)> files, WrittenPaints written, string keptFolder)
     {
         if (Folder is not { } paint) throw new InvalidOperationException("iRacing's Documents folder wasn't found. Is iRacing installed?");
         string folder = paint;
@@ -74,10 +74,27 @@ internal static partial class IracingPaint
             if (!IsPaintFile(name)) throw new InvalidOperationException($"“{name}” isn't an iRacing paint file name.");
             if (kind != "car" && name.StartsWith("car", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Car paints go in a car's folder.");
             string path = Path.Combine(folder, name), temp = path + ".tmp";
+            if (written.NeedsKeeping(path, ReadExisting(path), bytes)) Keep(path, Path.Combine(keptFolder, Path.GetFileName(folder)));
             File.WriteAllBytes(temp, bytes);
             File.Move(temp, path, overwrite: true);
+            written.Record(path, bytes);
         }
+        written.Store();
         return folder;
+    }
+
+    private static byte[]? ReadExisting(string path) => File.Exists(path) ? File.ReadAllBytes(path) : null;
+
+    private static void Keep(string path, string keptFolder)
+    {
+        RecycleBin.Send(new[] { path });
+        if (!File.Exists(path)) return;
+        Directory.CreateDirectory(keptFolder);
+        string name = Path.GetFileNameWithoutExtension(path), extension = Path.GetExtension(path);
+        string target = Path.Combine(keptFolder, name + extension);
+        for (int n = 2; File.Exists(target); n++)
+            target = Path.Combine(keptFolder, $"{name} ({n.ToString(CultureInfo.InvariantCulture)}){extension}");
+        File.Copy(path, target);
     }
 
     public static bool ReloadInSim()

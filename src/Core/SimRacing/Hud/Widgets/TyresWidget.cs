@@ -13,7 +13,10 @@ internal sealed class TyresWidget : HudWidget
     private const float HeaderRoom = 27, RingsW = 280, RingsBody = 141, BarsW = 280, BarsBody = 175, StripW = 344, StripBody = 59;
     private static readonly string[] Names = { "LF", "RF", "LR", "RR" };
     private static readonly string[] WearSample = { "100%" }, PressureSample = { "888.8" };
+    private static readonly string[] RingParts = { "ring", "side" }, RingSideParts = { "head", "temps" }, BarParts = { "meta", "bars" }, StripParts = { "top", "stripe", "line" };
     private readonly double?[] _temps = new double?[3], _tread = new double?[3];
+
+    private static RectangleF Moved(RectangleF r, float dx, float dy) => new(r.X + dx, r.Y + dy, r.Width, r.Height);
 
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
@@ -111,16 +114,30 @@ internal sealed class TyresWidget : HudWidget
         int low = v.Options.Int("low"), high = v.Options.Int("high");
         bool pressure = v.Options.Bool("pressure"), temps = v.Options.Bool("temps"), wearOn = v.Options.Bool("wear");
         var unitFont = p.Font(8f, false);
+        var firstInner = new RectangleF(area.X, area.Y, tw, th).Inflated(-5 * d, -5 * d);
+        float s = Math.Min(Math.Min(firstInner.Height, 52 * d), firstInner.Width * 0.42f);
+        float headH = p.LineHeight(p.SmallBold), pillH = p.LineHeight(p.Label) + 4 * d, between = 5 * d;
+        float used = headH + (temps ? between + pillH : 0);
+        Span<RectangleF> rowBoxes = stackalloc RectangleF[2];
+        Span<RectangleF> sideBoxes = stackalloc RectangleF[2];
+        Span<float> rowSizes = stackalloc float[2];
+        Span<float> sideSizes = stackalloc float[2];
+        rowSizes[0] = s;
+        p.Arrange(v, "tyres.rings", firstInner, true, 7 * d, RingParts, rowSizes, rowBoxes);
+        var firstSide = rowBoxes[1];
+        sideSizes[0] = headH;
+        sideSizes[1] = temps ? pillH : -1;
+        p.Arrange(v, "tyres.rings.side", new RectangleF(firstSide.X, firstSide.Y + (firstSide.Height - used) / 2, firstSide.Width, used), false, between, RingSideParts, sideSizes, sideBoxes);
         for (int i = 0; i < 4; i++)
         {
-            var box = new RectangleF(area.X + i % 2 * (tw + gapX), area.Y + i / 2 * (th + gapY), tw, th);
+            float dx = i % 2 * (tw + gapX), dy = i / 2 * (th + gapY);
+            var box = new RectangleF(area.X + dx, area.Y + dy, tw, th);
             p.Tile(box);
-            var inner = box.Inflated(-5 * d, -5 * d);
             Fill(f, i);
             double? wear = wearOn ? Lowest(_tread[0], _tread[1], _tread[2]) : null;
 
-            float s = Math.Min(Math.Min(inner.Height, 52 * d), inner.Width * 0.42f);
-            var ring = new RectangleF(inner.X, inner.Y + (inner.Height - s) / 2, s, s);
+            var ringBox = Moved(rowBoxes[0], dx, dy);
+            var ring = new RectangleF(ringBox.X, ringBox.Y + (ringBox.Height - s) / 2, s, s);
             float stroke = Math.Max(3, s * 0.08f);
             var arc = ring.Inflated(-stroke / 2 - 1, -stroke / 2 - 1);
             bool drawRing = s >= 24 * d;
@@ -139,15 +156,11 @@ internal sealed class TyresWidget : HudWidget
                 p.Text(PressureUnit(v.Units), unitFont, p.P.Faint, new RectangleF(ring.X, y0 + nh - 3, ring.Width, uh), HAlign.Center, VAlign.Center, false);
             }
 
-            float sideX = ring.Right + 7 * d;
-            var side = new RectangleF(sideX, inner.Y, Math.Max(0, inner.Right - sideX), inner.Height);
-            float headH = p.LineHeight(p.SmallBold), pillH = p.LineHeight(p.Label) + 4 * d, between = 5 * d;
-            float used = headH + (temps ? between + pillH : 0);
-            var head = new RectangleF(side.X, side.Y + (side.Height - used) / 2, side.Width, headH);
+            var head = Moved(sideBoxes[0], dx, dy);
             p.Text(Names[i], p.SmallBold, p.P.AccentText, head, HAlign.Left, VAlign.Center, false);
             if (wearOn) p.Number(WearText(wear), p.SmallBold, wear is { } ww ? WearColor(p, ww) : p.P.Faint, head, HAlign.Right, VAlign.Center);
             if (!temps) continue;
-            var row = new RectangleF(side.X, head.Bottom + between, side.Width, pillH);
+            var row = Moved(sideBoxes[1], dx, dy);
             float gap = 3 * d, cw = (row.Width - gap * 2) / 3;
             for (int k = 0; k < 3; k++)
             {
@@ -167,15 +180,17 @@ internal sealed class TyresWidget : HudWidget
         float metaW = Math.Max(p.Measure(WearSample[0], p.Bold), p.Measure(PressureSample[0], p.Small)) + 2;
         float headH = p.LineHeight(p.SmallBold), wearH = p.LineHeight(p.Bold), lineH = p.LineHeight(p.Small);
         var track = HudPalette.Alpha(p.P.LineStrong, 120);
+        Span<RectangleF> parts = stackalloc RectangleF[2];
+        p.Arrange(v, "tyres.bars", new RectangleF(area.X, area.Y, tw, th).Inflated(-6 * d, -5 * d), true, 7 * d, BarParts, stackalloc float[] { metaW, 0 }, parts);
         for (int i = 0; i < 4; i++)
         {
-            var box = new RectangleF(area.X + i % 2 * (tw + gapX), area.Y + i / 2 * (th + gapY), tw, th);
+            float dx = i % 2 * (tw + gapX), dy = i / 2 * (th + gapY);
+            var box = new RectangleF(area.X + dx, area.Y + dy, tw, th);
             p.Tile(box);
-            var inner = box.Inflated(-6 * d, -5 * d);
             Fill(f, i);
             double? wear = wearOn ? Lowest(_tread[0], _tread[1], _tread[2]) : null;
 
-            var meta = new RectangleF(inner.X, inner.Y, metaW, inner.Height);
+            var meta = Moved(parts[0], dx, dy);
             p.Text(Names[i], p.SmallBold, p.P.AccentText, new RectangleF(meta.X, meta.Y, meta.Width, headH), HAlign.Left, VAlign.Center, false);
             if (wearOn) p.Number(WearText(wear), p.Bold, wear is { } ww ? WearColor(p, ww) : p.P.Faint, new RectangleF(meta.X, meta.Y + headH, meta.Width, wearH), HAlign.Left, VAlign.Center);
             float unitH = p.LineHeight(p.Label), room = meta.Height - headH - wearH;
@@ -187,8 +202,7 @@ internal sealed class TyresWidget : HudWidget
                 if (unit) p.Text(PressureUnit(v.Units), p.Label, p.P.Faint, new RectangleF(meta.X, meta.Bottom - unitH * 0.9f, meta.Width, unitH), HAlign.Left, VAlign.Center, false);
             }
 
-            float barsX = meta.Right + 7 * d;
-            var bars = new RectangleF(barsX, inner.Y, Math.Max(0, inner.Right - barsX), inner.Height);
+            var bars = Moved(parts[1], dx, dy);
             float gap = 3 * d, cw = (bars.Width - gap * 2) / 3, radius = p.CornerRadius(3);
             float textH = p.LineHeight(p.Label) + 4 * d;
             for (int k = 0; k < 3; k++)
@@ -215,28 +229,30 @@ internal sealed class TyresWidget : HudWidget
         float topH = p.LineHeight(p.Bold), stripeH = 6 * d, lineH = p.LineHeight(p.Small), between = 4 * d;
         float used = topH + (temps ? between + stripeH : 0) + (pressure || temps ? between + lineH : 0);
         float y = area.Y + Math.Max(0, (area.Height - used) / 2);
+        var firstInner = new RectangleF(area.X, area.Y, cw, area.Height).Inflated(-7 * d, 0);
+        Span<RectangleF> parts = stackalloc RectangleF[3];
+        p.Arrange(v, "tyres.strip", new RectangleF(firstInner.X, y, firstInner.Width, used), false, between, StripParts,
+            stackalloc float[] { topH, temps ? stripeH : -1, pressure || temps ? lineH : -1 }, parts);
         for (int i = 0; i < 4; i++)
         {
-            var col = new RectangleF(area.X + i * cw, area.Y, cw, area.Height);
+            float dx = i * cw;
+            var col = new RectangleF(area.X + dx, area.Y, cw, area.Height);
             if (i > 0) p.Divider(col.X, area.Y + 2 * d, area.Bottom - 2 * d);
-            var inner = col.Inflated(-7 * d, 0);
             Fill(f, i);
             double? wear = wearOn ? Lowest(_tread[0], _tread[1], _tread[2]) : null;
 
-            var top = new RectangleF(inner.X, y, inner.Width, topH);
+            var top = Moved(parts[0], dx, 0);
             p.Text(Names[i], p.SmallBold, p.P.AccentText, top, HAlign.Left, VAlign.Center, false);
             if (wearOn) p.Number(WearText(wear), p.Bold, wear is { } ww ? WearColor(p, ww) : p.P.Faint, top, HAlign.Right, VAlign.Center);
-            float next = top.Bottom;
             if (temps)
             {
-                var stripe = new RectangleF(inner.X, next + between, inner.Width, stripeH);
+                var stripe = Moved(parts[1], dx, 0);
                 float gap = 2 * d, sw = (stripe.Width - gap * 2) / 3;
                 for (int k = 0; k < 3; k++)
                     p.Fill(new RectangleF(stripe.X + k * (sw + gap), stripe.Y, sw, stripe.Height), Heat(p.P, _temps[k], low, high), p.CornerRadius(2));
-                next = stripe.Bottom;
             }
             if (!pressure && !temps) continue;
-            var line = new RectangleF(inner.X, next + between, inner.Width, lineH);
+            var line = Moved(parts[2], dx, 0);
             if (pressure) p.Text(PressureNumber(f.TyreColdPressure[i], v.Units), p.Small, p.P.Muted, line, HAlign.Left, VAlign.Center, false);
             if (temps) p.Text(TempNumber(_temps[1], v.Units, "°"), p.Small, p.P.Muted, line, HAlign.Right, VAlign.Center, false);
         }

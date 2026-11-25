@@ -28,6 +28,7 @@ internal sealed record HudOption(string Key, string Label, HudOptionKind Kind, s
     public double Max { get; init; } = 100;
     public double Step { get; init; } = 1;
     public string? Unit { get; init; }
+    public bool Slider { get; init; }
 
     public static HudOption Bool(string key, string label, bool on, string? help = null) => new(key, label, HudOptionKind.Bool, on ? "true" : "false", help);
 
