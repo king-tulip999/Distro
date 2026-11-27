@@ -8,7 +8,7 @@ internal static class OldAppDialog
 {
     public static void CheckLater(MainWindow window, AppServices app)
     {
-        if (app.Demo || app.Config.Ui.OldAppNoticeOff) return;
+        if (app.Demo || AppIdentity.IsLivrea || app.Config.Ui.OldAppNoticeOff) return;
         _ = Run(window, app);
     }
 

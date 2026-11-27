@@ -46,7 +46,7 @@ internal static class SearchSources
         var list = new List<SearchEntry>();
         try { list.AddRange(Keybinds(app)); }
         catch (Exception ex) { App.LogError(ex); }
-        if (!AppIdentity.IsTecnica)
+        if (AppIdentity.IsVelocita)
         {
             try { list.AddRange(Widgets()); }
             catch (Exception ex) { App.LogError(ex); }

@@ -8,6 +8,8 @@ internal sealed class TabRow : Panel
     private const double TightestPad = 6;
     private double _widestPad = -1;
 
+    internal double TightestWidth { get; private set; }
+
     protected override Size MeasureOverride(Size available)
     {
         var tabs = InternalChildren.OfType<Control>().ToList();
@@ -15,9 +17,10 @@ internal sealed class TabRow : Panel
         if (_widestPad < 0) _widestPad = tabs[0].Padding.Left;
         var free = new Size(double.PositiveInfinity, available.Height);
         foreach (var tab in tabs) tab.Measure(free);
+        double fixedWidth = tabs.Sum(t => t.DesiredSize.Width - t.Padding.Left - t.Padding.Right);
+        TightestWidth = fixedWidth + 2 * TightestPad * tabs.Count;
         if (!double.IsInfinity(available.Width))
         {
-            double fixedWidth = tabs.Sum(t => t.DesiredSize.Width - t.Padding.Left - t.Padding.Right);
             double pad = Math.Floor(Math.Clamp((available.Width - fixedWidth) / (2 * tabs.Count), TightestPad, _widestPad));
             foreach (var tab in tabs)
             {

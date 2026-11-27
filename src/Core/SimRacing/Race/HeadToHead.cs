@@ -66,6 +66,72 @@ internal sealed class MySectors
     public double? LastLap;
 }
 
+internal static class DuelSectors
+{
+    public static int[] Groups(IReadOnlyList<double> starts, int target)
+    {
+        int n = starts.Count;
+        if (target <= 0 || n <= target) return Enumerable.Range(0, n).ToArray();
+        var picks = new int[target];
+        for (int j = 1; j < target; j++)
+        {
+            double want = j / (double)target;
+            int best = picks[j - 1] + 1;
+            for (int i = best + 1; i <= n - (target - j); i++)
+                if (Math.Abs(starts[i] - want) < Math.Abs(starts[best] - want)) best = i;
+            picks[j] = best;
+        }
+        return picks;
+    }
+
+    public static int Merge(DuelValue[] cells, int count, int[] groups)
+    {
+        if (groups.Length >= count) return count;
+        for (int g = 0; g < groups.Length; g++)
+        {
+            int to = g + 1 < groups.Length ? groups[g + 1] : count;
+            cells[g] = Combine(cells, groups[g], to);
+        }
+        for (int i = groups.Length; i < count; i++) cells[i] = DuelValue.Empty;
+        return groups.Length;
+    }
+
+    public static void Merge(double[] values, int count, int[] groups)
+    {
+        if (groups.Length >= count) return;
+        for (int g = 0; g < groups.Length; g++)
+        {
+            int to = g + 1 < groups.Length ? groups[g + 1] : count;
+            double sum = 0;
+            for (int i = groups[g]; i < to; i++) sum += values[i];
+            values[g] = sum;
+        }
+        for (int i = groups.Length; i < count; i++) values[i] = double.NaN;
+    }
+
+    private static DuelValue Combine(DuelValue[] cells, int from, int to)
+    {
+        double driven = 0, ghost = 0;
+        bool allDone = true, allGhost = true, started = false;
+        for (int i = from; i < to; i++)
+        {
+            var c = cells[i];
+            if (c.State != DuelState.Done) allDone = false;
+            if (c.State != DuelState.Ghost) allGhost = false;
+            if (c.State is DuelState.Done or DuelState.Live)
+            {
+                driven += c.Value;
+                started = true;
+            }
+            else if (c.State == DuelState.Ghost) ghost += c.Value;
+        }
+        if (allDone) return new DuelValue(driven, DuelState.Done);
+        if (started) return new DuelValue(driven, DuelState.Live);
+        if (allGhost) return new DuelValue(ghost, DuelState.Ghost);
+        return DuelValue.Empty;
+    }
+}
+
 internal sealed class DuelLog
 {
     public const int Pieces = 24, KeepLaps = 12;

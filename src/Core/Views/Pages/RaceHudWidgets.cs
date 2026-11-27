@@ -283,8 +283,8 @@ internal sealed partial class RaceHudWidgets
     private List<FrameworkElement> WhenRows(HudWidgetConfig w, HudWidgetDef def)
     {
         var when = new List<FrameworkElement>();
-        if (def.HideWhenEmpty is { } hideByDefault)
-            when.Add(SettingRows.Row("Only when needed", def.Kind == "alerts" ? "Hidden until an alert comes up." : "Hidden until a car of another class is near.", true,
+        if (def.HideWhenEmpty is { } hideByDefault && !def.HideAlways)
+            when.Add(SettingRows.Row("Only when needed", def.Needed, true,
                 Ui.Switch(w.OnlyWhenNeeded ?? hideByDefault, v => { w.OnlyWhenNeeded = v; Changed(); })));
         when.Add(SettingRows.Row("Only in the car", "Hidden in the garage and while you're out of the car. Only matters when Show the widgets in Overlay settings isn't In the car.", true, Ui.Switch(w.OnlyOnTrack, v => { w.OnlyOnTrack = v; Changed(); })));
         when.Add(SettingRows.Row("Hide in replays", null, true, Ui.Switch(w.HideInReplay, v => { w.HideInReplay = v; Changed(); })));
@@ -341,6 +341,17 @@ internal sealed partial class RaceHudWidgets
         resetScale.Visibility = Math.Abs(w.Scale - 1) > 0.001 ? Visibility.Visible : Visibility.Collapsed;
         place.Add(SettingRows.Row("Scale", "Drag the widget's corner while arranging on screen to scale it.", true,
             new StackPanel { Orientation = Orientation.Horizontal, Children = { scaleText, resetScale } }));
+        var heightText = new TextBlock { Text = w.ScreenHeight > 0 ? $"{w.ScreenHeight:0} px" : "Auto", Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        var resetHeight = Ui.LabeledButton("I.Undo", "Reset to auto", () =>
+        {
+            Host?.RecordUndo();
+            w.ScreenHeight = 0;
+            Changed();
+            Fill();
+        }, "GhostButton");
+        resetHeight.Visibility = w.ScreenHeight > 0 ? Visibility.Visible : Visibility.Collapsed;
+        place.Add(SettingRows.Row("Height", "Drag the widget's bottom edge while arranging on screen. Auto fits the content; taller shows more rows where the widget has them.", true,
+            new StackPanel { Orientation = Orientation.Horizontal, Children = { heightText, resetHeight } }));
         var home = Ui.LabeledButton("I.Target", "Bring back to the middle", () =>
         {
             Host?.RecordUndo();
@@ -405,9 +416,16 @@ internal sealed partial class RaceHudWidgets
             SettingRows.Row(label, help, true, Ui.SliderWithValue(min, max, Math.Round(metres * 100), v => $"{v:0} {Units.Cm}", v => { set(v / 100); Changed(); }, ComboWidth - 42, 1));
         double reach = HudWidgetConfig.VrReach * 100;
         rows.Add(Slider("Sideways", "Right of your head is positive.", -reach, reach, w.VrX, v => w.VrX = v));
-        rows.Add(Slider("Height", "Above your eyes is positive.", -reach, reach, w.VrY, v => w.VrY = v));
+        rows.Add(Slider("Up / down", "Above your eyes is positive.", -reach, reach, w.VrY, v => w.VrY = v));
         rows.Add(Slider("Distance", null, HudWidgetConfig.MinVrDistance * 100, HudWidgetConfig.MaxVrDistance * 100, w.VrDistance, v => w.VrDistance = v));
         rows.Add(Slider("Width", null, HudWidgetConfig.MinVrWidth * 100, HudWidgetConfig.MaxVrWidth * 100, w.VrWidth, v => w.VrWidth = v));
+        rows.Add(SettingRows.Row("Height", "Auto fits the content. Taller shows more rows where the widget has them.", true,
+            Ui.SliderWithValue(0, HudWidgetConfig.MaxVrHeight * 100, Math.Round(w.VrHeight * 100), v => v <= 0 ? "Auto" : $"{v:0} {Units.Cm}", v =>
+            {
+                w.VrHeight = v <= 0 ? 0 : v / 100;
+                w.Clamp();
+                Changed();
+            }, ComboWidth - 42, 1)));
         FrameworkElement Angle(string label, string help, double degrees, Action<double> set) =>
             SettingRows.Row(label, help, true, Ui.SliderWithValue(-HudWidgetConfig.MaxVrAngle, HudWidgetConfig.MaxVrAngle, Math.Round(degrees), v => $"{v:0}°", v => { set(v); Changed(); }, ComboWidth - 42, 1));
         rows.Add(Angle("Turn", "Positive turns the face to the right.", w.VrTurn, v => w.VrTurn = v));
@@ -766,7 +784,7 @@ internal sealed partial class RaceHudWidgets
         try
         {
             double room = _well is { ActualWidth: > 40 } well ? well.ActualWidth - WellPad * 2 : 560;
-            var laid = host.SizeOf(w, race);
+            var laid = host.ScreenSizeOf(w, race);
             double tall = _pageScroll is { ViewportHeight: > 200 } page ? page.ViewportHeight - WellPad * 2 - 80 : double.PositiveInfinity;
             float scale = (float)Math.Clamp(Math.Min(room / Math.Max(1, laid.Width), tall / Math.Max(1, laid.Height)), MinPreviewScale, 1);
             AlignPreview();

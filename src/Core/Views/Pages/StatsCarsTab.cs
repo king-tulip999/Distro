@@ -273,8 +273,8 @@ internal static class StatsCarsTab
         best.Children.Add(new TextBlock { Text = set, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, MaxWidth = 380 });
         top.Children.Add(best);
         var names = new StackPanel { VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 18, 20, 0) };
-        names.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = p.Place, Style = Ui.Res<Style>("H2"), TextWrapping = TextWrapping.Wrap, MaxHeight = 52, TextTrimming = TextTrimming.CharacterEllipsis }));
-        names.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = p.Car, Style = Ui.Res<Style>("Muted"), TextTrimming = TextTrimming.CharacterEllipsis }));
+        names.Children.Add(new TextBlock { Text = p.Place, Style = Ui.Res<Style>("H2"), TextWrapping = TextWrapping.Wrap });
+        names.Children.Add(new TextBlock { Text = p.Car, Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap });
         Grid.SetColumn(names, 1);
         top.Children.Add(names);
         var tallies = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 16, 0, 0) };

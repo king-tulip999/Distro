@@ -4,7 +4,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Core.Controls;
 using Core.Grr;
-using Core.LiveryShop;
 using Core.Services;
 using Core.Theme;
 
@@ -18,6 +17,8 @@ internal sealed class SetupScreen : UserControl
     private readonly ScrollViewer _scroll = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
     private ResourceDictionary? _text;
     private StartupState? _startup;
+    private Core.Views.Pages.CarModelPicker? _models;
+    private FrameworkElement? _column;
 
     private const double ColumnWidth = 600, HeaderGap = 16, WordmarkHeight = 62, MarkGap = 14;
 
@@ -28,6 +29,7 @@ internal sealed class SetupScreen : UserControl
         FontSize = 13;
         _done = done;
         Content = new Grid { Children = { new TopographyBackdrop(), _scroll } };
+        _scroll.ScrollChanged += (_, e) => { if (e.ViewportHeightChange != 0) FitColumn(); };
         Loaded += (_, _) => { Unsubscribe(); ThemeManager.Changed += Build; };
         Unloaded += (_, _) => Unsubscribe();
         Build();
@@ -71,11 +73,44 @@ internal sealed class SetupScreen : UserControl
         _text = LargerText();
         using var scope = Ui.Scope(_text);
         Background = Ui.Res<Brush>("WindowBg");
-        var column = new StackPanel { MaxWidth = AppIdentity.IsTecnica ? ColumnWidth : ColumnWidth * 2 + Ui.PanelSpacing, Margin = new Thickness(39, 28, 39, 28), VerticalAlignment = VerticalAlignment.Center };
+        if (AppIdentity.IsLivrea)
+        {
+            _scroll.Content = _column = LivreaColumn();
+            Dispatcher.BeginInvoke(FitColumn, System.Windows.Threading.DispatcherPriority.Loaded);
+            return;
+        }
+        var column = new StackPanel { MaxWidth = AppIdentity.IsVelocita ? ColumnWidth * 2 + Ui.PanelSpacing : ColumnWidth, Margin = new Thickness(39, 28, 39, 28), VerticalAlignment = VerticalAlignment.Center };
         column.Children.Add(Brand());
         column.Children.Add(Sections());
         column.Children.Add(Finish());
         _scroll.Content = column;
+    }
+
+    private const double LivreaMinHeight = 620;
+
+    private void FitColumn()
+    {
+        if (_column is null || _scroll.ViewportHeight <= 0) return;
+        _column.Height = Math.Max(LivreaMinHeight, _scroll.ViewportHeight - _column.Margin.Top - _column.Margin.Bottom);
+    }
+
+    private FrameworkElement LivreaColumn()
+    {
+        var grid = new Grid { MaxWidth = ColumnWidth * 2 + Ui.PanelSpacing, Margin = new Thickness(39, 28, 39, 28), VerticalAlignment = VerticalAlignment.Top };
+        foreach (var height in new[] { GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto })
+            grid.RowDefinitions.Add(new RowDefinition { Height = height });
+        var start = Section("Start", "Everything here can be changed later in Settings.", StartOptions(wide: true), inline: true);
+        if (_models is null) _models = new Core.Views.Pages.CarModelPicker(_app, setup: true);
+        else if (_models.Parent is Panel old) old.Children.Remove(_models);
+        var models = Section("3D car models", "Tick the cars you paint. You can get the rest later.", _models, inline: true);
+        models.Margin = new Thickness(0);
+        var parts = new[] { Brand(), start, models, Finish() };
+        for (int i = 0; i < parts.Length; i++)
+        {
+            Grid.SetRow(parts[i], i);
+            grid.Children.Add(parts[i]);
+        }
+        return grid;
     }
 
     private static ResourceDictionary LargerText()
@@ -111,7 +146,11 @@ internal sealed class SetupScreen : UserControl
             HorizontalAlignment = HorizontalAlignment.Center, Padding = new Thickness(16, 6, 16, 6), Margin = new Thickness(0, Ui.PanelSpacing, 0, 0),
         };
         System.Windows.Automation.AutomationProperties.SetName(finish, label);
-        finish.Click += (_, _) => _done();
+        finish.Click += (_, _) =>
+        {
+            _models?.DownloadPicked();
+            _done();
+        };
         return finish;
     }
 
@@ -147,13 +186,6 @@ internal sealed class SetupScreen : UserControl
         Add(rows, "GRR League page", "Your league's next race, standings, results and schedule.", grr.ShowPage, true, on =>
         {
             grr.ShowPage = on;
-            _app.Save();
-            _app.Plugins.RaiseChanged();
-        });
-        var livery = _app.Config.LiveryShop;
-        Add(rows, "Livery Shop page", "Paint your iRacing car, helmet and suit, saved straight into iRacing.", livery.ShowPage, true, on =>
-        {
-            livery.ShowPage = on;
             _app.Save();
             _app.Plugins.RaiseChanged();
         });
@@ -238,20 +270,37 @@ internal sealed class SetupScreen : UserControl
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 13, 16, 13), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = stack };
     }
 
-    private FrameworkElement StartOptions()
+    private FrameworkElement StartOptions(bool wide = false)
     {
         var u = _app.Config.Ui;
         var rows = new StackPanel();
         Option("Start with Windows", _app.Demo ? "Not in demo mode." : $"{AppIdentity.Name} opens when you sign in.", _startup?.Enabled == true, !_app.Demo && _startup is not null, on => _ = SetStartupAsync(on));
         Option("Start in background", "Opens in the tray.", u.StartMinimized, true, on => { u.StartMinimized = on; _app.Save(); });
         Option("Close in background", $"The close button hides {AppIdentity.Name} to the tray.", u.CloseToTray, true, on => { u.CloseToTray = on; _app.Save(); });
+        if (wide)
+        {
+            var tiles = new Grid();
+            rows.Children.Add(InstallFolder(tile: true));
+            var options = rows.Children.Cast<FrameworkElement>().ToList();
+            rows.Children.Clear();
+            for (int i = 0; i < options.Count; i++)
+            {
+                if (i > 0) tiles.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
+                tiles.ColumnDefinitions.Add(new ColumnDefinition());
+                options[i].Margin = new Thickness(0);
+                Grid.SetColumn(options[i], i * 2);
+                tiles.Children.Add(options[i]);
+            }
+            rows.Children.Add(tiles);
+            return rows;
+        }
         rows.Children.Add(InstallFolder());
         return rows;
 
         void Option(string title, string caption, bool on, bool enabled, Action<bool> changed) => Add(rows, title, caption, on, enabled, changed);
     }
 
-    private FrameworkElement InstallFolder()
+    private FrameworkElement InstallFolder(bool tile = false)
     {
         string? exe = Environment.ProcessPath;
         string here = exe is null ? "" : Path.GetDirectoryName(exe) ?? "";
@@ -262,7 +311,7 @@ internal sealed class SetupScreen : UserControl
             TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 2, 0, 0),
         });
         path.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
-        var label = Compact(new TextBlock { Text = "Install folder", FontSize = 14 });
+        var label = Compact(new TextBlock { Text = "Install folder", FontSize = tile ? 15.5 : 14 });
         var move = new Button { Content = "Move…", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0), IsEnabled = canMove };
         move.Click += async (_, _) =>
         {
@@ -293,7 +342,26 @@ internal sealed class SetupScreen : UserControl
             App.RelaunchAfterExit("", AppHome.RemoveSteps(exe), target);
         };
         DockPanel.SetDock(move, Dock.Right);
-        return new DockPanel { Margin = new Thickness(2, 10, 0, 0), Children = { move, new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { label, path } } } };
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { label, path } };
+        if (!tile) return new DockPanel { Margin = new Thickness(2, 10, 0, 0), Children = { move, text } };
+        label.Style = Ui.Res<Style>("H3");
+        label.FontSize = 15.5;
+        path.Margin = new Thickness(0, 3, 0, 0);
+        var face = new Border
+        {
+            Child = new DockPanel { Children = { move, text } }, BorderThickness = Hairline.Edges(), Padding = new Thickness(10, 9, 10, 9),
+            Background = Ui.Res<Brush>("SurfaceAlt"), BorderBrush = Ui.Res<Brush>("Line"), Cursor = canMove ? System.Windows.Input.Cursors.Hand : null,
+        };
+        System.Windows.Automation.AutomationProperties.SetName(face, "Install folder");
+        face.MouseEnter += (_, _) => face.BorderBrush = Ui.Res<Brush>(canMove ? "LineStrong" : "Line");
+        face.MouseLeave += (_, _) => face.BorderBrush = Ui.Res<Brush>("Line");
+        face.MouseLeftButtonUp += (_, e) =>
+        {
+            if (!move.IsEnabled || e.OriginalSource is DependencyObject source && move.IsAncestorOf(source)) return;
+            e.Handled = true;
+            move.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, move));
+        };
+        return face;
     }
 
     private async Task LoadStartupAsync()

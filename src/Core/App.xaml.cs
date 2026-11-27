@@ -43,61 +43,9 @@ public partial class App : Application
             FanService.Run(this);
             return;
         }
-        if (Array.FindIndex(e.Args, a => string.Equals(a, WebPreview.Arg, StringComparison.OrdinalIgnoreCase)) is >= 0 and var webAt)
-        {
-            WebPreview.Run(this, webAt + 1 < e.Args.Length ? e.Args[webAt + 1] : null);
-            return;
-        }
-        if (ArgValue(e.Args, HudSheet.Arg) is { } sheetFolder)
-        {
-            HudSheet.Run(this, sheetFolder, only: ArgValue(e.Args, HudSheet.OnlyArg));
-            return;
-        }
-        if (ArgValue(e.Args, HudSheet.FramesArg) is { } framesFolder)
-        {
-            HudSheet.Run(this, framesFolder, frames: true);
-            return;
-        }
-        if (ArgValue(e.Args, HudSheet.SiteFramesArg) is { } siteFramesFolder)
-        {
-            HudSheet.RunSite(this, siteFramesFolder, frames: true, only: ArgValue(e.Args, HudSheet.OnlyArg));
-            return;
-        }
-        if (ArgValue(e.Args, HudSheet.SiteArg) is { } siteFolder)
-        {
-            HudSheet.RunSite(this, siteFolder, only: ArgValue(e.Args, HudSheet.OnlyArg));
-            return;
-        }
-        if (ArgValue(e.Args, FuelReplay.Arg) is { } replayFolder)
-        {
-            int at = Array.FindIndex(e.Args, a => string.Equals(a, FuelReplay.Arg, StringComparison.OrdinalIgnoreCase));
-            string reportFile = at + 2 < e.Args.Length ? e.Args[at + 2] : Path.Combine(replayFolder, "fuel-replay.txt");
-            FuelReplay.Run(this, replayFolder, reportFile);
-            return;
-        }
-        if (Array.FindIndex(e.Args, a => string.Equals(a, TrackMapBuild.Arg, StringComparison.OrdinalIgnoreCase)) is >= 0 and var mapsAt && mapsAt + 3 < e.Args.Length)
-        {
-            TrackMapBuild.Run(this, e.Args.Skip(mapsAt + 1).ToList());
-            return;
-        }
-        if (Array.FindIndex(e.Args, a => string.Equals(a, "--shot-diff", StringComparison.OrdinalIgnoreCase)) is >= 0 and var diffAt && diffAt + 3 < e.Args.Length)
-        {
-            int changes = 0;
-            try { changes = ShotDiff.Run(e.Args[diffAt + 1], e.Args[diffAt + 2], e.Args[diffAt + 3]); }
-            catch (Exception ex) { File.WriteAllText(Path.Combine(e.Args[diffAt + 3], "changed.txt"), "error " + ex.Message); }
-            Shutdown(changes > 0 ? 2 : 0);
-            return;
-        }
-        if (Array.FindIndex(e.Args, a => string.Equals(a, GoldenRun.Arg, StringComparison.OrdinalIgnoreCase)) is >= 0 and var goldenAt && goldenAt + 2 < e.Args.Length)
-        {
-            GoldenRun.Run(this, e.Args[goldenAt + 1], e.Args[goldenAt + 2], e.Args.Contains("--approve", StringComparer.OrdinalIgnoreCase));
-            return;
-        }
-        if (ArgValue(e.Args, FanProbe.Arg) is { } probeFile)
-        {
-            FanProbe.Run(this, probeFile);
-            return;
-        }
+        bool ranTool = false;
+        RunTool(e.Args, ref ranTool);
+        if (ranTool) return;
         PerfProbe.Mark("onstartup");
         Plugins.PluginManager.DiscoverEarly();
         System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty.OverrideMetadata(typeof(System.Windows.Media.Animation.Timeline), new FrameworkPropertyMetadata { DefaultValue = PcClass.FrameRate });
@@ -110,16 +58,14 @@ public partial class App : Application
         Theme.TipPlacement.Install();
         Views.TextBalance.Install();
 
-        string? screenshotDir = ArgValue(e.Args, "--screenshots");
+        string? screenshotDir = null, perfFile = null, monkeyDir = null, controlsDir = null;
+        bool demo = false;
+        ReadTestArgs(e.Args, ref screenshotDir, ref perfFile, ref monkeyDir, ref controlsDir, ref demo);
         bool afterUpdate = e.Args.Any(a => a.Equals("--updated", StringComparison.OrdinalIgnoreCase) || a.Equals("--update-failed", StringComparison.OrdinalIgnoreCase));
         bool stayInTray = e.Args.Contains(UpdateService.StayInTrayArg, StringComparer.OrdinalIgnoreCase);
-        string? perfFile = ArgValue(e.Args, "--perf");
-        string? monkeyDir = ArgValue(e.Args, "--monkey");
-        string? controlsDir = ArgValue(e.Args, "--controls");
         PerfProbe.File = perfFile;
         if (perfFile is not null) try { File.Delete(perfFile); } catch { }
         Motion.FollowFocus = screenshotDir is null && perfFile is null && monkeyDir is null && controlsDir is null;
-        bool demo = screenshotDir is not null || perfFile is not null || monkeyDir is not null || controlsDir is not null || e.Args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
         bool fresh = e.Args.Contains("--fresh", StringComparer.OrdinalIgnoreCase);
         bool withTray = screenshotDir is null && perfFile is null && controlsDir is null;
         if (demo && ArgValue(e.Args, "--culture") is { } cultureName)
@@ -166,7 +112,9 @@ public partial class App : Application
         if (demo)
         {
             ConfigStore.ReadOnly = true;
-            config = fresh ? ConfigStore.Normalize(ConfigStore.Fresh()) : DemoData.Config();
+            config = ConfigStore.Normalize(ConfigStore.Fresh());
+            if (!fresh) UseDemoConfig(ref config);
+            config.Ui.CloseToTray = false;
         }
         else
         {
@@ -205,7 +153,7 @@ public partial class App : Application
         _services = new AppServices(demo, config);
         PerfProbe.Mark("services");
         _services.Start(withTray);
-        if (!demo && !AppIdentity.IsTecnica && e.Args.Contains(SimRacing.Race.FieldLog.Arg, StringComparer.OrdinalIgnoreCase))
+        if (!demo && AppIdentity.IsVelocita && e.Args.Contains(SimRacing.Race.FieldLog.Arg, StringComparer.OrdinalIgnoreCase))
             _fieldLog = new SimRacing.Race.FieldLog(_services.Telemetry, Path.Combine(Config.ConfigStore.Folder, "field-log"));
         PerfProbe.Mark("started");
 
@@ -221,28 +169,9 @@ public partial class App : Application
             _trayWired = true;
         }
 
-        if (screenshotDir is not null)
-        {
-            ScreenshotRunner.Run(window, screenshotDir);
-            return;
-        }
-        if (controlsDir is not null)
-        {
-            ControlSweep.Run(window, controlsDir);
-            return;
-        }
-        if (monkeyDir is not null)
-        {
-            MonkeyRunner.Run(window, monkeyDir, int.TryParse(ArgValue(e.Args, "--seed"), out int seed) ? seed : Environment.TickCount,
-                double.TryParse(ArgValue(e.Args, "--minutes"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double minutes) ? minutes : 10,
-                e.Args.Contains("--full", StringComparer.OrdinalIgnoreCase));
-            return;
-        }
-        if (perfFile is not null)
-        {
-            PerfProbe.Run(window, perfFile);
-            return;
-        }
+        bool testRun = false;
+        StartTestRun(window, e.Args, ref testRun);
+        if (testRun) return;
 
         if (stayInTray && _services.Tray is not null)
         {
@@ -271,6 +200,14 @@ public partial class App : Application
         if (tookOverFans)
             _services.Notify($"Fan control is back in {AppIdentity.Name}", $"The background fan control you left running has stopped; {AppIdentity.Name} drives the fans again.", NoticeKind.Info);
     }
+
+    partial void RunTool(string[] args, ref bool ran);
+
+    static partial void ReadTestArgs(string[] args, ref string? screenshots, ref string? perf, ref string? monkey, ref string? controls, ref bool demo);
+
+    static partial void UseDemoConfig(ref AppConfig config);
+
+    static partial void StartTestRun(MainWindow window, string[] args, ref bool started);
 
     internal static void RelaunchAfterExit(string args, IEnumerable<string>? steps = null, string? exe = null, string? scratch = null)
     {

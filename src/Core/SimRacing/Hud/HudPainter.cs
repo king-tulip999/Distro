@@ -213,6 +213,8 @@ internal sealed class HudPainter : IDisposable
 
     public bool IsPreview { get; set; }
 
+    public bool FillHeight { get; set; }
+
     public bool PlaysEntrances { get; set; }
 
     public List<(string Key, string Id)>? Overflow { get; set; }
@@ -253,6 +255,8 @@ internal sealed class HudPainter : IDisposable
         MinWidth = 0;
         Items?.Clear();
         _panels.Clear();
+        _lastPanelBottom = _panelBottom;
+        _panelBottom = 0;
         _fresh.Clear();
         _loose.Clear();
         _paintedAnywhere = false;
@@ -463,12 +467,18 @@ internal sealed class HudPainter : IDisposable
 
     private readonly List<(RectangleF Box, Color Color)> _panels = new();
 
+    private float _panelBottom, _lastPanelBottom;
+
     public void Panel(RectangleF r)
     {
         int alpha = PanelAlpha;
         float radius = Look.Corner;
         r = Snap(r);
         if (r.Width <= 1 || r.Height <= 1) return;
+        float bottom = r.Bottom + _inset.Y;
+        _panelBottom = Math.Max(_panelBottom, bottom);
+        if (FillHeight && _lastPanelBottom > 0 && Math.Abs(bottom - _lastPanelBottom) < 1 && Bounds.Bottom - r.Bottom > 1)
+            r = RectangleF.FromLTRB(r.Left, r.Top, r.Right, Bounds.Bottom);
         if (radius <= 0.5f)
         {
             if (alpha > 0) FillFresh(Brush(HudPalette.Alpha(PanelColor, alpha)), r);

@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -30,13 +30,16 @@ internal static class SettingsIndex
         "settings.sensorrate", "settings.background", "settings.access", "settings.pawnio", "settings.rescan",
     };
 
-    private static readonly HashSet<string> VelocitaOnly = new(StringComparer.Ordinal) { "settings.grr", "settings.livery", "settings.simtools", "settings.overlaypage", "settings.statspage", "settings.storage" };
+    private static readonly HashSet<string> VelocitaOnly = new(StringComparer.Ordinal) { "settings.grr", "settings.simtools", "settings.overlaypage", "settings.statspage", "settings.storage" };
 
-    public static IReadOnlyList<SearchEntry> All => AppIdentity.IsTecnica
-        ? _tecnica ??= Entries.Where(e => e.Anchor is null || !VelocitaOnly.Contains(e.Anchor)).ToArray()
-        : _velocita ??= Entries.Where(e => e.Anchor is null || !TecnicaOnly.Contains(e.Anchor)).ToArray();
+    private static readonly HashSet<string> LivreaOnly = new(StringComparer.Ordinal) { "settings.models" };
 
-    private static SearchEntry[]? _velocita, _tecnica;
+    public static IReadOnlyList<SearchEntry> All => _forApp ??= Entries.Where(e => e.Anchor is null || Fits(e.Anchor)).ToArray();
+
+    private static bool Fits(string anchor) =>
+        (AppIdentity.IsVelocita || !VelocitaOnly.Contains(anchor)) && (AppIdentity.IsTecnica || !TecnicaOnly.Contains(anchor)) && (AppIdentity.IsLivrea || !LivreaOnly.Contains(anchor));
+
+    private static SearchEntry[]? _forApp;
 
     private static readonly SearchEntry[] Entries = new SearchEntry[]
     {
@@ -104,6 +107,8 @@ internal static class SettingsIndex
         new("Settings file", "Where the settings are kept: open the folder.", "Settings", "settings", "settings.folder", "config.json folder appdata location path data configuration"),
         new("Storage", $"How much space replays, paints, telemetry and {AppIdentity.Name}'s own data take; clear old replays and paints.", "Settings", "settings", "settings.storage",
             "disk space cleanup clean free replays paints liveries trading paints recycle bin size"),
+        new("3D car models", "Pick which cars' 3D models are downloaded to this PC, update them or delete them to free space.", "Settings", "settings", "settings.models",
+            "3d car model models download glb space delete update"),
         new("What is PawnIO?", "The optional driver for CPU temperatures and motherboard fans: what it does, safety, removing it.", "Settings", "settings", "settings.pawnio", "pawnio driver kernel safe anti-cheat winring0 admin administrator uninstall"),
         new($"Reset {AppIdentity.Name}", "Back to defaults, as if freshly installed (a copy of your settings is kept).", "Settings", "settings", "settings.reset", "reset defaults factory start over clear wipe restore"),
         new($"Uninstall {AppIdentity.Name}", $"Delete {AppIdentity.Name}, its settings and everything it saved on this PC.", "Settings", "settings", "settings.uninstall", "uninstall remove delete app exe data appdata wipe clean"),
@@ -114,7 +119,6 @@ internal static class SettingsIndex
         new("Theme", $"{AppIdentity.Name} (the glow theme, with its accent), Custom, color sets (Pastel, Neon, Night, High contrast…), Teams (F1, WEC, IMSA, GT World Challenge, NLS, IndyCar, NASCAR, rally, classics) and GRR; animations.", "Settings", "settings", "settings.theme", "glow tecnica velocita soft 2048 vanilla custom oled pastel dark mode black color animation appearance grr teams team f1 formula wec imsa nascar indycar rally gt world challenge nls nurburgring livery conditions night wet fog dawn floodlights high contrast colorblind accessible accent colour highlight pink violet purple blue cyan teal mint lime palette search"),
         new("Hardware access", "Admin rights and sensor driver status.", "Settings", "settings", "settings.access", "admin driver"),
         new("GRR League page", "Show or hide the GRR League page in the title bar.", "Settings", "settings", "settings.grr", "grr league page show hide standings schedule results"),
-        new("Livery Shop page", "Show or hide the Livery Shop paint editor in the title bar.", "Settings", "settings", "settings.livery", "livery shop paint painter editor page show hide tga spec"),
         new("Sim Racing Tools page", "Show or hide the Sim Racing Tools page in the title bar.", "Settings", "settings", "settings.simtools", "sim racing tools fov controls setups page show hide"),
         new("iRacing Overlay page", "Show or hide the iRacing Overlay page in the title bar.", "Settings", "settings", "settings.overlaypage", "iracing overlay hud widgets page show hide"),
         new("Session Stats page", "Show or hide the Session Stats page in the title bar.", "Settings", "settings", "settings.statspage", "session stats laps pace page show hide"),

@@ -12,9 +12,10 @@ internal static class ThemePreview
 {
     internal sealed record SampleText(string Label, string Value, string Change, string Warning, string Setting, string[] Choices, (string Name, string Detail)[] Rows);
 
-    internal static SampleText Sample => AppIdentity.IsTecnica
-        ? new("CPU temperature", "64 °C", "−3 °C", "High load", "Background usage", new[] { "Standard", "Reduced" }, new[] { ("Desk", "2560 × 1440"), ("TV", "3840 × 2160") })
-        : new("Last lap", "1:47.382", "−0.214", "Pit window", "Units", new[] { "Metric", "Imperial" }, new[] { ("Spa-Francorchamps", "2:17.884"), ("Monza", "1:47.382") });
+    internal static SampleText Sample => AppIdentity.Pick(
+        new SampleText("CPU temperature", "64 °C", "−3 °C", "High load", "Background usage", new[] { "Standard", "Reduced" }, new[] { ("Desk", "2560 × 1440"), ("TV", "3840 × 2160") }),
+        new SampleText("Last lap", "1:47.382", "−0.214", "Pit window", "Units", new[] { "Metric", "Imperial" }, new[] { ("Spa-Francorchamps", "2:17.884"), ("Monza", "1:47.382") }),
+        new SampleText("Layers", "24", "+3", "Unsaved", "Finish", new[] { "Gloss", "Matte" }, new[] { ("Porsche 911 GT3 R", "Car"), ("Ferrari 296 GT3", "Car") }));
 
     public static FrameworkElement For(ThemeSpec spec, double width)
     {

@@ -58,6 +58,9 @@
                     </Button.ToolTip>
                     <Image x:Name="ThemeLogoImage" Stretch="Uniform" Height="23" RenderOptions.BitmapScalingMode="HighQuality" />
                 </Button>
+                <!-- the current page's own buttons (ITitleTools), left of the window buttons -->
+                <ContentControl x:Name="PageTools" DockPanel.Dock="Right" Focusable="False" Margin="0,7,12,0" VerticalAlignment="Top"
+                                WindowChrome.IsHitTestVisibleInChrome="True" />
             </DockPanel>
 
             <!-- the accent line between the title bar and the page: one straight line, fading out to the right -->

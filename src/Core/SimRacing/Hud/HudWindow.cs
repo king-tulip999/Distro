@@ -7,11 +7,12 @@ namespace Core.SimRacing.Hud;
 
 internal sealed class HudWindow : OverlayWindow
 {
-    private enum Drag { None, Move, Corner }
+    private enum Drag { None, Move, Corner, Bottom }
 
     private Drag _drag;
     private Point _start;
     private RectangleF _startRect;
+    private float _startBottom;
 
     public HudWindow(string title) => Text = title;
 
@@ -28,6 +29,11 @@ internal sealed class HudWindow : OverlayWindow
 
     public event Action<HudWindow, RectangleF, bool>? Dragging;
 
+    public event Action<HudWindow, float>? Stretching;
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public float ContentBottom { get; set; }
+
     public event Action<HudWindow>? Dropped;
 
     public event Action<HudWindow>? Picked;
@@ -38,7 +44,9 @@ internal sealed class HudWindow : OverlayWindow
     {
         if (Locked) return Drag.None;
         float w = Rect.Width, h = Rect.Height, g = Grip * 1.4f;
-        return p.X >= w - g && p.Y >= h - g ? Drag.Corner : Drag.Move;
+        if (p.X >= w - g && p.Y >= h - g) return Drag.Corner;
+        bool handle = p.Y >= h - Grip && Math.Abs(p.X - w / 2) <= Grip * 2.5f;
+        return handle || (p.Y >= h - Grip * 0.6f && p.X < w - g) ? Drag.Bottom : Drag.Move;
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -55,6 +63,7 @@ internal sealed class HudWindow : OverlayWindow
         if (_drag == Drag.None) return;
         _start = Control.MousePosition;
         _startRect = Rect;
+        _startBottom = ContentBottom > 0 ? ContentBottom : Rect.Height;
         Capture = true;
     }
 
@@ -66,13 +75,18 @@ internal sealed class HudWindow : OverlayWindow
         {
             Cursor = Locked ? Cursors.No : ZoneAt(e.Location) switch
             {
-                Drag.Corner => Cursors.SizeNWSE, _ => Cursors.Default,
+                Drag.Corner => Cursors.SizeNWSE, Drag.Bottom => Cursors.SizeNS, _ => Cursors.Default,
             };
             return;
         }
         var now = Control.MousePosition;
         float dx = now.X - _start.X, dy = now.Y - _start.Y;
         var r = _startRect;
+        if (_drag == Drag.Bottom)
+        {
+            Stretching?.Invoke(this, r.Y + _startBottom + dy);
+            return;
+        }
         var proposed = _drag switch
         {
             Drag.Move => new RectangleF(r.X + dx, r.Y + dy, r.Width, r.Height),

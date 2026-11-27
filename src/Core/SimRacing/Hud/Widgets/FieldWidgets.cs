@@ -824,10 +824,22 @@ internal sealed class RelativeWidget : HudWidget
             if (ahead >= behind && ahead > 0) ahead--;
             else behind--;
         }
+        if (p.FillHeight)
+            while (ahead + behind + 1 < fit)
+            {
+                if (behind <= ahead) behind++;
+                else ahead++;
+            }
         string pits = o.Choice("hidePits");
         int player = f.PlayerCarIdx;
-        var rows = FieldOrder.Relative(f, ahead, behind, pits == "true",
-            car => v.ClassShown(car) && !(pits == "stall" && car != player && f.CarSurface[car] == TrackSurface.InPitStall), v.Race.Profile);
+        Func<int, bool> shownCar = car => v.ClassShown(car) && !(pits == "stall" && car != player && f.CarSurface[car] == TrackSurface.InPitStall);
+        var rows = FieldOrder.Relative(f, ahead, behind, pits == "true", shownCar, v.Race.Profile);
+        if (p.FillHeight && rows.Count(r => r.TrackDistance > 0) is var found && found < ahead)
+        {
+            behind += ahead - found;
+            ahead = found;
+            rows = FieldOrder.Relative(f, ahead, behind, pits == "true", shownCar, v.Race.Profile);
+        }
         double close = o.Number("close");
         int me = f.PlayerCarIdx;
         var cols = new List<Column>();
@@ -1149,6 +1161,21 @@ internal sealed class StandingsWidget : HudWidget
             else if (group) fit += Math.Min(otherTop, block.Count);
         }
         if (!mineFound && group && pickFrom.Count > 0) fit -= Math.Min(otherTop, pickFrom[0].Count);
+        int filled = pickFrom.Count(b => b.Count > 0);
+        float dividers = o.Choice("divider") != "none" ? BreakRoom(p) * 2 * filled : 0;
+        int roomRows = (int)((area.Height - headH - dividers - (group ? filled * (classHead + underHead + blockPad * 2) : 0)) / rowH);
+        int othersRows = pickFrom.Where(b => !b.Any(r => r.CarIdx == me)).Sum(b => Math.Min(otherTop, b.Count));
+        if (p.FillHeight && group && mineFound && filled > 1 && roomRows - othersRows < top + 2)
+        {
+            pickFrom = pickFrom.Select(b => b.Any(r => r.CarIdx == me) ? b : new List<StandingRow>()).ToList();
+            fit = top + around + 1;
+            roomRows = (int)((area.Height - headH - (dividers / filled) - (classHead + underHead + blockPad * 2)) / rowH);
+        }
+        if (p.FillHeight && roomRows > 0 && roomRows != fit)
+        {
+            around = Math.Max(0, around + roomRows - fit);
+            fit = roomRows;
+        }
         var shown = Pick(pickFrom, Math.Max(1, fit), top, otherTop, me, around);
         bool highlight = o.Bool("highlightMe"), stripes = o.Bool("stripes");
         bool multiclass = f.Session.NumCarClasses > 1;
@@ -1158,6 +1185,7 @@ internal sealed class StandingsWidget : HudWidget
         for (int b = 0; b < blocks.Count; b++)
         {
             if (shown[b].Count == 0) continue;
+            if (group && y + blockPad * 2 + classHead + underHead + rowH > area.Bottom + 1) break;
             if (group)
             {
                 var first = blocks[b][0];

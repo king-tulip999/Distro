@@ -193,10 +193,10 @@ internal sealed class ListDetail
         for (int i = 0; i < facts.Count; i++)
         {
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var name = new TextBlock { Text = facts[i].Label, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 5) };
+            var name = new TextBlock { Text = facts[i].Label, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 1, 10, 5) };
             Grid.SetRow(name, i);
             grid.Children.Add(name);
-            var shown = TextFit.TipWhenTrimmed(new TextBlock { Text = facts[i].Value, FontSize = 12.5, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 0, 5) });
+            var shown = new TextBlock { Text = facts[i].Value, FontSize = 12.5, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 0, 5) };
             TextCase.Verbatim(shown);
             Grid.SetRow(shown, i);
             Grid.SetColumn(shown, 1);

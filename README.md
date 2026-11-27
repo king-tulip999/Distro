@@ -94,17 +94,6 @@ Your iRacing history, kept on your PC: result cards, ratings, personal bests, an
 | **iRacing keybinds** | Every in-sim keybind per profile, with what's set, missing or changed |
 | **Trading Paints and Garage 61** | Start them with Velocita or when iRacing starts, and see your own paint on car pictures across the app |
 
-### Livery Shop (beta)
-
-Paint your iRacing car, helmet and suit, saved straight into iRacing. Off unless you turn it on.
-
-| Feature | What it does |
-| --- | --- |
-| **Painting** | Shapes, stripes, numbers, text, logos, brush, eraser and pen, over iRacing's car template, with team colors that update everything painted in them |
-| **Import** | PNG, JPG, SVG, TGA or a Photoshop file with every layer kept, by button, drag and drop or Ctrl+V |
-| **Versions** | Save, rename, duplicate, export and import versions of a design, each a file you can open from Velocita |
-| **Live preview** | The car drawn by iRacing, updated each time your paint saves |
-
 ### GRR League
 
 Your league's next race, standings and results, if you race with GRR. Off unless you turn it on.
@@ -188,7 +177,7 @@ An optional free, signed driver Tecnica can use for CPU temperatures and motherb
 <summary><b>What does it send online?</b></summary>
 <br>
 
-An update check against GitHub releases (if you leave it on), a small ping for Tecnica's network readout, the GRR feed if you show that page, and iRacing's car templates when you load one in the Livery Shop. No accounts, no telemetry. Your stats stay on your PC.
+An update check against GitHub releases (if you leave it on), a small ping for Tecnica's network readout, the GRR feed if you show that page, and iRacing's car templates when you load one in Livrea. No accounts, no telemetry. Your stats stay on your PC.
 </details>
 
 <details>
@@ -227,8 +216,8 @@ Each app checks for updates in Settings → Application → About and updates. *
 | [Saira](https://github.com/Omnibus-Type/Saira) by Omnibus-Type | The app font, wordmark and the iRacing Overlay's numbers | SIL Open Font License 1.1 |
 | [SIMRacingApps](https://github.com/SIMRacingApps/SIMRacingAppsServer) by Jeffrey Gilliam | Track centerline and pit lane routes for Session Stats' track maps | Apache 2.0 |
 | Track map drawings by [iRacing](https://www.iracing.com), collected in [racing-track-maps-vector](https://github.com/meowmachine/racing-track-maps-vector) by meowmachine | Track maps for Session Stats and the iRacing Overlay | © iRacing.com Motorsport Simulations, LLC |
-| [ag-psd](https://github.com/Agamnentzar/ag-psd) by Agamnentzar | Photoshop file import in the Livery Shop | MIT |
-| [Google Fonts](https://fonts.google.com): Anton, Archivo Black, Barlow, Barlow Condensed, Bebas Neue, Kanit, Orbitron, Oswald, Racing Sans One, Russo One, Teko | Text in the Livery Shop | SIL Open Font License 1.1 |
+| [ag-psd](https://github.com/Agamnentzar/ag-psd) by Agamnentzar | Photoshop file import in Livrea | MIT |
+| [Google Fonts](https://fonts.google.com): Anton, Archivo Black, Barlow, Barlow Condensed, Bebas Neue, Kanit, Orbitron, Oswald, Racing Sans One, Russo One, Teko | Text in Livrea | SIL Open Font License 1.1 |
 | [PawnIO](https://pawnio.eu) | Optional driver for CPU and motherboard sensors (not bundled; installed separately) | See its site |
 
 **Inspired by** (no code or assets from these are used):
@@ -236,7 +225,7 @@ Each app checks for updates in Settings → Application → About and updates. *
 - [Fan Control](https://github.com/Rem0o/FanControl.Releases) by Rem0o: the Fan Control page
 - [Resize Raccoon](https://github.com/mistenkt/resize-raccoon) by mistenkt and its fork [Resize Rabbit](https://github.com/rosscarlson/resize-rabbit) by rosscarlson: Window placement
 
-Full license texts ship with the components (for example `NOTICES.md` inside the track map library and `Saira-OFL.txt` beside the fonts, and the Livery Shop's font and ag-psd licenses inside its files). Thanks to the [GRR League](https://www.grassrootsracing.org) for letting Velocita use its site data and logo.
+Full license texts ship with the components (for example `NOTICES.md` inside the track map library and `Saira-OFL.txt` beside the fonts, and Livrea's font and ag-psd licenses inside its files). Thanks to the [GRR League](https://www.grassrootsracing.org) for letting Velocita use its site data and logo.
 </details>
 
 <br>

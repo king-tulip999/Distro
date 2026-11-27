@@ -42,7 +42,7 @@ internal static class Uninstaller
     internal static List<string> Files(string exe)
     {
         var files = new List<string> { exe + ".old" };
-        if (!AppIdentity.IsTecnica) files.Add(Path.Combine(Path.GetTempPath(), "velocita-web-preview.txt"));
+        if (AppIdentity.IsVelocita) files.Add(Path.Combine(Path.GetTempPath(), "velocita-web-preview.txt"));
         if (Path.GetDirectoryName(exe) is not { Length: > 0 } folder) return files;
         try
         {

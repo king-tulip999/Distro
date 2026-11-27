@@ -13,7 +13,18 @@ internal enum UpdateState { Idle, Checking, UpToDate, Available, Downloading, Fa
 
 internal sealed class UpdateService
 {
-    public const string Repository = "king-tulip999/Distro";
+    public const string Owner = "king-tulip999";
+
+    public static string Repository => RepositoryOf(AppIdentity.Kind);
+
+    internal static string RepositoryOf(AppKind kind) => Owner + "/" + kind switch
+    {
+        AppKind.Tecnica => "Tecnica",
+        AppKind.Livrea => "Livrea",
+        _ => "Velocita",
+    };
+
+    public const string SharedRepository = Owner + "/Distro";
 
     public static string ProjectPage => $"https://github.com/{Repository}";
 
@@ -53,7 +64,9 @@ internal sealed class UpdateService
 
     private static Version RunningVersion()
     {
-        var assembly = typeof(UpdateService).Assembly;
+        var core = typeof(UpdateService).Assembly;
+        var entry = System.Reflection.Assembly.GetEntryAssembly();
+        var assembly = entry is not null && entry.GetReferencedAssemblies().Any(a => a.Name == core.GetName().Name) ? entry : core;
         var named = assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
             .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion;
         return named is not null && TryVersion(named, out var version) ? version : Normalize(assembly.GetName().Version ?? new Version(0, 0, 0));
@@ -159,7 +172,7 @@ internal sealed class UpdateService
         Set(UpdateState.Checking);
         try
         {
-            Latest = Newest(await Http.GetStringAsync(ReleasesApi));
+            Latest = Newest(await ReleasesJsonAsync());
             S.LastCheckUtc = DateTime.UtcNow;
             _app.Save();
             _retries = 0;
@@ -302,7 +315,9 @@ internal sealed class UpdateService
     }
 
     internal static string TrustedPage(string? url) =>
-        url is not null && url.StartsWith($"https://github.com/{Repository}/", StringComparison.OrdinalIgnoreCase) ? url : ReleasesPage;
+        url is not null && (IsPageOf(url, Repository) || IsPageOf(url, SharedRepository)) ? url : ReleasesPage;
+
+    private static bool IsPageOf(string url, string repository) => url.StartsWith($"https://github.com/{repository}/", StringComparison.OrdinalIgnoreCase);
 
     internal static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(30);
 
@@ -360,12 +375,27 @@ internal sealed class UpdateService
         return Parse(doc.RootElement);
     }
 
-    internal static string ReleasesApi => $"https://api.github.com/repos/{Repository}/releases?per_page=30";
+    internal static string ReleasesApi => ReleasesApiOf(Repository);
+
+    private static string ReleasesApiOf(string repository) => $"https://api.github.com/repos/{repository}/releases?per_page=30";
+
+    internal static async Task<string> ReleasesJsonAsync()
+    {
+        try
+        {
+            var own = await Http.GetStringAsync(ReleasesApi);
+            if (!NeedsSharedReleases(own)) return own;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) { }
+        return await Http.GetStringAsync(ReleasesApiOf(SharedRepository));
+    }
+
+    internal static bool NeedsSharedReleases(string ownJson) => Newest(ownJson) is null;
 
     public async Task<List<ReleaseInfo>> ReleasesUpToInstalledAsync()
     {
         if (Repository.Length == 0) throw new InvalidOperationException("No release page is set up for this build.");
-        try { return Releases(await Http.GetStringAsync(ReleasesApi), Installed); }
+        try { return Releases(await ReleasesJsonAsync(), Installed); }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) { throw new InvalidOperationException("The release page couldn't be found.", ex); }
     }
 

@@ -62,6 +62,11 @@ internal sealed record HudWidgetDef(string Kind, string Name, string Description
     public IReadOnlyList<HudOption> Options { get; init; } = Array.Empty<HudOption>();
     public string? Limits { get; init; }
     public bool? HideWhenEmpty { get; init; }
+    // Text under the "Only when needed" switch.
+    public string? Needed { get; init; }
+    // Always hidden while empty: the widget has its own range setting, so no switch.
+    public bool HideAlways { get; init; }
+    public bool Hides(HudWidgetConfig c) => HideAlways || (c.OnlyWhenNeeded ?? HideWhenEmpty) == true;
     public Editors.HudEditorDef? Editor { get; init; }
     public Func<HudOptions, SizeF>? Natural { get; init; }
     public bool FixedSize { get; init; }

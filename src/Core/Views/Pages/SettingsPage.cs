@@ -7,7 +7,6 @@ using Core.Config;
 using Core.Controls;
 using Core.Grr;
 using Core.Hardware;
-using Core.LiveryShop;
 using Core.Services;
 using Core.Theme;
 
@@ -26,7 +25,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     public event Action? SectionsChanged { add { } remove { } }
 
-    private static (PageSection Section, string Anchor)[] Cards => AppIdentity.IsTecnica ? AllCards : AllCards.Where(c => c.Anchor != "settings.access").ToArray();
+    private static (PageSection Section, string Anchor)[] Cards => AllCards.Where(c => (AppIdentity.IsTecnica || c.Anchor != "settings.access") && (AppIdentity.IsLivrea || c.Anchor != "settings.models")).ToArray();
 
     private static readonly (PageSection Section, string Anchor)[] AllCards =
     {
@@ -34,6 +33,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         (new("look", "Appearance", "I.Palette"), "settings.look"),
         (new("performance", "Performance", "I.Gauge"), "settings.performance"),
         (new("access", "Hardware access", "I.Cpu"), "settings.access"),
+        (new("models", "3D car models", "I.Download"), "settings.models"),
         (new("data", "Data and configuration", "I.Folder"), "settings.data"),
     };
 
@@ -162,6 +162,19 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         if (AppIdentity.IsTecnica) BuildHardware();
         BuildData();
         BuildDiagnostics();
+        if (AppIdentity.IsLivrea) BuildModels();
+    }
+
+    private void BuildModels()
+    {
+        int index = _sections.Children.Count;
+        _sections.ColumnOf = (columns, i) => columns < 2 ? null : i == index ? 1 : 0;
+        _sections.EvenBottoms = true;
+        var head = Ui.SectionHeader("3D car models", null);
+        DockPanel.SetDock(head, Dock.Top);
+        var outer = new DockPanel { LastChildFill = true, Children = { head, new CarModelPicker(_app, setup: false) } };
+        Ui.Anchor(outer, "settings.models");
+        _sections.Children.Add(outer);
     }
 
     private StartupState? _startupState;
@@ -175,7 +188,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         BuildStartup(startup);
         var window = Group(app, "Window", "settings.window");
         BuildWindow(window);
-        if (!AppIdentity.IsTecnica)
+        if (AppIdentity.IsVelocita)
         {
             var grr = _app.Config.Grr;
             window.Children.Add(Ui.Divider());
@@ -184,13 +197,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
                 more: "Your league's next race, standings, results and schedule.");
             Ui.Anchor(grrRow, "settings.grr");
             window.Children.Add(grrRow);
-            var livery = _app.Config.LiveryShop;
-            window.Children.Add(Ui.Divider());
-            var liveryRow = Ui.SettingRow("Livery Shop page", null,
-                Ui.Switch(livery.ShowPage, v => { livery.ShowPage = v; _app.Save(); _app.Plugins.RaiseChanged(); }),
-                more: "Paint your iRacing car, helmet and suit, saved straight into iRacing.");
-            Ui.Anchor(liveryRow, "settings.livery");
-            window.Children.Add(liveryRow);
             var sim = _app.Config.SimRacing;
             window.Children.Add(Ui.Divider());
             var simRow = Ui.SettingRow("Sim Racing Tools page", null,
@@ -616,12 +622,15 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
         var folder = Ui.LabeledButton("I.Folder", "Open folder", () => OpenFolder(ConfigStore.Folder));
         folder.ToolTip = TextCase.PathTip(ConfigStore.Folder);
-        var fileRow = Ui.SettingRow("Settings file", "Your settings, the error log, backups made by Reset and Import, and iRacing backups, all in one folder.", folder);
+        var fileRow = Ui.SettingRow("Settings file", AppIdentity.Pick(
+            "Your settings, the error log and backups made by Reset and Import, all in one folder.",
+            "Your settings, the error log, backups made by Reset and Import, and iRacing backups, all in one folder.",
+            "Your settings, designs, the error log and backups made by Reset and Import, all in one folder."), folder);
         Grid.SetIsSharedSizeScope(fileRow, true);
         Ui.Anchor(fileRow, "settings.folder");
         section.Children.Add(fileRow);
         section.Children.Add(Ui.Divider());
-        if (!AppIdentity.IsTecnica)
+        if (AppIdentity.IsVelocita)
         {
             section.Children.Add(StorageFold());
             section.Children.Add(Ui.Divider());
@@ -895,27 +904,31 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             _ = _window.Confirm("Delete saved colors?", "“Dusk” is removed from My colors. The colors in use now don't change.", "Delete", danger: true);
             return Task.CompletedTask;
         });
-        yield return ("quit-with-fans", () =>
-        {
-            _window.CloseModal(false);
-            _ = _window.ShowModal(_window.FanQuitCard(_ => { }, out _));
-            return Task.CompletedTask;
-        });
+        if (AppIdentity.IsTecnica)
+            yield return ("quit-with-fans", () =>
+            {
+                _window.CloseModal(false);
+                _ = _window.ShowModal(_window.FanQuitCard(_ => { }, out _));
+                return Task.CompletedTask;
+            });
         yield return ("confirm-delete-closed", () =>
         {
             _window.CloseModal(false);
             return Task.CompletedTask;
         });
-        yield return ("pawnio-prompt", () =>
+        if (AppIdentity.IsTecnica)
         {
-            _ = OfferPawnIoAsync(force: true);
-            return Task.CompletedTask;
-        });
-        yield return ("pawnio-prompt-closed", () =>
-        {
-            _window.CloseModal(false);
-            return Task.CompletedTask;
-        });
+            yield return ("pawnio-prompt", () =>
+            {
+                _ = OfferPawnIoAsync(force: true);
+                return Task.CompletedTask;
+            });
+            yield return ("pawnio-prompt-closed", () =>
+            {
+                _window.CloseModal(false);
+                return Task.CompletedTask;
+            });
+        }
         yield return ("accent-mint", () =>
         {
             _app.UseAccent(GlowAccent.Swatches.First(s => s.Name == "Mint").Hex);
@@ -994,7 +1007,8 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         var button = Ui.LabeledButton("I.Undo", $"Reset {AppIdentity.Name}", () => _ = ResetAsync(), "DangerButton");
         button.ToolTip = "Asks first. Your current settings are kept as a copy in the settings folder.";
         var row = Ui.SettingRow("Back to defaults",
-            $"Every setting, profile, layout and fan curve. {AppIdentity.Name} restarts; a copy of your settings is kept.",
+            AppIdentity.Pick("Every setting, profile, layout and fan curve.", "Every setting, overlay layout and preset.", "Every setting. Your designs and versions stay.")
+                + $" {AppIdentity.Name} restarts; a copy of your settings is kept.",
             button);
         Grid.SetIsSharedSizeScope(row, true);
         Ui.Anchor(row, "settings.reset");
@@ -1009,10 +1023,16 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             return;
         }
         if (!await _window.Confirm($"Reset {AppIdentity.Name} to defaults?",
-                "Everything goes back to how it was on first install: window placements and groups, display setups, " +
-                $"fan curves and calibration, overlay layouts, page layouts, the page order and these settings. {AppIdentity.Name} then restarts.\n\n" +
+                AppIdentity.Pick(
+                    "Everything goes back to how it was on first install: window placements and groups, display setups, fan curves and calibration, overlay layouts, page layouts, the page order and these settings.",
+                    "Everything goes back to how it was on first install: overlay layouts and presets, page layouts, the page order and these settings.",
+                    "Everything goes back to how it was on first install: the page order and these settings.")
+                + $" {AppIdentity.Name} then restarts.\n\n" +
                 "Kept: a copy of your current settings (config.before-reset-….json in the settings folder, rename it to config.json to go back), " +
-                "iRacing backups, the PawnIO driver and the Start with Windows task. Changes already made to Windows (displays, sound) aren't undone.",
+                AppIdentity.Pick(
+                    "the PawnIO driver and the Start with Windows task. Changes already made to Windows (displays, sound) aren't undone.",
+                    "iRacing backups and the Start with Windows task.",
+                    "your designs, versions, downloaded 3D car models and the Start with Windows task."),
                 "Reset and restart", danger: true))
             return;
         try
@@ -1046,12 +1066,14 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             _app.Notify("Demo mode", "Demo mode never changes this PC, so there's nothing to uninstall.", NoticeKind.Info);
             return;
         }
-        string data = AppIdentity.IsTecnica
-            ? "window placements, display setups, fan curves and calibration, overlay layouts"
-            : "overlay layouts, session stats, lap traces, setups, liveries and the iRacing backups it made";
-        string kept = AppIdentity.IsTecnica
-            ? "Fan control stops and the fans go back to the BIOS / driver. Kept: the PawnIO driver (Windows Settings → Apps → Installed apps → PawnIO) and changes already made to Windows (displays, sound)."
-            : "Kept: iRacing's own files in Documents.";
+        string data = AppIdentity.Pick(
+            "window placements, display setups, fan curves and calibration, overlay layouts",
+            "overlay layouts, session stats, lap traces, setups, liveries and the iRacing backups it made",
+            "your designs, their saved versions and the 3D models you loaded");
+        string kept = AppIdentity.Pick(
+            "Fan control stops and the fans go back to the BIOS / driver. Kept: the PawnIO driver (Windows Settings → Apps → Installed apps → PawnIO) and changes already made to Windows (displays, sound).",
+            "Kept: iRacing's own files in Documents.",
+            "Kept: the paint files already saved into Documents\\iRacing\\paint.");
         if (!await _window.Confirm($"Uninstall {AppIdentity.Name}?",
                 $"{AppIdentity.Name} closes, then {AppIdentity.ExeName} ({Environment.ProcessPath}) and everything it saved are deleted: " +
                 $"your settings, {data}, the error log, settings backups and the Start with Windows task.\n\n" +

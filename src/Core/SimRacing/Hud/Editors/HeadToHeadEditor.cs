@@ -10,7 +10,8 @@ internal static class HeadToHeadEditor
         {
             new("main", null, HudTab.Layout, true, O("style"),
                 O("titleRow") with { ShowIf = o => o.Choice("style") != Widgets.HeadToHeadWidget.Ticker },
-                O("within"), O("cars")),
+                O("within"), O("cars"),
+                O("sectors") with { ShowIf = o => o.Choice("style") != Widgets.HeadToHeadWidget.Trend }),
         },
     };
 }

@@ -7,7 +7,7 @@ internal readonly record struct VrSnap(double Value, string? Note);
 
 internal static class VrAlign
 {
-    public const double MoveReach = 0.03, DistanceReach = 0.03, WidthReach = 0.02;
+    public const double MoveReach = 0.03, DistanceReach = 0.03, WidthReach = 0.02, HeightReach = 0.02;
     private const float Far = 10, Same = 0.0005f;
 
     public static VrSnap Move(HudWidgetConfig me, bool sideways, double value, IEnumerable<HudWidgetConfig> widgets, RaceHudSettings? settings, Func<HudWidgetConfig, double> aspect, Func<HudWidgetConfig, string> name)
@@ -32,6 +32,15 @@ internal static class VrAlign
 
     public static VrSnap Width(HudWidgetConfig me, double value, IEnumerable<HudWidgetConfig> widgets, Func<HudWidgetConfig, string> name) =>
         Match(value, Others(me, widgets), o => o.VrWidth, WidthReach, o => $"Same width as {name(o)}");
+
+    public static VrSnap Height(HudWidgetConfig me, double value, IEnumerable<HudWidgetConfig> widgets, Func<HudWidgetConfig, double> aspect, Func<HudWidgetConfig, double> natural, Func<HudWidgetConfig, string> name)
+    {
+        double content = me.VrWidth * natural(me);
+        var best = Match(value, Others(me, widgets), o => o.VrWidth * aspect(o), HeightReach, o => $"Same height as {name(o)}");
+        bool fits = Math.Abs(content - value) <= HeightReach;
+        if (fits && (best.Note is null || Math.Abs(content - value) <= Math.Abs(best.Value - value))) return new VrSnap(content, "Fits its content");
+        return best;
+    }
 
     private static List<HudWidgetConfig> Others(HudWidgetConfig me, IEnumerable<HudWidgetConfig> widgets) =>
         widgets.Where(o => !ReferenceEquals(o, me) && o.Vr == me.Vr && o.Vr != HudVrPlacement.Off && o.VrWidth > 0).ToList();

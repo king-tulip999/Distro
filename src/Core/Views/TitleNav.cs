@@ -98,7 +98,7 @@ internal sealed class TitleNav : Grid
         protected override void OnRender(DrawingContext dc)
         {
             base.OnRender(dc);
-            if (InternalChildren.Count == 0) return;
+            if (!InternalChildren.OfType<UIElement>().Any(c => c.Visibility == Visibility.Visible)) return;
             Mark(dc, LeadBrush, _leadAt, _leadOpacity);
             foreach (double x in _marks) Mark(dc, LineBrush, x, 1);
         }
@@ -517,11 +517,20 @@ internal sealed class TitleNav : Grid
     private void Paint(Entry entry)
     {
         entry.Selected = entry.Group.Items.Any(i => string.Equals(i.Page, _page, StringComparison.OrdinalIgnoreCase));
+        var shown = entry.Selected && IsOnlyPage(entry) ? Visibility.Collapsed : Visibility.Visible;
+        if (entry.Box.Visibility != shown)
+        {
+            entry.Box.Visibility = shown;
+            _groups.InvalidateVisual();
+        }
         string tone = entry.Selected ? "AccentText" : entry.Hover || ReferenceEquals(_menuEntry, entry) ? "Heading" : "TextMuted";
         entry.Text?.SetResourceReference(TextBlock.ForegroundProperty, tone);
         entry.Glyph?.SetResourceReference(Control.ForegroundProperty, tone);
         entry.Chevron?.SetResourceReference(Control.ForegroundProperty, tone);
     }
+
+    private bool IsOnlyPage(Entry entry) =>
+        !entry.Group.IsMenu && _groups.Children.Count == 1 && ReferenceEquals(_groups.Children[0], entry.Box);
 
     private static readonly string[] AccentKeys = ["Accent", "AccentSoft", "AccentText"];
 

@@ -83,7 +83,7 @@ internal sealed partial class RaceHudWidgets
         _well.SetResourceReference(Panel.BackgroundProperty, "Bg");
 
         var title = new TextBlock { Text = "Preview", Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
-        _previewNote = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
+        _previewNote = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
         _previewHidden = Ui.IconText("I.EyeOff", new TextBlock { Text = "Hidden in game", Style = Ui.Res<Style>("Caption") }, "TextMuted");
         _previewHidden.VerticalAlignment = VerticalAlignment.Center;
         _previewHidden.Margin = new Thickness(0, 0, 10, 0);
@@ -101,8 +101,9 @@ internal sealed partial class RaceHudWidgets
             head.Children.Add(tip);
         }
         head.Children.Add(_previewHidden);
-        head.Children.Add(_previewNote);
-        var headBar = Hairline.Frame(new Border { Padding = new Thickness(14, 10, 10, 10), Child = head }, Sides.Bottom);
+        head.Children.Add(new FrameworkElement());
+        var heading = new StackPanel { Children = { head, _previewNote } };
+        var headBar = Hairline.Frame(new Border { Padding = new Thickness(14, 10, 10, 10), Child = heading }, Sides.Bottom);
         headBar.SetResourceReference(Border.BorderBrushProperty, "Line");
 
         var body = new DockPanel { LastChildFill = true };
@@ -593,7 +594,7 @@ internal sealed partial class RaceHudWidgets
                 if (_tabBody is { } settle) await settle.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
                 _settings?.UpdateLayout();
                 if (_settings is not null)
-                    foreach (var finding in Services.LayoutLint.Inspect(_settings, $"hud {kind} {name}")) Report(finding.ToString());
+                    foreach (var finding in Services.ScreenshotRunner.Lint(_settings, $"hud {kind} {name}")) Report(finding);
             }
         }
     }

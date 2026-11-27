@@ -546,6 +546,8 @@ public sealed class HudWidgetConfig
 
     public double Scale { get; set; } = 1;
 
+    public double ScreenHeight { get; set; }
+
     public bool Locked { get; set; }
 
     public int Opacity { get; set; } = 100;
@@ -564,7 +566,7 @@ public sealed class HudWidgetConfig
 
     public string? Hotkey { get; set; }
 
-    public const double VrReach = 2, MinVrDistance = 0.2, MaxVrDistance = 3, MinVrWidth = 0.05, MaxVrWidth = 2, MaxVrAngle = 80;
+    public const double VrReach = 2, MinVrDistance = 0.2, MaxVrDistance = 3, MinVrWidth = 0.05, MaxVrWidth = 2, MinVrHeight = 0.02, MaxVrHeight = 2, MaxVrAngle = 80;
 
     public HudVrPlacement Vr { get; set; }
 
@@ -575,6 +577,8 @@ public sealed class HudWidgetConfig
     public double VrDistance { get; set; } = 1;
 
     public double VrWidth { get; set; }
+
+    public double VrHeight { get; set; }
 
     public double VrTurn { get; set; }
 
@@ -594,6 +598,7 @@ public sealed class HudWidgetConfig
         H = double.IsFinite(H) ? Math.Clamp(H, MinSize, MaxSize) : 200;
         X = double.IsFinite(X) ? Math.Clamp(X, -MaxSize, MaxSize) : 0;
         Y = double.IsFinite(Y) ? Math.Clamp(Y, -MaxSize, MaxSize) : 0;
+        ScreenHeight = double.IsFinite(ScreenHeight) && ScreenHeight > 0 ? Math.Clamp(ScreenHeight, MinSize, MaxSize) : 0;
         Scale = double.IsFinite(Scale) && Scale > 0 ? Math.Round(Math.Clamp(Scale, MinScale, MaxScale), 3) : 1;
         Opacity = Math.Clamp(Opacity, 20, 100);
         if (Background is { } bg) Background = Math.Clamp(bg, 0, 100);
@@ -605,6 +610,7 @@ public sealed class HudWidgetConfig
         VrY = double.IsFinite(VrY) ? Math.Clamp(VrY, -VrReach, VrReach) : 0;
         VrDistance = double.IsFinite(VrDistance) ? Math.Clamp(VrDistance, MinVrDistance, MaxVrDistance) : 1;
         VrWidth = double.IsFinite(VrWidth) && VrWidth > 0 ? Math.Clamp(VrWidth, MinVrWidth, MaxVrWidth) : 0;
+        VrHeight = double.IsFinite(VrHeight) && VrHeight > 0 ? Math.Clamp(VrHeight, MinVrHeight, MaxVrHeight) : 0;
         VrTurn = double.IsFinite(VrTurn) ? Math.Clamp(VrTurn, -MaxVrAngle, MaxVrAngle) : 0;
         VrTilt = double.IsFinite(VrTilt) ? Math.Clamp(VrTilt, -MaxVrAngle, MaxVrAngle) : 0;
         Sessions = (Sessions ?? new()).Where(s => !string.IsNullOrWhiteSpace(s)).Select(RaceHudSettings.SessionKind).Distinct(StringComparer.OrdinalIgnoreCase).ToList();

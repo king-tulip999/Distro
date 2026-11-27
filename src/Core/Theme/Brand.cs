@@ -1,12 +1,14 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Core.Theme;
 
 internal static class Brand
 {
     public static string Name => AppIdentity.Name;
-    public static string Wordmark => AppIdentity.IsTecnica ? "TECNICA" : "VELOCITA";
+    public static string Wordmark => AppIdentity.Pick("TECNICA", "VELOCITA", "LIVREA");
     public const string TrayKey = "Brand";
 
     private const double Grid = 24;
@@ -22,6 +24,10 @@ internal static class Brand
     public const string VelocitaInk = "";
 
     public const string VelocitaAccent = "M10.66,8.11 11.76,9.3 14.53,12.77 15.93,14.19 16.92,14.87 17.41,15.09 17.91,15.23 18.39,15.27 18.85,15.22 19.31,15.05 19.77,14.74 20.2,14.28 20.56,13.64 20.81,12.86 20.89,12 20.81,11.14 20.56,10.36 20.2,9.72 19.77,9.26 19.31,8.95 18.85,8.78 18.39,8.73 17.91,8.77 17.41,8.91 16.42,9.44 15.93,9.81 14.95,10.75 13.08,8.38 14.06,7.46 15.43,6.53 16.29,6.13 17.24,5.84 18.28,5.73 19.39,5.83 20.51,6.2 20.83,6.36 21.85,7.09 22.72,8.09 23.37,9.3 23.77,10.68 23.89,12.15 23.77,13.32 23.37,14.7 22.72,15.91 21.85,16.91 21.58,17.14 20.83,17.64 19.72,18.09 18.28,18.27 17.24,18.16 16.29,17.87 15.6,17.56 14.79,17.08 14.06,16.54 13.34,15.89 12.24,14.7 9.47,11.23 8.07,9.81 7.08,9.13 6.59,8.91 6.09,8.77 5.61,8.73 5.15,8.78 4.69,8.95 4.23,9.26 3.8,9.72 3.44,10.36 3.19,11.14 3.11,12 3.19,12.86 3.44,13.64 3.8,14.28 4.23,14.74 4.69,15.05 5.15,15.22 5.61,15.27 6.09,15.23 6.59,15.09 7.58,14.56 8.07,14.19 9.05,13.25 10.92,15.62 9.94,16.54 8.57,17.47 7.5,17.95 6.5,18.2 5.41,18.27 4.28,18.09 3.17,17.64 2.15,16.91 1.28,15.91 0.63,14.7 0.23,13.32 0.11,11.85 0.23,10.68 0.63,9.3 1.28,8.09 2.15,7.09 3.17,6.36 4.28,5.91 5.41,5.73 6.5,5.8 7.5,6.05 8.57,6.53 9.34,7.01Z";
+
+    public const string LivreaInk = "M7,20 13,4 17,4 11,20Z";
+
+    public const string LivreaAccent = "M1,20 7,4 11,4 5,20ZM13,20 19,4 23,4 17,20Z";
 
     private static readonly int[] CrispSizes = { 16, 20, 24, 32 };
 
@@ -56,9 +62,9 @@ internal static class Brand
 
     private static Geometry? _ink, _accent;
 
-    public static Geometry InkShape => _ink ??= Parse(AppIdentity.IsTecnica ? TecnicaInk : VelocitaInk);
+    public static Geometry InkShape => _ink ??= Parse(AppIdentity.Pick(TecnicaInk, VelocitaInk, LivreaInk));
 
-    public static Geometry AccentShape => _accent ??= Parse(AppIdentity.IsTecnica ? TecnicaAccent : VelocitaAccent);
+    public static Geometry AccentShape => _accent ??= Parse(AppIdentity.Pick(TecnicaAccent, VelocitaAccent, LivreaAccent));
 
     public static Geometry Parse(string data)
     {
@@ -68,47 +74,82 @@ internal static class Brand
         return geometry;
     }
 
+    private static readonly int[] MarkSizes = { 16, 20, 24, 32, 40, 48, 64, 128, 256 };
+
+    private static readonly Dictionary<(int Size, Color Ink, Color Accent), BitmapSource> Marks = new();
+
     public static void Draw(DrawingContext dc, Rect tile, Color ink, Color accent, double pixelsPerDip)
     {
-        double device = tile.Width * pixelsPerDip;
-        if (Math.Abs(device - Math.Round(device)) < 0.01 && PixelSizes.TryGetValue((int)Math.Round(device), out var rows))
-        {
-            DrawPixels(dc, tile, rows, Solid(ink), Solid(accent), 1 / pixelsPerDip);
-            return;
-        }
-        double unit = tile.Width / Grid;
-        dc.PushTransform(new TranslateTransform(tile.X, tile.Y));
-        dc.PushTransform(new ScaleTransform(unit, unit));
-        dc.DrawGeometry(Solid(ink), null, InkShape);
-        dc.DrawGeometry(Solid(accent), null, AccentShape);
-        dc.Pop();
-        dc.Pop();
+        if (Mark((int)Math.Ceiling(tile.Width * pixelsPerDip), ink, accent) is { } art)
+            dc.DrawImage(art, tile);
     }
 
-    private static void DrawPixels(DrawingContext dc, Rect tile, string[] rows, Brush ink, Brush accent, double px)
+    internal static BitmapSource? Mark(int devicePixels, Color ink, Color accent)
     {
-        double left = Math.Round(tile.X / px) * px, top = Math.Round(tile.Y / px) * px;
-        var lines = Enumerable.Range(0, rows.Length + 1);
-        dc.PushGuidelineSet(new GuidelineSet(lines.Select(i => left + i * px).ToArray(), lines.Select(i => top + i * px).ToArray()));
-        for (int y = 0; y < rows.Length; y++)
+        int size = MarkSizes.FirstOrDefault(s => s >= devicePixels, MarkSizes[^1]);
+        lock (Marks)
         {
-            string row = rows[y];
-            for (int x = 0; x < row.Length;)
+            if (Marks.TryGetValue((size, ink, accent), out var cached)) return cached;
+            try
             {
-                int end = x;
-                while (end < row.Length && row[end] == row[x]) end++;
-                if (row[x] != '.')
-                    dc.DrawRectangle(row[x] == 'P' ? ink : accent, null, new Rect(left + x * px, top + y * px, (end - x) * px, px));
-                x = end;
+                var source = new BitmapImage(new Uri($"pack://application:,,,/Core;component/Assets/Marks/{Name}-{size}.png"));
+                var art = Tint(new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0), ink, accent);
+                art.Freeze();
+                return Marks[(size, ink, accent)] = art;
+            }
+            catch (IOException)
+            {
+                return null;
             }
         }
-        dc.Pop();
     }
 
-    private static SolidColorBrush Solid(Color c)
+    internal static BitmapSource Tint(BitmapSource art, Color ink, Color accent)
     {
-        var brush = new SolidColorBrush(c);
-        brush.Freeze();
-        return brush;
+        int width = art.PixelWidth, height = art.PixelHeight, stride = width * 4;
+        var px = new byte[stride * height];
+        art.CopyPixels(px, stride, 0);
+
+        double brightSum = 0, red = 0, green = 0, blue = 0;
+        int strong = 0;
+        for (int i = 0; i < px.Length; i += 4)
+        {
+            var (max, sat) = Shade(px, i);
+            if (sat > 0.35 && px[i + 3] > 204)
+            {
+                brightSum += max;
+                blue += px[i];
+                green += px[i + 1];
+                red += px[i + 2];
+                strong++;
+            }
+        }
+        if (strong == 0) return art;
+        double reference = brightSum / strong;
+        if (Near(accent, red / strong, green / strong, blue / strong) && ink.R > 225 && ink.G > 225 && ink.B > 225) return art;
+
+        for (int i = 0; i < px.Length; i += 4)
+        {
+            var (max, sat) = Shade(px, i);
+            double weight = Math.Clamp((sat - 0.15) / 0.2, 0, 1);
+            double shade = Math.Min(1, max / reference);
+            px[i] = Mix(ink.B * max, accent.B * shade, weight);
+            px[i + 1] = Mix(ink.G * max, accent.G * shade, weight);
+            px[i + 2] = Mix(ink.R * max, accent.R * shade, weight);
+        }
+        return BitmapSource.Create(width, height, art.DpiX, art.DpiY, PixelFormats.Bgra32, null, px, stride);
     }
+
+    private static (double Max, double Saturation) Shade(byte[] px, int i)
+    {
+        double max = Math.Max(px[i], Math.Max(px[i + 1], px[i + 2])) / 255.0;
+        double min = Math.Min(px[i], Math.Min(px[i + 1], px[i + 2])) / 255.0;
+        return (max, max > 0 ? (max - min) / max : 0);
+    }
+
+    private static byte Mix(double white, double coloured, double weight) =>
+        (byte)Math.Clamp(Math.Round(white * (1 - weight) + coloured * weight), 0, 255);
+
+    private static bool Near(Color c, double red, double green, double blue) =>
+        Math.Abs(c.R - red) < 40 && Math.Abs(c.G - green) < 40 && Math.Abs(c.B - blue) < 40;
 }

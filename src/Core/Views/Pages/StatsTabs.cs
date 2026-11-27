@@ -161,9 +161,9 @@ internal static class StatsTabs
             lead.VerticalAlignment = VerticalAlignment.Center;
             grid.Children.Add(lead);
         }
-        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = top, FontSize = 13, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
+        var name = new TextBlock { Text = top, FontSize = 13, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
         name.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
-        var sub = TextFit.TipWhenTrimmed(new TextBlock { Text = bottom, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 1, 0, 0) });
+        var sub = new TextBlock { Text = bottom, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 0, 0) };
         sub.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
         var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { name, sub } };
         Grid.SetColumn(names, 1);

@@ -124,7 +124,7 @@ internal static class DiagnosticReport
         sb.AppendLine($"- Close in background {(c.Ui.CloseToTray ? "on" : "off")}, start in background {(c.Ui.StartMinimized ? "on" : "off")}, auto-install updates {(c.Updates.AutoInstall ? "on" : "off")}");
         sb.AppendLine();
 
-        if (!AppIdentity.IsTecnica)
+        if (AppIdentity.IsVelocita)
         {
             sb.AppendLine("## VR");
             sb.AppendLine($"- iRacing Overlay: {(c.SimRacing.Hud.Enabled ? "shown" : "off")}");

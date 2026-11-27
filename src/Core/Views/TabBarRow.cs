@@ -36,9 +36,12 @@ internal sealed class TabBarRow : Panel
     private static bool Fits(UIElement tabs, double room, double height)
     {
         if (room <= 0) return false;
-        tabs.Measure(new Size(room, height));
         tabs.Measure(new Size(double.PositiveInfinity, height));
-        return tabs.DesiredSize.Width <= room + 0.5;
+        UIElement inner = tabs;
+        while (inner is Decorator { Child: { } child }) inner = child;
+        if (inner is not TabRow row) return tabs.DesiredSize.Width <= room + 0.5;
+        double chrome = tabs.DesiredSize.Width - row.DesiredSize.Width;
+        return row.TightestWidth + chrome <= room + 0.5;
     }
 
     protected override Size ArrangeOverride(Size final)

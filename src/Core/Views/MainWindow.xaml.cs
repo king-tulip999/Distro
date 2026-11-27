@@ -113,6 +113,8 @@ public partial class MainWindow : Window, IModalHost
         _app.Updates.Changed += UpdateBadgeState;
         _updateBadge.Style = Ui.Res<Style>("PrimaryButton");
         _updateBadge.Click += (_, _) => _ = _app.Updates.InstallAsync();
+        _modelBadge.Click += (_, _) => GoTo("settings", "settings.models");
+        Core.LiveryShop.CarModels.Changed += () => Dispatcher.BeginInvoke(ModelBadgeState);
 
         ContentRendered += (_, _) =>
         {
@@ -234,6 +236,9 @@ public partial class MainWindow : Window, IModalHost
     {
         BuildNavBar();
         Nav.Select(_current, CurrentSectioned?.CurrentSection);
+        var tools = _current is not null && _pages.GetValueOrDefault(_current) is ITitleTools page ? page.TitleTools : null;
+        if (!ReferenceEquals(PageTools.Content, tools)) PageTools.Content = tools;
+        PlaceNav();
     }
 
     private List<NavGroup> NavGroups() =>
@@ -247,7 +252,7 @@ public partial class MainWindow : Window, IModalHost
     }
 
     private void BuildNavBar() =>
-        Nav.Build(NavGroups(), PageGroup("settings", "Settings"), _updateBadge);
+        Nav.Build(NavGroups(), PageGroup("settings", "Settings"), Badges);
 
     private void OpenNavItem(NavItem item)
     {
@@ -270,7 +275,8 @@ public partial class MainWindow : Window, IModalHost
     {
         double width = PageArea.ActualWidth;
         if (width <= 0) return;
-        double frame = Math.Min(Ui.PageWidth, width), offset = Math.Round((width - frame) / 2), body = offset + Ui.PageSide;
+        bool full = _current is not null && _pages.GetValueOrDefault(_current) is IFullWidthPage;
+        double frame = full ? width : Math.Min(Ui.PageWidth, width), offset = Math.Round((width - frame) / 2), body = offset + Ui.PageSide;
         if (Math.Abs(TitleLeft.Margin.Left - (BrandInset + offset)) > 0.1)
         {
             TitleLeft.Margin = new Thickness(BrandInset + offset, TitleLeft.Margin.Top, 0, 0);
@@ -756,6 +762,21 @@ public partial class MainWindow : Window, IModalHost
     private const double TitleButtonHeight = 28;
 
     private readonly Button _updateBadge = new() { Visibility = Visibility.Collapsed };
+    private readonly Button _modelBadge = new() { Visibility = Visibility.Collapsed };
+    private StackPanel? _badgeRow;
+    private StackPanel Badges => _badgeRow ??= new StackPanel { Orientation = Orientation.Horizontal, Visibility = Visibility.Collapsed, Children = { _modelBadge, _updateBadge } };
+
+    private void ShowBadges() =>
+        Badges.Visibility = _modelBadge.Visibility == Visibility.Visible || _updateBadge.Visibility == Visibility.Visible ? Visibility.Visible : Visibility.Collapsed;
+
+    private void ModelBadgeState()
+    {
+        var batch = Core.LiveryShop.CarModels.Batch;
+        _modelBadge.Visibility = batch is null ? Visibility.Collapsed : Visibility.Visible;
+        if (batch is { } b) _modelBadge.Content = $"Downloading 3D car models: {b.Current} of {b.Total}";
+        _modelBadge.Margin = new Thickness(0, 0, _updateBadge.Visibility == Visibility.Visible ? Ui.ButtonGap : 0, 0);
+        ShowBadges();
+    }
 
     private bool _launched;
 
@@ -1100,6 +1121,7 @@ public partial class MainWindow : Window, IModalHost
     {
         var u = _app.Updates;
         _updateBadge.Visibility = u.Available ? Visibility.Visible : Visibility.Collapsed;
+        ShowBadges();
         if (u.Latest is not { } r) return;
         bool downloading = u.State == UpdateState.Downloading;
         _updateBadge.IsEnabled = !downloading;
@@ -1319,7 +1341,7 @@ public partial class MainWindow : Window, IModalHost
     {
         if (ThemeLogo.Visibility != Visibility.Visible || !IsLoaded) return;
         double width = ThemeLogo.ActualWidth > 0 ? ThemeLogo.ActualWidth : 96;
-        double free = TitleBar.ActualWidth - Nav.Margin.Left - Nav.ActualWidth - CaptionButtons.ActualWidth - ThemeLogo.Margin.Right - width;
+        double free = TitleBar.ActualWidth - Nav.Margin.Left - Nav.ActualWidth - CaptionButtons.ActualWidth - PageTools.ActualWidth - PageTools.Margin.Right - ThemeLogo.Margin.Right - width;
         double target = Math.Clamp((free - 24) / 120, 0, 1);
         ThemeLogo.IsHitTestVisible = target > 0.5;
         if (Math.Abs(target - _logoTarget) < 0.01) return;

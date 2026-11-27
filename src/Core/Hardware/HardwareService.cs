@@ -47,7 +47,7 @@ internal sealed record HardwareCatalog(
     IReadOnlyDictionary<string, CurveLive> Curves,
     bool Emergency);
 
-internal sealed class HardwareService : IDisposable
+internal sealed partial class HardwareService : IDisposable
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, bool> _consumers = new();
@@ -126,7 +126,7 @@ internal sealed class HardwareService : IDisposable
 
     public bool PawnIoLikelyMissing => PawnIoState != PawnIoState.Installed;
 
-    private DemoHardware? _demo;
+    private IFakeHardware? _demo;
     private System.Threading.Timer? _demoTimer;
     private readonly object _demoGate = new();
 
@@ -156,7 +156,9 @@ internal sealed class HardwareService : IDisposable
         _pendingFanSettings = new FanSettings { Enabled = false };
     }
 
-    public void UseDemo() => _demo = new DemoHardware();
+    public void UseDemo() => MakeDemo(ref _demo);
+
+    partial void MakeDemo(ref IFakeHardware? demo);
 
     public void Acquire(string consumer, bool fullTree = false)
     {

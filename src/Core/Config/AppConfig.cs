@@ -116,7 +116,9 @@ public readonly struct AppTheme : IEquatable<AppTheme>
     public static readonly AppTheme Tecnica = new("Tecnica");
     public static readonly AppTheme Velocita = new("Velocita");
 
-    public static AppTheme Glow => AppIdentity.IsTecnica ? Tecnica : Velocita;
+    public static readonly AppTheme Livrea = new("Livrea");
+
+    public static AppTheme Glow => AppIdentity.Pick(Tecnica, Velocita, Livrea);
 
     internal static readonly AppTheme[] Numbered = { Glow, Glow, Glow, Glow, Custom };
 

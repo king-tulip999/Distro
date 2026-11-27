@@ -27,12 +27,17 @@ internal sealed class HeadToHeadWidget : HudWidget
         TitleRow,
         HudOption.Number("within", "Show a car within", 2, 0.5, 10, 0.1, Units.S, "A car shows once the gap to it is this small, and goes again a little after it grows past it"),
         HudOption.Choice("cars", "Cars", "both", new HudChoice("both", "Ahead and behind"), new HudChoice("ahead", "Only the car ahead"), new HudChoice("behind", "Only the car behind")),
+        HudOption.Choice("sectors", "Sectors", "all", new HudChoice("all", "Every sector line"), new HudChoice("3", "Merge to 3", "Joins iRacing's sector lines into three parts of the lap")),
     };
 
     private readonly DuelSnapshot _ahead = new(), _behind = new();
     private readonly MySectors _mine = new();
     private bool _stickyAhead, _stickyBehind, _showAhead, _showBehind;
     private long _seq = long.MinValue;
+    private IReadOnlyList<double>? _rawStarts;
+    private int _target = -1;
+    private int[] _groups = Array.Empty<int>();
+    private IReadOnlyList<double> _starts = Array.Empty<double>();
     private readonly PointF[] _tri = new PointF[3];
     private readonly List<(string Text, Font Font, Color Color, bool Space)> _runs = new();
     private readonly HudMapSource _maps = new();
@@ -61,6 +66,16 @@ internal sealed class HeadToHeadWidget : HudWidget
     private void Refresh(HudView v, bool preview)
     {
         var f = v.Frame;
+        int target = v.Options.Choice("sectors") == "3" ? 3 : 0;
+        var raw = v.Race.Duels.SectorStarts;
+        if (!ReferenceEquals(raw, _rawStarts) || target != _target)
+        {
+            _rawStarts = raw;
+            _target = target;
+            _groups = DuelSectors.Groups(raw, target);
+            _starts = _groups.Select(i => raw[i]).ToArray();
+            _seq = long.MinValue;
+        }
         if (f.Sequence != _seq)
         {
             _seq = f.Sequence;
@@ -72,6 +87,9 @@ internal sealed class HeadToHeadWidget : HudWidget
             log.Fill(_ahead, me, a, race, now, a >= 0 && f.CarOnPitRoad[a]);
             log.Fill(_behind, me, b, race, now, b >= 0 && f.CarOnPitRoad[b]);
             log.FillMine(_mine, me, now);
+            MergeSectors(_ahead);
+            MergeSectors(_behind);
+            _mine.Count = DuelSectors.Merge(_mine.Sector, _mine.Count, _groups);
             string cars = v.Options.Choice("cars");
             double within = v.Options.Number("within");
             _stickyAhead = Visible(_ahead, cars != "behind", within, _stickyAhead);
@@ -85,6 +103,12 @@ internal sealed class HeadToHeadWidget : HudWidget
             _showAhead = cars != "behind" && _ahead.HasGap;
             _showBehind = cars != "ahead" && _behind.HasGap;
         }
+    }
+
+    private void MergeSectors(DuelSnapshot s)
+    {
+        DuelSectors.Merge(s.LastSector, s.Sectors, _groups);
+        s.Sectors = DuelSectors.Merge(s.Sector, s.Sectors, _groups);
     }
 
     private static bool Visible(DuelSnapshot s, bool allowed, double within, bool was)
@@ -300,9 +324,9 @@ internal sealed class HeadToHeadWidget : HudWidget
         return p.Measure(text, font) <= room ? text : SectorName(v, a);
     }
 
-    private static string SectorName(HudView v, double pct) => PooledText.Number("S", LapMath.SectorAt(v.Race.Duels.SectorStarts, pct) + 1);
+    private string SectorName(HudView v, double pct) => PooledText.Number("S", LapMath.SectorAt(_starts, pct) + 1);
 
-    private static string NextTurn(HudView v, int to)
+    private string NextTurn(HudView v, int to)
     {
         double b = (to + 1) / (double)DuelLog.Pieces;
         var turns = v.Race.Turns.All;
@@ -346,7 +370,7 @@ internal sealed class HeadToHeadWidget : HudWidget
         var font = p.Body;
         var bold = p.Bold;
         var cellFont = p.SmallBold;
-        int n = Math.Max(1, v.Race.Duels.SectorStarts.Count);
+        int n = Math.Max(1, _starts.Count);
         float gap = 6 * d, lead = 3 * d + 6 * d, cellGap = 3 * d;
         float posW = MathF.Ceiling(p.Measure("00", bold) + 8 * d);
         float numW = MathF.Ceiling(p.Measure("#000", font) + 2 * d);
@@ -533,7 +557,7 @@ internal sealed class HeadToHeadWidget : HudWidget
         float chartH = shown == 2 ? twoChart : oneChart;
         var area = p.Header("Corners", WithinText(v), null, Block(chartH) * shown - 8 * d);
         float y = area.Y;
-        int n = Math.Max(1, v.Race.Duels.SectorStarts.Count);
+        int n = Math.Max(1, _starts.Count);
         Span<float> sizes = stackalloc float[] { headH, chartH, labelsH + 4 * d, boxH + 6 * d, footH * 2 };
         Span<RectangleF> parts = stackalloc RectangleF[5];
         bool register = true;
@@ -583,7 +607,7 @@ internal sealed class HeadToHeadWidget : HudWidget
     {
         float d = p.Density, radius = p.CornerRadius(4);
         p.Fill(r, p.Solid(p.Sunken(0.35), 230), radius);
-        var starts = v.Race.Duels.SectorStarts;
+        var starts = _starts;
         for (int i = 1; i < starts.Count; i++)
         {
             float x = r.X + (float)starts[i] * r.Width;
@@ -615,7 +639,7 @@ internal sealed class HeadToHeadWidget : HudWidget
         float right = float.NegativeInfinity;
         if (turns.Count == 0)
         {
-            var starts = v.Race.Duels.SectorStarts;
+            var starts = _starts;
             for (int i = 0; i < starts.Count; i++)
             {
                 double end = i + 1 < starts.Count ? starts[i + 1] : 1;
@@ -782,7 +806,7 @@ internal sealed class HeadToHeadWidget : HudWidget
                     g.DrawLines(p.FlatPen(color, w), lanes[i]);
                 }
             }
-            var starts = v.Race.Duels.SectorStarts;
+            var starts = _starts;
             for (int i = 0; i < starts.Count; i++)
             {
                 var at = MapPoint(starts[i], out var nrm);

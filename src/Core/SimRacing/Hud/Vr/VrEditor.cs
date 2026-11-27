@@ -13,7 +13,7 @@ internal readonly record struct VrEditorHit(VrEditorPart Part, int Row = -1)
 
 internal readonly record struct VrEditorElement(VrEditorPart Part, int Row, RectangleF Box);
 
-internal sealed record VrEditorRow(string Label, double Min, double Max, double Step, string Unit, Func<double> Get, Action<double> Set, Func<double, VrSnap>? Snap = null);
+internal sealed record VrEditorRow(string Label, double Min, double Max, double Step, string Unit, Func<double> Get, Action<double> Set, Func<double, VrSnap>? Snap = null, Func<bool>? Auto = null);
 
 internal enum VrEditorResult { None, Redraw, Changed, Close }
 
@@ -26,6 +26,7 @@ internal sealed class VrEditor
     private readonly Action<int> _stepLayout;
     private readonly Func<HudWidgetConfig, double> _aspect;
     private readonly Func<HudWidgetConfig, string> _name;
+    private readonly Func<HudWidgetConfig, double> _natural;
     private List<HudWidgetConfig?> _candidates = new();
     private int _dragRow = -1;
     private float _dragFromX;
@@ -35,12 +36,13 @@ internal sealed class VrEditor
 
     public bool MovingPanel => _panelDrag;
 
-    public VrEditor(RaceHudSettings settings, Action<int> stepLayout, Func<HudWidgetConfig, double>? aspect = null, Func<HudWidgetConfig, string>? name = null)
+    public VrEditor(RaceHudSettings settings, Action<int> stepLayout, Func<HudWidgetConfig, double>? aspect = null, Func<HudWidgetConfig, string>? name = null, Func<HudWidgetConfig, double>? natural = null)
     {
         _settings = settings;
         _stepLayout = stepLayout;
         _aspect = aspect ?? (_ => 0.5);
         _name = name ?? (w => w.Kind);
+        _natural = natural ?? _aspect;
     }
 
     public string? Note { get; private set; }
@@ -88,12 +90,15 @@ internal sealed class VrEditor
         {
             rows.Add(new("Sideways", -reach, reach, 1, Units.Cm, () => w.VrX * 100, v => w.VrX = v / 100,
                 v => Cm(VrAlign.Move(w, true, v / 100, Placed, _settings, _aspect, _name))));
-            rows.Add(new("Height", -reach, reach, 1, Units.Cm, () => w.VrY * 100, v => w.VrY = v / 100,
+            rows.Add(new("Up / down", -reach, reach, 1, Units.Cm, () => w.VrY * 100, v => w.VrY = v / 100,
                 v => Cm(VrAlign.Move(w, false, v / 100, Placed, _settings, _aspect, _name))));
             rows.Add(new("Distance", HudWidgetConfig.MinVrDistance * 100, HudWidgetConfig.MaxVrDistance * 100, 1, Units.Cm, () => w.VrDistance * 100, v => w.VrDistance = v / 100,
                 v => Cm(VrAlign.Distance(w, v / 100, Placed, _name))));
             rows.Add(new("Width", HudWidgetConfig.MinVrWidth * 100, HudWidgetConfig.MaxVrWidth * 100, 1, Units.Cm, () => w.VrWidth * 100, v => w.VrWidth = v / 100,
                 v => Cm(VrAlign.Width(w, v / 100, Placed, _name))));
+            rows.Add(new("Height", HudWidgetConfig.MinVrHeight * 100, HudWidgetConfig.MaxVrHeight * 100, 1, Units.Cm, () => w.VrWidth * _aspect(w) * 100,
+                v => VrPlacement.SetHeight(w, v / 100, w.VrWidth * _natural(w)),
+                v => Cm(VrAlign.Height(w, v / 100, Placed, _aspect, _natural, _name)), () => w.VrHeight <= 0));
             rows.Add(new("Turn", -HudWidgetConfig.MaxVrAngle, HudWidgetConfig.MaxVrAngle, VrAdjust.AngleStep, "°", () => w.VrTurn, v => w.VrTurn = v));
             rows.Add(new("Tilt", -HudWidgetConfig.MaxVrAngle, HudWidgetConfig.MaxVrAngle, VrAdjust.AngleStep, "°", () => w.VrTilt, v => w.VrTilt = v));
         }
@@ -101,7 +106,7 @@ internal sealed class VrEditor
         {
             double far = RaceHudSettings.MaxVrShiftDistance * 100;
             rows.Add(new("Sideways", -reach, reach, 1, Units.Cm, () => _settings.VrShiftX * 100, v => _settings.VrShiftX = v / 100));
-            rows.Add(new("Height", -reach, reach, 1, Units.Cm, () => _settings.VrShiftY * 100, v => _settings.VrShiftY = v / 100));
+            rows.Add(new("Up / down", -reach, reach, 1, Units.Cm, () => _settings.VrShiftY * 100, v => _settings.VrShiftY = v / 100));
             rows.Add(new("Distance", -far, far, 1, Units.Cm, () => _settings.VrShiftDistance * 100, v => _settings.VrShiftDistance = v / 100));
         }
         return rows;
@@ -281,5 +286,5 @@ internal sealed class VrEditor
         return true;
     }
 
-    public static string Value(VrEditorRow row) => row.Unit == "°" ? $"{row.Get():0}°" : $"{row.Get():0} {row.Unit}";
+    public static string Value(VrEditorRow row) => row.Auto?.Invoke() == true ? "Auto" : row.Unit == "°" ? $"{row.Get():0}°" : $"{row.Get():0} {row.Unit}";
 }

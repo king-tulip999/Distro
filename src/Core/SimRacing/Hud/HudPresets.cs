@@ -50,11 +50,11 @@ internal static class HudPresets
             b.Clamp();
             if (!string.Equals(a.Kind, b.Kind, StringComparison.OrdinalIgnoreCase) || a.Enabled != b.Enabled || a.Anchor != b.Anchor
                 || !string.Equals(a.Monitor, b.Monitor, StringComparison.OrdinalIgnoreCase)
-                || Math.Abs(a.X - b.X) > 0.05 || Math.Abs(a.Y - b.Y) > 0.05 || Math.Abs(a.W - b.W) > 0.05 || Math.Abs(a.H - b.H) > 0.05 || Math.Abs(a.Scale - b.Scale) > 0.001
+                || Math.Abs(a.X - b.X) > 0.05 || Math.Abs(a.Y - b.Y) > 0.05 || Math.Abs(a.W - b.W) > 0.05 || Math.Abs(a.H - b.H) > 0.05 || Math.Abs(a.Scale - b.Scale) > 0.001 || Math.Abs(a.ScreenHeight - b.ScreenHeight) > 0.05
                 || a.Locked != b.Locked || a.Opacity != b.Opacity || a.UpdateHz != b.UpdateHz || a.HideInReplay != b.HideInReplay
                 || a.OnlyWhenNeeded != b.OnlyWhenNeeded || a.OnlyOnTrack != b.OnlyOnTrack || a.Background != b.Background
                 || a.Vr != b.Vr || Math.Abs(a.VrX - b.VrX) > 0.0005 || Math.Abs(a.VrY - b.VrY) > 0.0005
-                || Math.Abs(a.VrDistance - b.VrDistance) > 0.0005 || Math.Abs(a.VrWidth - b.VrWidth) > 0.0005
+                || Math.Abs(a.VrDistance - b.VrDistance) > 0.0005 || Math.Abs(a.VrWidth - b.VrWidth) > 0.0005 || Math.Abs(a.VrHeight - b.VrHeight) > 0.0005
                 || Math.Abs(a.VrTurn - b.VrTurn) > 0.05 || Math.Abs(a.VrTilt - b.VrTilt) > 0.05 || a.VrCurve != b.VrCurve || a.VrOnly != b.VrOnly
                 || !a.Sessions.Order(StringComparer.OrdinalIgnoreCase).SequenceEqual(b.Sessions.Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase)
                 || !SameOptions(a, b))

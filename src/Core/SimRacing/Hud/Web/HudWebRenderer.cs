@@ -297,7 +297,7 @@ internal sealed class HudWebRenderer : IDisposable
         if (frame.Status != SimStatus.Connected || pixels.W < 8 || pixels.H < 8 || config.W <= 0 || config.H <= 0) return Empty;
         if (OnlyLayout && !config.Enabled || config.Id.StartsWith(MissingPrefix, StringComparison.Ordinal) || Shows?.Invoke(config, frame) == false) return Empty;
         var view = new HudView { Frame = frame, Race = race, Settings = settings, Config = config, Options = t.Options!, Def = t.Def };
-        if ((config.OnlyWhenNeeded ?? t.Def.HideWhenEmpty) == true && !t.Widget!.HasContent(view)) return Empty;
+        if (t.Def.Hides(config) && !t.Widget!.HasContent(view)) return Empty;
         var layout = SizeOf?.Invoke(config, race) ?? new SizeF((float)config.W, (float)config.H);
         if (layout.Width < 1 || layout.Height < 1) layout = new SizeF((float)config.W, (float)config.H);
         float scale = Math.Min(pixels.W / layout.Width, pixels.H / layout.Height);

@@ -72,7 +72,7 @@ internal sealed class HudHost : IDisposable
         public SizeF Fit;
     }
 
-    private readonly record struct WidgetPlace(string Id, string Monitor, HudAnchor Anchor, double X, double Y, double W, double H, double Scale);
+    private readonly record struct WidgetPlace(string Id, string Monitor, HudAnchor Anchor, double X, double Y, double W, double H, double Scale, double ScreenHeight);
 
     private SimStatus _lastStatus;
 
@@ -513,7 +513,7 @@ internal sealed class HudHost : IDisposable
             if (s.Widget.Animating) hz = Math.Max(hz, s.Def.MovingHz);
             fastest = Math.Max(fastest, hz);
             bool due = Stopwatch.GetElapsedTime(s.LastDraw, now).TotalMilliseconds >= 1000.0 / hz - 4;
-            if (!_editing && frame.Status == SimStatus.Connected && (s.Config.OnlyWhenNeeded ?? s.Def.HideWhenEmpty) == true)
+            if (!_editing && frame.Status == SimStatus.Connected && s.Def.Hides(s.Config))
             {
                 if (s.Dirty || due && s.LastSeq != frame.Sequence)
                 {
@@ -599,7 +599,8 @@ internal sealed class HudHost : IDisposable
     {
         long start = Stopwatch.GetTimestamp();
         var monitor = HudGeometry.MonitorFor(s.Config.Monitor, Monitors);
-        var fit = SizeOf(s.Config, Race);
+        var natural = SizeOf(s.Config, Race);
+        var fit = VrPlacement.Screen(s.Config, natural, MinHeight(s.Def));
         bool onMonitor = !AppIdentity.SimHub && !(s.Config.VrOnly && !_editing && _vr.On && s.Config.Vr != HudVrPlacement.Off);
         if (!onMonitor && s.Window?.Visible == true) { s.Window.Hide(); s.Window.ReleaseSurface(); }
         if (onMonitor)
@@ -608,6 +609,7 @@ internal sealed class HudHost : IDisposable
             {
                 var w = new HudWindow("Velocita · " + s.Def.Name) { Tag = s.Config.Id };
                 w.Dragging += OnDragging;
+                w.Stretching += OnStretching;
                 w.Dropped += OnDropped;
                 w.Picked += win => WidgetPicked?.Invoke((string)win.Tag!);
                 w.Clicked += OnClicked;
@@ -638,7 +640,9 @@ internal sealed class HudHost : IDisposable
                 var painter = s.Painter!;
                 float scale = size.Width / fit.Width;
                 s.BandPx = band * scale;
+                window.ContentBottom = s.BandTop ? rect.Height : rect.Height - s.BandPx;
                 painter.Simulated = frame.Simulated;
+                painter.FillHeight = s.Config.ScreenHeight > 0;
                 painter.Begin(g, scale, new SizeF(fit.Width, size.Height / scale), Palette, Look);
                 painter.Background = s.Config.Background;
                 var view = new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def };
@@ -660,7 +664,7 @@ internal sealed class HudHost : IDisposable
         }
         if (_vr.Wants(s.Config))
         {
-            try { DrawVr(s, frame, fit); }
+            try { DrawVr(s, frame, natural); }
             catch (Exception ex)
             {
                 LogOnce("vr", ex);
@@ -681,18 +685,33 @@ internal sealed class HudHost : IDisposable
     private void DrawVr(Slot s, TelemetryFrame frame, SizeF fit)
     {
         if (s.Config.VrWidth <= 0) PlaceInVr(s.Config);
-        var size = VrPlacement.Pixels(fit, VrShare.MaxPixels);
+        var canvas = VrCanvas(s.Config, s.Def, fit);
+        var size = VrPlacement.Pixels(canvas, VrShare.MaxPixels);
         var target = _vr.Begin(s.Config.Id, size);
         var painter = target.Painter;
-        float scale = size.Width / fit.Width;
+        float scale = size.Width / canvas.Width;
         painter.Simulated = frame.Simulated;
-        painter.Begin(target.Surface.Graphics!, scale, new SizeF(fit.Width, size.Height / scale), Palette, Look);
+        painter.FillHeight = s.Config.VrHeight > 0;
+        painter.Begin(target.Surface.Graphics!, scale, new SizeF(canvas.Width, size.Height / scale), Palette, Look);
         painter.Background = s.Config.Background;
         s.Widget.Paint(painter, new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def });
         painter.FinishPanels();
         if (VrAdjustLabel(s) is { } label) AdjustFrame(painter, label);
         painter.End(target.Surface.Dc, size);
         _vr.Publish(target, s.Config.Id, s.Def.Name, s.Config, VrPlacement.Pose(s.Config, Settings));
+    }
+
+    private static float MinHeight(HudWidgetDef? def) => (float)Math.Max(def?.MinH ?? 0, HudWidgetConfig.MinSize);
+
+    private static SizeF VrCanvas(HudWidgetConfig config, HudWidgetDef? def, SizeF fit) => VrPlacement.Canvas(config, fit, MinHeight(def));
+
+    public SizeF ScreenSizeOf(HudWidgetConfig config, RaceState race) => VrPlacement.Screen(config, SizeOf(config, race), MinHeight(HudCatalog.Find(config.Kind)));
+
+    public double VrAspect(HudWidgetConfig w, bool asShown)
+    {
+        var fit = SizeOf(w, Race);
+        var size = asShown ? VrCanvas(w, HudCatalog.Find(w.Kind), fit) : fit;
+        return size.Width > 0 ? size.Height / size.Width : 0.5;
     }
 
     private const string EditorId = "vr-editor";
@@ -726,11 +745,7 @@ internal sealed class HudHost : IDisposable
             return;
         }
         HideFlash();
-        _editor = new VrEditor(Settings, StepLayout, w =>
-        {
-            var size = SizeOf(w, Race);
-            return size.Width > 0 ? size.Height / size.Width : 0.5;
-        }, w => HudCatalog.Find(w.Kind)?.Name ?? w.Kind);
+        _editor = new VrEditor(Settings, StepLayout, w => VrAspect(w, true), w => HudCatalog.Find(w.Kind)?.Name ?? w.Kind, w => VrAspect(w, false));
         _editor.SetCandidates(candidates);
         _vrSetting = VrAdjustSetting.Move;
         _mouse.Moved += OnMouseMoved;
@@ -1035,7 +1050,7 @@ internal sealed class HudHost : IDisposable
             return;
         }
         var monitor = HudGeometry.MonitorFor(config.Monitor, Monitors);
-        VrPlacement.PlaceFromScreen(config, HudGeometry.Place(config, monitor, SizeOf(config, Race)), monitor.Bounds);
+        VrPlacement.PlaceFromScreen(config, HudGeometry.Place(config, monitor, ScreenSizeOf(config, Race)), monitor.Bounds);
     }
 
     private readonly HashSet<string> _logged = new();
@@ -1058,11 +1073,16 @@ internal sealed class HudHost : IDisposable
         p.Fill(tag, p.P.Accent, 4);
         p.Text(label, p.SmallBold, p.P.OnAccent, tag, HAlign.Center, VAlign.Center);
         if (!s.Config.Locked)
+        {
             for (int i = 0; i < 3; i++)
             {
                 float o = 4 + i * 4;
                 p.Line(b.Right - o, b.Bottom - 3, b.Right - 3, b.Bottom - o, p.P.AccentText, 1.5f);
             }
+            float mid = b.X + b.Width / 2;
+            p.Line(mid - 12, b.Bottom - 7, mid + 12, b.Bottom - 7, p.P.AccentText, 1.5f);
+            p.Line(mid - 8, b.Bottom - 3.5f, mid + 8, b.Bottom - 3.5f, p.P.AccentText, 1.5f);
+        }
     }
 
     private void CloseWindows()
@@ -1229,7 +1249,7 @@ internal sealed class HudHost : IDisposable
         if (on && (Settings.Layout(_layoutName) ?? Settings.Layout(Settings.ActiveLayout)) is { Widgets.Count: > 0 } layout)
         {
             if (_editing) RecordUndo();
-            HudGeometry.SnapAll(layout.Widgets, Monitors, Settings.GridSize, w => SizeOf(w, Race));
+            HudGeometry.SnapAll(layout.Widgets, Monitors, Settings.GridSize, w => ScreenSizeOf(w, Race));
             foreach (var s in _slots.Values) { s.Dirty = true; s.Window?.Repaint(); }
             if (_holding) SafeTick();
         }
@@ -1270,7 +1290,7 @@ internal sealed class HudHost : IDisposable
     private Places Snapshot()
     {
         var layout = Settings.Layout(_layoutName);
-        return new(layout, (layout?.Widgets ?? new()).Select(w => new WidgetPlace(w.Id, w.Monitor, w.Anchor, w.X, w.Y, w.W, w.H, w.Scale)).ToList());
+        return new(layout, (layout?.Widgets ?? new()).Select(w => new WidgetPlace(w.Id, w.Monitor, w.Anchor, w.X, w.Y, w.W, w.H, w.Scale, w.ScreenHeight)).ToList());
     }
 
     private void NoteEditStart()
@@ -1284,7 +1304,7 @@ internal sealed class HudHost : IDisposable
         var widgets = places.Layout?.Widgets ?? new();
         foreach (var p in places.Items)
             if (widgets.FirstOrDefault(w => w.Id == p.Id) is { } w)
-                (w.Monitor, w.Anchor, w.X, w.Y, w.W, w.H, w.Scale) = (p.Monitor, p.Anchor, p.X, p.Y, p.W, p.H, p.Scale);
+                (w.Monitor, w.Anchor, w.X, w.Y, w.W, w.H, w.Scale, w.ScreenHeight) = (p.Monitor, p.Anchor, p.X, p.Y, p.W, p.H, p.Scale, p.ScreenHeight);
         foreach (var s in _slots.Values) s.Dirty = true;
         Save();
         if (_holding) SafeTick();
@@ -1295,7 +1315,7 @@ internal sealed class HudHost : IDisposable
         if (!_slots.TryGetValue((string)window.Tag!, out var s)) return;
         if (_dragging != s) { RecordUndo(); _dragging = s; s.DragBandTop = s.BandTop; }
         var monitor = HudGeometry.MonitorAt(new PointF(proposed.X + proposed.Width / 2, proposed.Y + proposed.Height / 2), Monitors);
-        var fit = s.Fit.Width > 0 ? s.Fit : SizeOf(s.Config, Race);
+        var fit = s.Fit.Width > 0 ? s.Fit : ScreenSizeOf(s.Config, Race);
         bool snap = Settings.Snap && !HudWindow.Free;
         if (resizing)
         {
@@ -1327,6 +1347,33 @@ internal sealed class HudHost : IDisposable
         Draw(s, Race.Frame);
     }
 
+    private void OnStretching(HudWindow window, float bottom)
+    {
+        if (!_slots.TryGetValue((string)window.Tag!, out var s)) return;
+        if (_dragging != s) { RecordUndo(); _dragging = s; s.DragBandTop = s.BandTop; }
+        var monitor = HudGeometry.MonitorFor(s.Config.Monitor, Monitors);
+        var content = Content(s, window.Rect);
+        if (Settings.Snap && !HudWindow.Free && Settings.GridSize > 1)
+        {
+            float grid = Settings.GridSize * monitor.Scale;
+            bottom = monitor.Bounds.Top + MathF.Round((bottom - monitor.Bounds.Top) / grid) * grid;
+        }
+        float k = (float)(monitor.Scale * s.Config.Scale);
+        var natural = SizeOf(s.Config, Race);
+        float height = Math.Max(1, bottom - content.Top) / Math.Max(0.001f, k);
+        s.Config.ScreenHeight = Math.Abs(height - natural.Height) * k < AutoHeightPixels ? 0 : Math.Round(height);
+        s.Config.Clamp();
+        var fit = ScreenSizeOf(s.Config, Race);
+        var rect = new RectangleF(content.X, content.Y, content.Width, fit.Height * k);
+        s.Fit = fit;
+        HudGeometry.Store(s.Config, rect, monitor, fit);
+        window.Rect = new RectangleF(rect.X, s.BandTop ? rect.Y - s.BandPx : rect.Y, rect.Width, rect.Height + s.BandPx);
+        s.Dirty = true;
+        Draw(s, Race.Frame);
+    }
+
+    private const float AutoHeightPixels = 6;
+
     private void OnDropped(HudWindow window)
     {
         if (!_slots.TryGetValue((string)window.Tag!, out var s)) return;
@@ -1334,7 +1381,7 @@ internal sealed class HudHost : IDisposable
         HideGuides();
         var rect = Content(s, window.Rect);
         if (!HudWindow.Free) rect = HudGeometry.Resolve(rect, Others(s, monitor).ToList(), monitor.Bounds);
-        HudGeometry.Store(s.Config, rect, monitor, s.Fit.Width > 0 ? s.Fit : SizeOf(s.Config, Race));
+        HudGeometry.Store(s.Config, rect, monitor, s.Fit.Width > 0 ? s.Fit : ScreenSizeOf(s.Config, Race));
         _dragging = null;
         s.Dirty = true;
         Save();
@@ -1561,14 +1608,17 @@ internal sealed class HudHost : IDisposable
 
     public void RenderPreview(HudWidgetConfig config, RaceState race, HudPainter painter, float scale, ref Bitmap? bitmap)
     {
-        var layout = SizeOf(config, race);
+        var natural = SizeOf(config, race);
+        var layout = VrPlacement.Screen(config, natural, MinHeight(HudCatalog.Find(config.Kind)));
         int w = Math.Max(1, (int)Math.Round(layout.Width * scale)), h = Math.Max(1, (int)Math.Round(layout.Height * scale));
+        painter.FillHeight = config.ScreenHeight > 0;
         if (bitmap is null || bitmap.Width != w || bitmap.Height != h)
         {
             bitmap?.Dispose();
             bitmap = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
         }
         DrawAt(config, race, painter, scale, layout);
+        painter.FillHeight = false;
         painter.End(_previewSurface.Dc, _previewSurface.Size);
         using var copy = Graphics.FromImage(bitmap);
         copy.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;

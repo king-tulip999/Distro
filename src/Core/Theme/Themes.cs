@@ -62,7 +62,13 @@ internal static class Themes
         CardEdge = Hairline, Outline = "InputEdge", Glow = true, GlowStrength = 1.0, CornerGlow = true, Exact = true,
     };
 
-    public static ThemeSpec AppGlow => AppIdentity.IsTecnica ? Tecnica : Velocita;
+    public static readonly ThemeSpec Livrea = new()
+    {
+        Id = AppTheme.Livrea, Name = "Livrea", Dark = true, Colors = GlowPalettes.Livrea,
+        CardEdge = Hairline, Outline = "InputEdge", Glow = true, GlowStrength = 1.0, CornerGlow = true, Exact = true,
+    };
+
+    public static ThemeSpec AppGlow => AppIdentity.Pick(Tecnica, Velocita, Livrea);
 
     public static string? SetAccent(string? hex)
     {

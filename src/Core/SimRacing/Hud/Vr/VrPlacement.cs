@@ -129,6 +129,25 @@ internal static class VrPlacement
             Math.Clamp(width, HudWidgetConfig.MinVrWidth, HudWidgetConfig.MaxVrWidth));
     }
 
+    public const double AutoHeightReach = 0.005;
+    public const float MaxCanvasHeight = 4000;
+
+    public static SizeF Canvas(HudWidgetConfig c, SizeF fit, float minHeight)
+    {
+        if (c.VrHeight <= 0 || c.VrWidth <= 0 || fit.Width <= 0) return fit;
+        float height = (float)(fit.Width * c.VrHeight / c.VrWidth);
+        return new SizeF(fit.Width, Math.Clamp(height, Math.Max(1, minHeight), MaxCanvasHeight));
+    }
+
+    public static SizeF Screen(HudWidgetConfig c, SizeF fit, float minHeight) =>
+        c.ScreenHeight <= 0 || fit.Width <= 0 ? fit : new SizeF(fit.Width, Math.Clamp((float)c.ScreenHeight, Math.Max(1, minHeight), MaxCanvasHeight));
+
+    public static void SetHeight(HudWidgetConfig c, double height, double natural)
+    {
+        c.VrHeight = Math.Abs(height - natural) < AutoHeightReach ? 0 : height;
+        c.Clamp();
+    }
+
     public static void PlaceFromScreen(HudWidgetConfig w, RectangleF widget, RectangleF monitor)
     {
         var spot = FromScreen(widget, monitor);

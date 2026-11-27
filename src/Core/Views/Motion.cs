@@ -282,6 +282,13 @@ internal interface IShowAnchor
     void ShowAnchor(DependencyObject target);
 }
 
+internal interface IFullWidthPage { }
+
+internal interface ITitleTools
+{
+    FrameworkElement TitleTools { get; }
+}
+
 internal interface IPageHistory
 {
     object? HistoryState { get; }

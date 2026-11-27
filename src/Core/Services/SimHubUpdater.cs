@@ -59,7 +59,7 @@ internal sealed class SimHubUpdater
         string? scratch = null;
         try
         {
-            var latest = UpdateService.Newest(await UpdateService.Http.GetStringAsync(UpdateService.ReleasesApi));
+            var latest = UpdateService.Newest(await UpdateService.ReleasesJsonAsync());
             if (latest is null || latest.Version <= UpdateService.Current)
             {
                 result = SimHubUpdateState.UpToDate;

@@ -1,8 +1,17 @@
 <Project>
 
-  <!-- One version for Core, Tecnica and Velocita; it changes only on a release and equals the tag (v1.4 = 1.4.0). -->
+  <!-- Each app has its own version; it changes only when that app is released and equals the tag on its repository (v1.4 = 1.4.0).
+       Velocita for SimHub uses Velocita's. The running app reads the version of its own exe. -->
   <PropertyGroup>
-    <Version>4.4.10</Version>
+    <TecnicaVersion>4.4.11</TecnicaVersion>
+    <VelocitaVersion>4.4.11</VelocitaVersion>
+    <LivreaVersion>4.4.10</LivreaVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Version>$(VelocitaVersion)</Version>
+    <Version Condition="'$(MSBuildProjectName)' == 'Tecnica'">$(TecnicaVersion)</Version>
+    <Version Condition="'$(MSBuildProjectName)' == 'Livrea'">$(LivreaVersion)</Version>
   </PropertyGroup>
 
 </Project>

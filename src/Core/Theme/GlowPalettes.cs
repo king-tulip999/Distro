@@ -53,4 +53,13 @@ internal static class GlowPalettes
         ("Meter1", "#DB156B"), ("Meter2", "#DB156B"), ("Meter3", "#DB156B"),
         ("GraphText", "#FF9CC4"), ("GraphSoft", "#310920"), ("ScrollThumbBrushDrag", "#AB1053"),
         ("BgGlow", "#150A10"));
+
+    public static readonly IReadOnlyDictionary<string, Color> Livrea = With(Shared(),
+        ("Accent", "#9B5CFF"), ("AccentHover", "#AB77FF"), ("AccentPressed", "#7A47CC"), ("AccentEdge", "#9B5CFF"),
+        ("AccentSoft", "#21143A"), ("AccentText", "#C19BFF"),
+        ("Hover", "#1D1D24"), ("HoverRaised", "#2A2A33"),
+        ("Slate", "#49C8F5"), ("SlateSoft", "#162637"), ("SlateDeep", "#8ADCFA"), ("FocusEdge", "#C19BFF"),
+        ("Meter1", "#9B5CFF"), ("Meter2", "#9B5CFF"), ("Meter3", "#9B5CFF"),
+        ("GraphText", "#D4BAFF"), ("GraphSoft", "#1E1236"), ("ScrollThumbBrushDrag", "#7A47CC"),
+        ("BgGlow", "#100A18"));
 }

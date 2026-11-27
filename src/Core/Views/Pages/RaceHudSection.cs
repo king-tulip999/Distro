@@ -492,7 +492,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, IHudEditor
         {
             var tags = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
             bool folded = !_carsOpen && entries.Count > CarsFolded;
-            foreach (var (text, remove) in folded ? entries.Take(CarsFolded - 1) : entries) tags.Children.Add(Tag(text, remove));
+            foreach (var (text, remove) in folded ? entries.Take(CarsFolded - 1) : entries) tags.Children.Add(CarTag(text, remove));
             if (entries.Count > CarsFolded)
             {
                 var more = Ui.LabeledButton(_carsOpen ? "I.ChevronUp" : "I.ChevronDown",
@@ -577,7 +577,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, IHudEditor
         _ = _window.ShowModal(dialog);
     }
 
-    private FrameworkElement Tag(string label, Action removeIt)
+    private FrameworkElement CarTag(string label, Action removeIt)
     {
         var text = TextFit.TipWhenTrimmed(new TextBlock { Text = label, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 260 });
         var remove = Ui.IconButton("I.X", $"Stop using this layout for {label}", () =>
@@ -814,7 +814,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, IHudEditor
             adminRow);
         var move = Group("Move every cockpit widget", null,
             Shift("Sideways", "Right is positive.", HudWidgetConfig.VrReach, S.VrShiftX, v => S.VrShiftX = v),
-            Shift("Height", "Up is positive.", HudWidgetConfig.VrReach, S.VrShiftY, v => S.VrShiftY = v),
+            Shift("Up / down", "Up is positive.", HudWidgetConfig.VrReach, S.VrShiftY, v => S.VrShiftY = v),
             Shift("Distance", "Further is positive.", RaceHudSettings.MaxVrShiftDistance, S.VrShiftDistance, v => S.VrShiftDistance = v),
             Recenter(),
             new TextBlock

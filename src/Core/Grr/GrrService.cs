@@ -5,7 +5,7 @@ using Core.Config;
 
 namespace Core.Grr;
 
-internal sealed class GrrService
+internal sealed partial class GrrService
 {
     public static readonly TimeSpan RefreshEvery = TimeSpan.FromHours(6);
     public static readonly TimeSpan RaceLength = TimeSpan.FromHours(2);
@@ -31,11 +31,13 @@ internal sealed class GrrService
         _demo = demo;
         _timer.Tick += (_, _) => _ = RefreshIfStaleAsync();
         if (!demo) return;
-        foreach (var league in GrrDemo.Leagues(DateTime.Now)) _data[league.League] = league;
+        FillDemo();
         foreach (var l in GrrLeagues.All) _fetched[l.Id] = DateTime.Now.AddMinutes(-4);
         Races = BuildRaces();
         _load = Task.CompletedTask;
     }
+
+    partial void FillDemo();
 
     public IReadOnlyList<GrrRace> Races { get; private set; } = new List<GrrRace>();
 

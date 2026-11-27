@@ -4089,15 +4089,6 @@
     "kind": "setting"
   },
   {
-    "title": "Livery Shop page",
-    "page": "settings",
-    "section": "general",
-    "anchor": "settings.livery",
-    "tabs": [],
-    "where": "Settings \u203A General",
-    "kind": "setting"
-  },
-  {
     "title": "Sim Racing Tools page",
     "page": "settings",
     "section": "general",

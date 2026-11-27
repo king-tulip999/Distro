@@ -7,7 +7,7 @@ using Core.SimRacing.Telemetry;
 
 namespace Core.SessionStats;
 
-internal sealed class SessionStatsService : IDisposable
+internal sealed partial class SessionStatsService : IDisposable
 {
     private const string Consumer = "Session stats";
     private readonly AppServices _app;
@@ -124,6 +124,8 @@ internal sealed class SessionStatsService : IDisposable
 
     private string? _failure;
 
+    static partial void FillDemo(StatsStore store);
+
     private void Open(bool demo)
     {
         try
@@ -131,7 +133,7 @@ internal sealed class SessionStatsService : IDisposable
             var store = _store = StatsStore.Open(demo ? ":memory:" : StatsStore.DefaultPath);
             try { store.Traces = _traces = TraceStore.Open(demo ? ":memory:" : TraceStore.DefaultPath); }
             catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException) { App.LogError(ex); }
-            if (demo) StatsDemo.Fill(store);
+            if (demo) FillDemo(store);
             RaceHistory.Use(store);
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or InvalidOperationException or IOException or UnauthorizedAccessException)

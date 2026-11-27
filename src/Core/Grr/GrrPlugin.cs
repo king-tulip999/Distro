@@ -7,7 +7,7 @@ using Core.Views;
 
 namespace Core.Grr;
 
-internal sealed class GrrPlugin : Plugin
+internal sealed partial class GrrPlugin : Plugin
 {
     public const string PluginId = "grr";
     public const string PageKey = "grr";
@@ -40,8 +40,14 @@ internal sealed class GrrPlugin : Plugin
         new("GRR League dashboard", "Your league's next race, championship standings, results and schedule from the GRR website, and your driver profile.", "GRR League", PageKey, GrrParts.Anchor, "grr league standings championship results schedule points driver profile cup gt indycar refresh"),
     };
 
-    public override IReadOnlyCollection<int>? IracingLeagueIds(AppServices app) =>
-        app.Demo && app.Config.Grr.IracingLeagueIds.Count == 0 ? new[] { SessionStats.StatsDemo.LeagueId } : app.Config.Grr.IracingLeagueIds.ToArray();
+    public override IReadOnlyCollection<int>? IracingLeagueIds(AppServices app)
+    {
+        int demoLeague = 0;
+        if (app.Demo && app.Config.Grr.IracingLeagueIds.Count == 0) DemoLeague(ref demoLeague);
+        return demoLeague != 0 ? new[] { demoLeague } : app.Config.Grr.IracingLeagueIds.ToArray();
+    }
+
+    static partial void DemoLeague(ref int id);
 
     private GrrService? _service;
 

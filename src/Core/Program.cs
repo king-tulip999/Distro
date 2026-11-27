@@ -18,11 +18,17 @@ internal static class Program
     public static void Run(AppKind kind, string[] args)
     {
         AppIdentity.Use(kind);
+        if (kind == AppKind.Livrea && args.Length == 4 && args[0] == "--pack-models")
+            Environment.Exit(LiveryShop.CarModels.PackFolder(args[1], args[2], WriterFor(args[3])));
+        if (kind == AppKind.Livrea && args.Length == 3 && args[0] == "--pack-room")
+            Environment.Exit(LiveryShop.CarModels.PackRoom(args[1], args[2], Console.Out));
         if (StartedProtected(args)) return;
-        if (kind != AppKind.Tecnica && SimRacing.Hud.Vr.OpenXrLayer.RunMachineStep(args) is int code) Environment.Exit(code);
-        if (kind != AppKind.Tecnica && SimRacing.Hud.Vr.OpenXrLayer.RunCleanupStep(args)) return;
+        if (kind == AppKind.Velocita && SimRacing.Hud.Vr.OpenXrLayer.RunMachineStep(args) is int code) Environment.Exit(code);
+        if (kind == AppKind.Velocita && SimRacing.Hud.Vr.OpenXrLayer.RunCleanupStep(args)) return;
         RunApp();
     }
+
+    private static StreamWriter WriterFor(string path) => new(path, append: false) { AutoFlush = true };
 
     public static void RunSimHub(string[] args)
     {
